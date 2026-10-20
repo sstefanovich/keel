@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a76a8"/>
+      <stop offset="1" stop-color="#123a5a"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#bg)"/>
+  <!-- sail -->
+  <path d="M520 150 L520 470 L760 470 Z" fill="#ffffff" opacity="0.92"/>
+  <path d="M490 220 L490 470 L320 470 Z" fill="#ffffff" opacity="0.7"/>
+  <!-- hull -->
+  <path d="M190 520 H834 L748 690 Q726 730 680 730 H344 Q298 730 276 690 Z" fill="#ffffff"/>
+  <!-- keel -->
+  <path d="M470 728 H554 L534 872 Q512 900 490 872 Z" fill="#ffffff"/>
+  <!-- waterline -->
+  <path d="M150 790 Q250 760 350 790 T550 790 T750 790 T880 790" stroke="#8fd0f5" stroke-width="22" fill="none" stroke-linecap="round" opacity="0.8"/>
+</svg>

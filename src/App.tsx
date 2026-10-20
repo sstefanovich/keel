@@ -1,0 +1,202 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { parseCapture } from "./core/capture";
+import { today } from "./core/dates";
+import { Hold } from "./core/hold";
+import { hideWindow, loadSettings, onQuickCapture, openFs, saveSettings } from "./lib/platform";
+import { HoldProvider, useHold } from "./ui/HoldContext";
+import { PromptModal, PromptSpec, QuickCapture } from "./ui/Modals";
+import { Sidebar } from "./ui/Sidebar";
+import { Nav, NavCtx, View } from "./ui/nav";
+import { useReminders } from "./ui/useReminders";
+import { AgendaView } from "./ui/views/AgendaView";
+import { CalendarView } from "./ui/views/CalendarView";
+import { FileView } from "./ui/views/FileView";
+import { SearchView } from "./ui/views/SearchView";
+import { SettingsView } from "./ui/views/SettingsView";
+import { TimesheetView } from "./ui/views/TimesheetView";
+
+/** Editors listen for this and save immediately, so other writers never race unsaved typing. */
+export const FLUSH_EVENT = "keel-flush";
+
+export default function App() {
+  const [state, setState] = useState<{ hold: Hold; dir: string } | { error: string } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { fs, dir } = await openFs();
+      const hold = new Hold(fs);
+      await hold.init();
+      setState({ hold, dir });
+    })().catch((e) => setState({ error: e instanceof Error ? e.message : String(e) }));
+  }, []);
+
+  if (!state) return <div className="splash">Opening the hold…</div>;
+  if ("error" in state) {
+    return (
+      <div className="splash">
+        <div>
+          <h1>Couldn't open the hold</h1>
+          <p className="muted">{state.error}</p>
+          <button
+            onClick={() => {
+              saveSettings({ ...loadSettings(), holdDir: undefined });
+              window.location.reload();
+            }}
+          >
+            Use the default folder
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <HoldProvider hold={state.hold} dir={state.dir}>
+      <Shell />
+    </HoldProvider>
+  );
+}
+
+function Shell() {
+  const { hold, bump, reportError, toast } = useHold();
+  useReminders(hold);
+  const [view, setView] = useState<View>({ kind: "agenda" });
+  const [capture, setCapture] = useState<{ hideAfter: boolean } | null>(null);
+  const [prompt, setPrompt] = useState<PromptSpec | null>(null);
+
+  const openFile = useCallback((path: string, line?: number) => setView({ kind: "file", path, line }), []);
+
+  const openLog = useCallback(
+    async (date: string) => {
+      try {
+        const path = await hold.ensureLog(date);
+        bump();
+        openFile(path);
+      } catch (e) {
+        reportError(e);
+      }
+    },
+    [hold, bump, openFile, reportError],
+  );
+  const openToday = useCallback(() => openLog(today()), [openLog]);
+
+  const openLink = useCallback(
+    async (target: string) => {
+      const found = hold.resolveLink(target);
+      if (found) return openFile(found);
+      try {
+        const name = target.split("/").pop()!;
+        const folder = target.includes("/") ? target.split("/").slice(0, -1).join("/") : "notes";
+        const path = await hold.createNote(name, folder);
+        bump();
+        openFile(path);
+      } catch (e) {
+        reportError(e);
+      }
+    },
+    [hold, bump, openFile, reportError],
+  );
+
+  const startCapture = useCallback((hideAfter = false) => {
+    window.dispatchEvent(new Event(FLUSH_EVENT));
+    setCapture({ hideAfter });
+  }, []);
+
+  const submitCapture = async (text: string) => {
+    const c = parseCapture(text);
+    if (!c) return;
+    try {
+      const path = await hold.ensureLog(today());
+      await hold.appendTo(path, c.heading, c.line);
+      bump();
+      toast(c.kind === "hours" ? "Hours logged" : c.kind === "log" ? "Added to today's log" : c.kind === "reminder" ? "Reminder set" : "Task added");
+      const hide = capture?.hideAfter;
+      setCapture(null);
+      if (hide) await hideWindow();
+    } catch (e) {
+      reportError(e);
+    }
+  };
+
+  const newItem = useCallback(
+    (kind: "note" | "meeting" | "client") => {
+      const make = async (fn: () => Promise<string>) => {
+        try {
+          const path = await fn();
+          bump();
+          setPrompt(null);
+          openFile(path);
+        } catch (e) {
+          reportError(e);
+        }
+      };
+      const specs: Record<typeof kind, PromptSpec> = {
+        note: { title: "New note", label: "Title", submitLabel: "Create", onSubmit: (v) => make(() => hold.createNote(v)) },
+        meeting: {
+          title: "New meeting",
+          label: "Meeting title",
+          placeholder: "Acme kickoff",
+          withDate: true,
+          submitLabel: "Create",
+          onSubmit: (v, d) => make(() => hold.createMeeting(v, d)),
+        },
+        client: {
+          title: "New client",
+          label: "Client name",
+          placeholder: "Acme Corp",
+          submitLabel: "Create",
+          onSubmit: (v) => make(() => hold.createClient(v)),
+        },
+      };
+      setPrompt(specs[kind]);
+    },
+    [hold, bump, openFile, reportError],
+  );
+
+  const nav: Nav = useMemo(
+    () => ({ view, go: setView, openFile, openToday, openLog, openLink, capture: () => startCapture(), newItem }),
+    [view, openFile, openToday, openLog, openLink, startCapture, newItem],
+  );
+
+  // start on today's log
+  useEffect(() => {
+    openToday();
+  }, [openToday]);
+
+  // global hotkey / tray → capture
+  useEffect(() => onQuickCapture((wasHidden) => startCapture(wasHidden)), [startCapture]);
+
+  // in-app shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      const act: Record<string, () => void> = e.shiftKey
+        ? { f: () => setView({ kind: "search" }), m: () => newItem("meeting") }
+        : { k: () => startCapture(), t: openToday, j: () => setView({ kind: "agenda" }), n: () => newItem("note") };
+      if (act[k]) {
+        e.preventDefault();
+        act[k]();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [startCapture, openToday, newItem]);
+
+  return (
+    <NavCtx.Provider value={nav}>
+      <div className="app">
+        <Sidebar />
+        <main className="main">
+          {view.kind === "file" && <FileView path={view.path} line={view.line} />}
+          {view.kind === "agenda" && <AgendaView />}
+          {view.kind === "timesheet" && <TimesheetView />}
+          {view.kind === "calendar" && <CalendarView />}
+          {view.kind === "search" && <SearchView initial={view.q} />}
+          {view.kind === "settings" && <SettingsView />}
+        </main>
+      </div>
+      {capture && <QuickCapture onSubmit={submitCapture} onClose={() => setCapture(null)} />}
+      {prompt && <PromptModal spec={prompt} onClose={() => setPrompt(null)} />}
+    </NavCtx.Provider>
+  );
+}
