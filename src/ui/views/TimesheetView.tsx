@@ -36,12 +36,12 @@ function money(n: number, currency: string) {
 }
 
 export function TimesheetView() {
-  const { hold, bump, reportError, toast } = useHold();
+  const { hold, bump, reportError, toast, focus } = useHold();
   const nav = useNav();
   const [preset, setPreset] = useState<Preset>("this-week");
   const [custom, setCustom] = useState<[ISODate, ISODate]>(() => rangeFor("this-month", today()));
   const [from, to] = preset === "custom" ? custom : rangeFor(preset, today());
-  const ts = hold.timesheet(from, to);
+  const ts = hold.timesheet(from, to, focus);
 
   const currencies = new Set(ts.byClient.filter((c) => c.client.rate).map((c) => c.client.currency));
   const billable = ts.byClient.reduce((s, c) => s + c.amount, 0);

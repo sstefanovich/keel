@@ -16,15 +16,16 @@ const KIND_LABEL = {
   reminder: "Reminder → today's log",
   log: "Log entry → today's log",
   flag: "Flag → pinned on the board",
+  waiting: "Waiting on → today's log",
 };
 
-export function QuickCapture({ onSubmit, onClose }: { onSubmit: (text: string) => Promise<void>; onClose: () => void }) {
+export function QuickCapture({ onSubmit, onClose, focus }: { onSubmit: (text: string) => Promise<void>; onClose: () => void; focus?: string }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   useEscape(onClose);
   useEffect(() => input.current?.focus(), []);
-  const parsed = parseCapture(text);
+  const parsed = parseCapture(text, undefined, focus);
 
   const submit = async () => {
     if (!parsed || busy) return;

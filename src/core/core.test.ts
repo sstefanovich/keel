@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { azureContext, azurePortalUrl } from "./azure";
 import { parseCapture } from "./capture";
-import { parseTime } from "./dates";
+import { buildReport, reportHtml, reportMarkdown } from "./report";
+import { parseTime, today } from "./dates";
 import { MemoryFs } from "./fs";
 import { Hold } from "./hold";
 import { appendToSection, parseFile, replaceBody, setFrontmatterField, setTaskChar } from "./parse";
@@ -199,6 +201,58 @@ Intro paragraph with no bullets.
   });
 });
 
+describe("snippets", () => {
+  it("collects fenced blocks on charts with the line above as title", () => {
+    const f = parseFile(
+      "clients/acme.md",
+      "# Acme\n## CLI\nLog in to the tenant:\n```bash\naz login --tenant acme.onmicrosoft.com\n```\n\n```\nno title\n```\n## Diagram\n```mermaid\ngraph TD; A-->B\n```\n",
+    );
+    expect(f.snippets.map((s) => [s.section, s.lang, s.title, s.code])).toEqual([
+      ["CLI", "bash", "Log in to the tenant", "az login --tenant acme.onmicrosoft.com"],
+      ["CLI", "", undefined, "no title"],
+      ["Diagram", "mermaid", undefined, "graph TD; A-->B"],
+    ]);
+    expect(f.chart).toEqual([]);
+    expect(parseFile("notes/x.md", "```bash\nls\n```\n").snippets).toEqual([]);
+  });
+});
+
+describe("azure links", () => {
+  const f = parseFile(
+    "clients/acme.md",
+    `# Acme
+## Azure
+- Tenant: acme.onmicrosoft.com
+- Subscription: Prod (11111111-2222-3333-4444-555555555555)
+- Resource group: \`rg-acme-prod\`
+- Subscription: Dev (aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)
+- Resource group: rg-acme-dev
+- Key vault: /subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/rg-acme-prod/providers/Microsoft.KeyVault/vaults/kv-acme
+- Server: vm-01
+`,
+  );
+  const url = (value: string) => {
+    const item = f.chart.find((i) => i.value.startsWith(value))!;
+    return azurePortalUrl(item, azureContext(f.chart, item.line));
+  };
+  it("links resource groups using the nearest subscription above", () => {
+    expect(url("rg-acme-prod")).toBe(
+      "https://portal.azure.com/#@acme.onmicrosoft.com/resource/subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/rg-acme-prod/overview",
+    );
+    expect(url("rg-acme-dev")).toContain("/subscriptions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/resourceGroups/rg-acme-dev/");
+  });
+  it("links full resource IDs and ignores everything else", () => {
+    expect(url("/subscriptions/")).toBe(
+      "https://portal.azure.com/#@acme.onmicrosoft.com/resource/subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/rg-acme-prod/providers/Microsoft.KeyVault/vaults/kv-acme",
+    );
+    expect(url("vm-01")).toBeUndefined();
+  });
+  it("falls back to the parent client's subscription", () => {
+    const p = parseFile("projects/x.md", "## Azure\n- Resource group: rg-x\n");
+    expect(azurePortalUrl(p.chart[0], azureContext(p.chart, p.chart[0].line, f.chart))).toContain("11111111-2222-3333-4444-555555555555/resourceGroups/rg-x");
+  });
+});
+
 describe("frontmatter editing", () => {
   it("sets, replaces and removes keys without touching the body", () => {
     const c = "---\ncolor: yellow\ncreated: 2026-10-20\n---\nCall Sam\n";
@@ -237,9 +291,23 @@ describe("parseCapture", () => {
     ["flag renew TLS cert", "", "renew TLS cert"],
     ["! call Sam", "", "call Sam"],
     ["flagship release notes", "Log", "- 10:05 flagship release notes"],
+    ["wait Jordan: firewall rules", "Tasks", "- [ ] firewall rules @waiting(Jordan)"],
+    ["waiting on Priya Shah: signed SOW", "Tasks", "- [ ] signed SOW @waiting(Priya Shah)"],
   ])("%s", (input, heading, line) => {
     expect(parseCapture(input, now)).toMatchObject({ heading, line });
   });
+});
+
+describe("parseCapture with a focused client", () => {
+  const now = new Date(2026, 9, 19, 10, 5);
+  it.each([
+    ["2h fixed login", "- 2h @acme fixed login"],
+    ["2h @globex other client", "- 2h @globex other client"],
+    ["todo review PR", "- [ ] review PR #acme"],
+    ["todo review PR #acme/portal", "- [ ] review PR #acme/portal"],
+    ["wait Jordan: rules", "- [ ] rules #acme @waiting(Jordan)"],
+    ["a thought", "- 10:05 a thought"],
+  ])("%s", (input, line) => expect(parseCapture(input, now, "acme")?.line).toBe(line));
 });
 
 describe("Hold", () => {
@@ -271,6 +339,20 @@ describe("Hold", () => {
     expect(hold.get(path)!.tasks).toHaveLength(1);
   });
 
+  it("carries tasks into today's log even if it was created early by browsing ahead", async () => {
+    const hold = await makeHold({
+      "logs/2026/2026-10-20.md": "---\ndate: 2026-10-20\n---\n## Tasks\n- [ ] finish deck\n",
+    });
+    await hold.ensureLog("2026-10-21", "2026-10-20"); // browsing to tomorrow: created, nothing carried
+    expect(hold.get("logs/2026/2026-10-21.md")!.tasks).toEqual([]);
+    expect(hold.get("logs/2026/2026-10-20.md")!.tasks[0].status).toBe("open");
+    await hold.ensureLog("2026-10-21", "2026-10-21"); // the next morning
+    expect(hold.get("logs/2026/2026-10-21.md")!.tasks.map((t) => t.text)).toEqual(["finish deck"]);
+    expect(hold.get("logs/2026/2026-10-20.md")!.tasks[0].status).toBe("migrated");
+    await hold.ensureLog("2026-10-21", "2026-10-21"); // opening again moves nothing twice
+    expect(hold.get("logs/2026/2026-10-21.md")!.tasks).toHaveLength(1);
+  });
+
   it("concurrent ensureLog calls migrate once", async () => {
     const hold = await makeHold({
       "logs/2026/2026-10-16.md": "---\ndate: 2026-10-16\n---\n## Tasks\n- [ ] carry me\n",
@@ -293,7 +375,10 @@ describe("Hold", () => {
   it("toggles a task on disk", async () => {
     const hold = await makeHold({ "notes/a.md": "# A\n- [ ] one\n" });
     await hold.setTaskStatus(hold.get("notes/a.md")!.tasks[0], "done");
-    expect(await hold.fs.read("notes/a.md")).toBe("# A\n- [x] one\n");
+    expect(await hold.fs.read("notes/a.md")).toBe(`# A\n- [x] one @done(${today()})\n`);
+    expect(hold.get("notes/a.md")!.tasks[0].doneOn).toBe(today());
+    await hold.setTaskStatus(hold.get("notes/a.md")!.tasks[0], "open");
+    expect(await hold.fs.read("notes/a.md")).toBe("# A\n- [ ] one\n");
   });
 
   it("totals a timesheet with client rates", async () => {
@@ -307,7 +392,82 @@ describe("Hold", () => {
       ["Acme Corp", 4, 400],
       ["globex", 0.75, 0],
     ]);
-    expect(hold.timesheetCsv(ts).split("\r\n")[1]).toBe("2026-10-19,acme,2.5,100,250,API refactor,logs/2026/2026-10-19.md");
+    expect(hold.timesheetCsv(ts).split("\r\n")[1]).toBe("2026-10-19,acme,,2.5,100,250,API refactor,logs/2026/2026-10-19.md");
+  });
+
+  it("rolls project hours up to their client", async () => {
+    const hold = await makeHold({
+      "clients/acme.md": "---\nrate: 100\n---\n# Acme\n",
+      "projects/Portal rebuild.md": "---\nclient: acme\n---\n# Portal rebuild\n",
+      "logs/2026/2026-10-19.md": "---\ndate: 2026-10-19\n---\n- 2h @acme/portal-rebuild api\n- 1h @portal-rebuild review\n- 1h @acme admin\n- 3h @globex other\n",
+    });
+    const ts = hold.timesheet("2026-10-19", "2026-10-19", "acme");
+    expect(ts.totalHours).toBe(4);
+    expect(ts.byClient[0].amount).toBe(400);
+    expect(ts.byClient[0].byProject).toEqual([
+      { key: "portal-rebuild", name: "Portal rebuild", hours: 3 },
+      { key: "", name: "", hours: 1 },
+    ]);
+  });
+
+  it("attributes tasks to clients by file or tag, and lists waiting items", async () => {
+    const hold = await makeHold({
+      "clients/acme.md": "# Acme\n- [ ] in client file\n",
+      "projects/Portal.md": "---\nclient: acme\n---\n- [ ] Jordan: firewall rules @waiting\n",
+      "meetings/2026-10-19 Sync.md": "---\nclient: globex\ndate: 2026-10-19\n---\n- [ ] send deck @waiting(Priya)\n",
+      "logs/2026/2026-10-19.md": "---\ndate: 2026-10-19\n---\n- [ ] tagged #acme\n- [ ] project tag #portal\n- [ ] untagged\n",
+    });
+    const owner = (text: string) => hold.taskClient(hold.tasks().find((t) => t.text.startsWith(text))!);
+    expect(owner("in client file")).toBe("acme");
+    expect(owner("tagged")).toBe("acme");
+    expect(owner("project tag")).toBe("acme");
+    expect(owner("send deck")).toBe("globex");
+    expect(owner("untagged")).toBeUndefined();
+    expect(hold.waitingOn().map((t) => [t.waiting, t.text])).toEqual(
+      expect.arrayContaining([["Jordan", "Jordan: firewall rules"], ["Priya", "send deck"]]),
+    );
+    expect(hold.waitingOn("acme").map((t) => t.waiting)).toEqual(["Jordan"]);
+    // waiting items stay off the agenda; focus filters it
+    const a = hold.agenda("2026-10-19", 14, "acme");
+    expect([...a.today, ...a.open].map((t) => t.text).sort()).toEqual(["in client file", "project tag #portal", "tagged #acme"]);
+  });
+
+  it("builds a client status report", async () => {
+    const hold = await makeHold({
+      "clients/acme.md": "---\nname: Acme Corp\nrate: 100\n---\n# Acme\n",
+      "projects/Portal.md": "---\nclient: acme\n---\n# Portal\n- [ ] API gateway design @due(2026-10-28)\n- [ ] Jordan: firewall rules @waiting @since(2026-10-14)\n",
+      "meetings/2026-10-20 Design review.md": "---\nclient: acme\ndate: 2026-10-20\n---\n# Design review\n- [x] agree auth approach\n",
+      "logs/2026/2026-10-19.md":
+        "---\ndate: 2026-10-19\n---\n- [x] wrote ADR #acme @done(2026-10-19)\n- [ ] cost model #acme\n- [x] other client #globex\n- 3h @acme/portal design\n- 1h @acme admin\n",
+      "logs/2026/2026-10-12.md": "---\ndate: 2026-10-12\n---\n- [x] last week #acme\n",
+    });
+    const r = buildReport(hold, "acme", "2026-10-19", "2026-10-25", "2026-10-25");
+    expect(r.completed.map((t) => t.text)).toEqual(expect.arrayContaining(["agree auth approach", "wrote ADR #acme"]));
+    expect(r.completed).toHaveLength(2);
+    expect(r.meetings.map((m) => m.title)).toEqual(["Design review"]);
+    expect(r.inProgress.map((t) => t.text)).toEqual(["cost model #acme"]);
+    expect(r.upcoming.map((t) => t.text)).toEqual(["API gateway design"]);
+    expect(r.waiting.map((t) => t.waiting)).toEqual(["Jordan"]);
+    const md = reportMarkdown(r);
+    expect(md).toContain("# Acme Corp: status update");
+    expect(md).toContain("- Portal: 3h\n- General: 1h\n- **Total: 4h**");
+    expect(md).toContain("- wrote ADR\n");
+    expect(md).toContain("- **Jordan**: firewall rules (11 days)");
+    expect(md).toContain("- Wed, Oct 28: API gateway design");
+    expect(reportMarkdown(r, { includeHours: false })).not.toContain("## Time");
+    // mid-week: waiting time counts to today, not to the end of the week
+    expect(reportMarkdown(buildReport(hold, "acme", "2026-10-19", "2026-10-25", "2026-10-20"))).toContain("firewall rules (6 days)");
+    expect(reportHtml(r)).toContain("<li><b>Jordan</b>: firewall rules (11 days)</li>");
+  });
+
+  it("keeps a waiting item's original date when it rolls over", async () => {
+    const hold = await makeHold({
+      "logs/2026/2026-10-16.md": "---\ndate: 2026-10-16\n---\n## Tasks\n- [ ] specs @waiting(Sam)\n- [ ] normal\n",
+    });
+    await hold.ensureLog("2026-10-19", "2026-10-19");
+    const moved = hold.get("logs/2026/2026-10-19.md")!.tasks;
+    expect(moved.map((t) => t.raw)).toEqual(["- [ ] specs @waiting(Sam) @since(2026-10-16)", "- [ ] normal"]);
+    expect(moved[0].since).toBe("2026-10-16");
   });
 
   it("resolves links and backlinks", async () => {

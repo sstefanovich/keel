@@ -8,7 +8,9 @@ import { PromptModal, PromptSpec, QuickCapture } from "./ui/Modals";
 import { Sidebar } from "./ui/Sidebar";
 import { Nav, NavCtx, NewKind, View } from "./ui/nav";
 import { ChartsView } from "./ui/views/ChartsView";
+import { DispatchView } from "./ui/views/DispatchView";
 import { FlagsView } from "./ui/views/FlagsView";
+import { WaitingView } from "./ui/views/WaitingView";
 import { useReminders } from "./ui/useReminders";
 import { AgendaView } from "./ui/views/AgendaView";
 import { CalendarView } from "./ui/views/CalendarView";
@@ -59,7 +61,7 @@ export default function App() {
 }
 
 function Shell() {
-  const { hold, bump, reportError, toast } = useHold();
+  const { hold, bump, reportError, toast, focus } = useHold();
   useReminders(hold);
   const [view, setView] = useState<View>({ kind: "agenda" });
   const [capture, setCapture] = useState<{ hideAfter: boolean } | null>(null);
@@ -104,18 +106,18 @@ function Shell() {
   }, []);
 
   const submitCapture = async (text: string) => {
-    const c = parseCapture(text);
+    const c = parseCapture(text, undefined, focus);
     if (!c) return;
     try {
       if (c.kind === "flag") {
-        await hold.hoistFlag(c.line);
+        await hold.hoistFlag(c.line, "yellow", focus);
       } else {
         const path = await hold.ensureLog(today());
         await hold.appendTo(path, c.heading, c.line);
       }
       bump();
       toast(
-        { hours: "Hours logged", log: "Added to today's log", reminder: "Reminder set", task: "Task added", flag: "Flag hoisted" }[c.kind],
+        { hours: "Hours logged", log: "Added to today's log", reminder: "Reminder set", task: "Task added", flag: "Flag hoisted", waiting: "Added to waiting on" }[c.kind],
       );
       const hide = capture?.hideAfter;
       setCapture(null);
@@ -138,14 +140,14 @@ function Shell() {
         }
       };
       const specs: Record<typeof kind, PromptSpec> = {
-        note: { title: "New note", label: "Title", submitLabel: "Create", onSubmit: (v) => make(() => hold.createNote(v)) },
+        note: { title: "New note", label: "Title", submitLabel: "Create", onSubmit: (v) => make(() => hold.createNote(v, "notes", focus)) },
         meeting: {
           title: "New meeting",
           label: "Meeting title",
           placeholder: "Acme kickoff",
           withDate: true,
           submitLabel: "Create",
-          onSubmit: (v, d) => make(() => hold.createMeeting(v, d)),
+          onSubmit: (v, d) => make(() => hold.createMeeting(v, d, focus)),
         },
         client: {
           title: "New client",
@@ -172,7 +174,7 @@ function Shell() {
       };
       setPrompt(specs[kind]);
     },
-    [hold, bump, openFile, reportError],
+    [hold, bump, openFile, reportError, focus],
   );
 
   const nav: Nav = useMemo(
@@ -213,6 +215,8 @@ function Shell() {
           {view.kind === "file" && <FileView path={view.path} line={view.line} />}
           {view.kind === "agenda" && <AgendaView />}
           {view.kind === "flags" && <FlagsView />}
+          {view.kind === "waiting" && <WaitingView />}
+          {view.kind === "dispatch" && <DispatchView />}
           {view.kind === "charts" && <ChartsView />}
           {view.kind === "timesheet" && <TimesheetView />}
           {view.kind === "calendar" && <CalendarView />}
@@ -220,7 +224,7 @@ function Shell() {
           {view.kind === "settings" && <SettingsView />}
         </main>
       </div>
-      {capture && <QuickCapture onSubmit={submitCapture} onClose={() => setCapture(null)} />}
+      {capture && <QuickCapture onSubmit={submitCapture} onClose={() => setCapture(null)} focus={focus} />}
       {prompt && <PromptModal spec={prompt} onClose={() => setPrompt(null)} />}
     </NavCtx.Provider>
   );

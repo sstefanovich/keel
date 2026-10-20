@@ -40,10 +40,17 @@ export interface ClientTotal {
   client: Client;
   hours: number;
   amount: number;
+  /** Hours per project key ("" = not tied to a project) */
+  byProject: { key: string; name: string; hours: number }[];
+}
+
+/** An hours line with its @key resolved to client (+ project). */
+export interface TimesheetEntry extends HoursEntry {
+  project?: string;
 }
 
 export interface Timesheet {
-  entries: HoursEntry[];
+  entries: TimesheetEntry[];
   byClient: ClientTotal[];
   byDay: Map<ISODate, number>;
   totalHours: number;
@@ -164,41 +171,47 @@ export class Hold {
 
   private async createLog(date: ISODate, today: ISODate): Promise<string> {
     const path = this.logPath(date);
-    if (await this.fs.exists(path)) return path;
-    let content = fillTemplate(await this.template("log"), { date });
+    if (!(await this.fs.exists(path))) await this.save(path, fillTemplate(await this.template("log"), { date }));
+    // Runs on every open of today's log, not just creation, so a log made early
+    // (by browsing ahead) still receives the carry-over. Repeating it is harmless:
+    // carried tasks are marked [>] in the old log.
+    if (date === today) await this.carryOver(path, date);
+    return path;
+  }
 
-    if (date === today) {
-      const prev = this.all()
-        .filter((f) => f.kind === "log" && f.date && f.date < date)
-        .sort((a, b) => (a.date! < b.date! ? 1 : -1))[0];
-      const carry = prev?.tasks.filter((t) => t.status === "open" && t.indent === 0) ?? [];
-      if (prev && carry.length) {
-        const prevLines = (await this.fs.read(prev.path)).split(/\r?\n/);
-        const moved: string[] = [];
-        for (const t of carry) {
-          if (prevLines[t.line] !== t.raw) continue;
-          moved.push(t.raw);
-          prevLines[t.line] = setTaskChar(t.raw, "migrated");
-        }
-        if (moved.length) {
-          content = appendToSection(content, "Tasks", moved.join("\n"));
-          await this.save(prev.path, prevLines.join(prev.content.includes("\r\n") ? "\r\n" : "\n"));
-        }
-      }
+  /** Move open top-level tasks from the most recent earlier log into this one. */
+  private async carryOver(path: string, date: ISODate): Promise<void> {
+    const prev = this.all()
+      .filter((f) => f.kind === "log" && f.date && f.date < date)
+      .sort((a, b) => (a.date! < b.date! ? 1 : -1))[0];
+    const carry = prev?.tasks.filter((t) => t.status === "open" && t.indent === 0) ?? [];
+    if (!prev || !carry.length) return;
+    const prevLines = (await this.fs.read(prev.path)).split(/\r?\n/);
+    const moved: string[] = [];
+    for (const t of carry) {
+      if (prevLines[t.line] !== t.raw) continue;
+      // waiting items keep their original date so "days waiting" doesn't reset each morning
+      const keepDate = t.waiting !== undefined && !/@since\(/.test(t.raw) && t.since;
+      moved.push(keepDate ? `${t.raw} @since(${t.since})` : t.raw);
+      prevLines[t.line] = setTaskChar(t.raw, "migrated");
     }
-    await this.save(path, content);
-    return path;
+    if (!moved.length) return;
+    // write the new copies first: if anything fails, tasks are duplicated rather than lost
+    await this.appendTo(path, "Tasks", moved.join("\n"));
+    await this.save(prev.path, prevLines.join(prev.content.includes("\r\n") ? "\r\n" : "\n"));
   }
 
-  async createMeeting(title: string, date: ISODate = todayISO()): Promise<string> {
+  async createMeeting(title: string, date: ISODate = todayISO(), client?: string): Promise<string> {
     const path = await this.freePath("meetings", `${date} ${title}`);
-    await this.save(path, fillTemplate(await this.template("meeting"), { date, title }));
+    const content = fillTemplate(await this.template("meeting"), { date, title, client });
+    await this.save(path, client ? setFrontmatterField(content, "client", client) : content);
     return path;
   }
 
-  async createNote(title: string, folder = "notes"): Promise<string> {
+  async createNote(title: string, folder = "notes", client?: string): Promise<string> {
     const path = await this.freePath(folder, title);
-    await this.save(path, fillTemplate(await this.template("note"), { date: todayISO(), title }));
+    const content = fillTemplate(await this.template("note"), { date: todayISO(), title, client });
+    await this.save(path, client ? setFrontmatterField(content, "client", client) : content);
     return path;
   }
 
@@ -224,11 +237,12 @@ export class Hold {
   }
 
   /** Every Chart item across clients and projects matching a query (label, value, section or file title). */
-  chartSearch(query: string, limit = 200): { item: ChartItem; file: ParsedFile }[] {
+  chartSearch(query: string, client?: string, limit = 200): { item: ChartItem; file: ParsedFile }[] {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
     if (!words.length) return [];
     const out: { item: ChartItem; file: ParsedFile }[] = [];
     for (const file of this.all()) {
+      if (client && this.fileClient(file) !== client) continue;
       for (const item of file.chart) {
         const hay = `${item.label ?? ""} ${item.value} ${item.section} ${file.title}`.toLowerCase();
         if (words.every((w) => hay.includes(w))) out.push({ item, file });
@@ -240,10 +254,10 @@ export class Hold {
 
   // ---------- flags ----------
 
-  /** Flags still flying (not lowered), oldest first. */
-  flags(): ParsedFile[] {
+  /** Flags still flying (not lowered), oldest first. With a client: that client's flags plus unassigned ones. */
+  flags(client?: string): ParsedFile[] {
     return this.all()
-      .filter((f) => f.kind === "flag" && !f.frontmatter.lowered)
+      .filter((f) => f.kind === "flag" && !f.frontmatter.lowered && (!client || !this.fileClient(f) || this.fileClient(f) === client))
       .sort((a, b) => String(a.frontmatter.created ?? "").localeCompare(String(b.frontmatter.created ?? "")) || a.mtime - b.mtime);
   }
 
@@ -253,11 +267,12 @@ export class Hold {
       .sort((a, b) => String(b.frontmatter.lowered).localeCompare(String(a.frontmatter.lowered)));
   }
 
-  async hoistFlag(text: string, color: FlagColor = "yellow"): Promise<string> {
+  async hoistFlag(text: string, color: FlagColor = "yellow", client?: string): Promise<string> {
     const words = text.split(/\s+/).slice(0, 6).join(" ");
     const path = await this.freePath("flags", `${todayISO()} ${words}`);
     const created = `${todayISO()} ${hhmm(new Date())}`;
-    await this.save(path, `---\ncolor: ${color}\ncreated: ${created}\n---\n${text.trim()}\n`);
+    const clientLine = client ? `client: ${client}\n` : "";
+    await this.save(path, `---\ncolor: ${color}\ncreated: ${created}\n${clientLine}---\n${text.trim()}\n`);
     return path;
   }
 
@@ -281,8 +296,59 @@ export class Hold {
     const lines = content.split(/\r?\n/);
     let i = lines[task.line] === task.raw ? task.line : lines.indexOf(task.raw);
     if (i === -1) throw new Error("That task changed on disk; reopen the file and try again.");
-    lines[i] = setTaskChar(lines[i], status);
+    let line = setTaskChar(lines[i], status).replace(/\s*@done\(\d{4}-\d{2}-\d{2}\)/, "");
+    if (status === "done") line += ` @done(${todayISO()})`;
+    lines[i] = line;
     await this.save(task.file, lines.join(eol));
+  }
+
+  // ---------- client attribution ----------
+
+  /** A project by its key: the slug of its file name ("Portal rebuild.md" → "portal-rebuild"). */
+  projectByKey(key: string): ParsedFile | undefined {
+    return this.all().find((f) => f.kind === "project" && slugify(basename(f.path)) === key);
+  }
+
+  /** Which client a file belongs to: the client file itself, or a `client:` in frontmatter. */
+  fileClient(f: ParsedFile): string | undefined {
+    if (f.kind === "client") return basename(f.path).toLowerCase();
+    const c = typeof f.frontmatter.client === "string" ? f.frontmatter.client.trim().toLowerCase() : "";
+    return c || undefined;
+  }
+
+  /** A task's client: from its file, else a #tag naming a client or project. */
+  taskClient(t: Task): string | undefined {
+    const f = this.files.get(t.file);
+    const fromFile = f && this.fileClient(f);
+    if (fromFile) return fromFile;
+    const clients = this.clients();
+    for (const tag of t.tags) {
+      const root = tag.split("/")[0];
+      if (clients.has(root)) return root;
+      const p = this.projectByKey(root);
+      if (p) return this.fileClient(p);
+    }
+    return undefined;
+  }
+
+  /** "@contoso/portal", "@portal" (a project key) or "@contoso" → client and optional project key. */
+  resolveHours(key: string): { client: string; project?: string } {
+    const [c, p] = key.split("/");
+    if (p) return { client: c, project: p };
+    const proj = this.projectByKey(c);
+    if (proj) return { client: this.fileClient(proj) ?? c, project: c };
+    return { client: c };
+  }
+
+  projectName(key: string): string {
+    return this.projectByKey(key)?.title ?? key;
+  }
+
+  /** Open tasks marked @waiting, oldest first. */
+  waitingOn(client?: string): Task[] {
+    return this.tasks()
+      .filter((t) => t.status === "open" && t.waiting !== undefined && (!client || this.taskClient(t) === client))
+      .sort((a, b) => (a.since ?? "").localeCompare(b.since ?? ""));
   }
 
   // ---------- links ----------
@@ -329,8 +395,11 @@ export class Hold {
     return out;
   }
 
-  agenda(today: ISODate = todayISO(), horizonDays = 14): Agenda {
-    const open = this.tasks().filter((t) => t.status === "open");
+  /** Waiting items live on their own list, so the agenda leaves them out unless they have a due date. */
+  agenda(today: ISODate = todayISO(), horizonDays = 14, client?: string): Agenda {
+    const open = this.tasks().filter(
+      (t) => t.status === "open" && (t.waiting === undefined || t.due) && (!client || this.taskClient(t) === client),
+    );
     const todayLog = this.logPath(today);
     const horizon = addDays(today, horizonDays);
     const byDue = (a: Task, b: Task) => (a.due! < b.due! ? -1 : a.due! > b.due! ? 1 : 0);
@@ -353,22 +422,35 @@ export class Hold {
       .sort((a, b) => (a.rule.time < b.rule.time ? -1 : a.rule.time > b.rule.time ? 1 : 0));
   }
 
-  timesheet(from: ISODate, to: ISODate): Timesheet {
+  timesheet(from: ISODate, to: ISODate, onlyClient?: string): Timesheet {
     const clients = this.clients();
-    const entries = this.all()
+    const entries: TimesheetEntry[] = this.all()
       .flatMap((f) => f.hours)
       .filter((h) => h.date >= from && h.date <= to)
+      .map((h) => {
+        const r = this.resolveHours(h.client);
+        return { ...h, client: r.client, project: r.project };
+      })
+      .filter((e) => !onlyClient || e.client === onlyClient)
       .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.line - b.line));
     const totals = new Map<string, ClientTotal>();
     const byDay = new Map<ISODate, number>();
     for (const e of entries) {
       const client = clients.get(e.client) ?? { key: e.client, name: e.client, rate: 0, currency: "USD" };
-      const t = totals.get(e.client) ?? { client, hours: 0, amount: 0 };
+      const t = totals.get(e.client) ?? { client, hours: 0, amount: 0, byProject: [] };
       t.hours += e.hours;
       t.amount += e.hours * client.rate;
+      const pk = e.project ?? "";
+      let p = t.byProject.find((x) => x.key === pk);
+      if (!p) {
+        p = { key: pk, name: pk ? this.projectName(pk) : "", hours: 0 };
+        t.byProject.push(p);
+      }
+      p.hours += e.hours;
       totals.set(e.client, t);
       byDay.set(e.date, (byDay.get(e.date) ?? 0) + e.hours);
     }
+    for (const t of totals.values()) t.byProject.sort((a, b) => b.hours - a.hours);
     return {
       entries,
       byClient: [...totals.values()].sort((a, b) => b.hours - a.hours),
@@ -380,11 +462,11 @@ export class Hold {
   timesheetCsv(ts: Timesheet): string {
     const clients = this.clients();
     const q = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
-    const rows = [["date", "client", "hours", "rate", "amount", "description", "file"].join(",")];
+    const rows = [["date", "client", "project", "hours", "rate", "amount", "description", "file"].join(",")];
     for (const e of ts.entries) {
       const rate = clients.get(e.client)?.rate ?? 0;
       rows.push(
-        [e.date, q(e.client), round2(e.hours), rate, round2(e.hours * rate), q(e.description), q(e.file)].join(","),
+        [e.date, q(e.client), q(e.project ? this.projectName(e.project) : ""), round2(e.hours), rate, round2(e.hours * rate), q(e.description), q(e.file)].join(","),
       );
     }
     return rows.join("\r\n") + "\r\n";

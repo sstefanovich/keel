@@ -15,12 +15,18 @@ function highlight(text: string, q: string) {
 }
 
 export function SearchView({ initial = "" }: { initial?: string }) {
-  const { hold } = useHold();
+  const { hold, focus } = useHold();
   const nav = useNav();
   const [q, setQ] = useState(initial);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
-  const hits = hold.search(q);
+  // with a focused client: its files, plus lines elsewhere that mention it (#acme / @acme)
+  const mention = focus ? new RegExp(`[#@]${focus}(\\b|/)`, "i") : null;
+  const hits = hold.search(q).filter((h) => {
+    if (!focus) return true;
+    const f = hold.get(h.path);
+    return (f && hold.fileClient(f) === focus) || mention!.test(h.snippet);
+  });
 
   const groups = new Map<string, typeof hits>();
   for (const h of hits) groups.set(h.path, [...(groups.get(h.path) ?? []), h]);

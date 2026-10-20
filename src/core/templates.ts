@@ -120,6 +120,39 @@ copy button, grouped by its \`##\` heading:
 
 A project names its client in frontmatter (\`client: acme\`) and appears on that client's Chart.
 
+Code blocks on a Chart get a copy button, and the line above becomes the title:
+
+    Log in to the tenant:
+    \`\`\`bash
+    az login --tenant acme.onmicrosoft.com
+    \`\`\`
+
+**Azure:** add \`- Tenant: acme.onmicrosoft.com\` and \`- Subscription: Prod (<subscription-guid>)\` to a
+Chart, and every \`- Resource group: rg-…\` (or full \`/subscriptions/…\` resource ID) gets a **Portal ↗**
+button. Projects use their client's tenant and subscription unless they list their own.
+
+## Hours per project
+\`- 2h @acme/portal-rebuild API work\` (or just \`@portal-rebuild\`) counts toward the project
+*and* rolls up to the client in the Timesheet and in Dispatch.
+
+## Waiting on
+\`- [ ] firewall rules @waiting(Jordan)\` puts the item on the **Waiting on** list, grouped by person,
+with how long it's been. Quick capture: \`wait Jordan: firewall rules\`.
+
+## Which client does something belong to?
+Anything in a client or project file, or in a meeting or note with \`client: acme\` in its frontmatter,
+or tagged \`#acme\` (or \`#portal-rebuild\`). **Focus** (top of the sidebar) narrows the Agenda, Flags,
+Charts, Waiting on, Timesheet and Search to one client. While focused, quick capture adds the
+client for you (\`2h fixed bug\` → \`- 2h @acme fixed bug\`).
+
+## Dispatch (status reports)
+**Dispatch** builds a client status update for a week: hours by project, what you completed,
+meetings, what's in progress, what you're waiting on, and what's due next. Copy it for an email,
+or save it as a note. Ticking a task stamps \`@done(date)\` so the report knows when it finished.
+
+## Diagrams
+A \`\`\`mermaid code block renders as a diagram right under it, in any note.
+
 ## Flags
 A **Flag** is a sticky note that stays pinned on Today and the Agenda until you lower it.
 Hoist one from the Flags board, or with quick capture: \`flag renew the TLS cert\`.

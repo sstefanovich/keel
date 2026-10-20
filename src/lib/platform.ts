@@ -152,6 +152,20 @@ export async function copyText(text: string) {
   }
 }
 
+/** Copy formatted HTML (for Outlook/Teams) with a plain-text alternative. */
+export async function copyRich(html: string, plain: string) {
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([plain], { type: "text/plain" }),
+      }),
+    ]);
+  } catch {
+    await copyText(plain);
+  }
+}
+
 // ---------- autostart ----------
 
 export async function getAutostart(): Promise<boolean> {

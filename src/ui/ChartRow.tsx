@@ -3,7 +3,7 @@ import { copyText, openUrl } from "../lib/platform";
 import { useHold } from "./HoldContext";
 
 /** One reference row: label, value (click to copy), open button for URLs. */
-export function ChartRow({ item, context, onContext }: { item: ChartItem; context?: string; onContext?: () => void }) {
+export function ChartRow({ item, context, onContext, portalUrl }: { item: ChartItem; context?: string; onContext?: () => void; portalUrl?: string }) {
   const { toast, reportError } = useHold();
   const copy = async () => {
     await copyText(item.value);
@@ -18,6 +18,11 @@ export function ChartRow({ item, context, onContext }: { item: ChartItem; contex
       {context && (
         <button className="link small chart-context" onClick={onContext}>
           {context}
+        </button>
+      )}
+      {portalUrl && (
+        <button className="portal-btn small" onClick={() => openUrl(portalUrl).catch(reportError)} title={`Open in the Azure portal\n${portalUrl}`}>
+          Portal ↗
         </button>
       )}
       <span className="chart-actions">

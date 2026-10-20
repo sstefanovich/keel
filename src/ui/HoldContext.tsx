@@ -9,6 +9,17 @@ interface HoldCtx {
   bump: () => void;
   reportError: (e: unknown) => void;
   toast: (msg: string) => void;
+  /** Client key everything is narrowed to, or undefined for all clients */
+  focus?: string;
+  setFocus: (client?: string) => void;
+}
+
+function loadFocus(): string | undefined {
+  try {
+    return localStorage.getItem("keel.focus") || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const Ctx = createContext<HoldCtx | null>(null);
@@ -25,6 +36,18 @@ export function HoldProvider({ hold, dir, children }: { hold: Hold; dir: string;
   const [version, setVersion] = useState(0);
   const [toasts, setToasts] = useState<{ id: number; msg: string; error?: boolean }[]>([]);
   const bump = useCallback(() => setVersion((v) => v + 1), []);
+  const [focus, setFocusState] = useState<string | undefined>(loadFocus);
+  const setFocus = useCallback((client?: string) => {
+    setFocusState(client);
+    try {
+      if (client) localStorage.setItem("keel.focus", client);
+      else localStorage.removeItem("keel.focus");
+    } catch {
+      // focus just won't survive a restart
+    }
+  }, []);
+  // forget a focus whose client file was deleted
+  const focusValid = !focus || hold.clients().has(focus);
 
   const push = useCallback((msg: string, error = false) => {
     const id = Date.now() + Math.random();
@@ -62,7 +85,7 @@ export function HoldProvider({ hold, dir, children }: { hold: Hold; dir: string;
   }, [hold, bump]);
 
   return (
-    <Ctx.Provider value={{ hold, dir, version, bump, reportError, toast: push }}>
+    <Ctx.Provider value={{ hold, dir, version, bump, reportError, toast: push, focus: focusValid ? focus : undefined, setFocus }}>
       {children}
       <div className="toasts" role="status">
         {toasts.map((t) => (

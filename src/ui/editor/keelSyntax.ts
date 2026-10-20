@@ -1,13 +1,15 @@
 import { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
 import { HighlightStyle } from "@codemirror/language";
-import { RangeSetBuilder } from "@codemirror/state";
-import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
+import { EditorState, RangeSetBuilder, StateField } from "@codemirror/state";
+import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { addDays, today } from "../../core/dates";
+import { mountMermaid } from "../mermaid";
 
 const TASK = /^(\s*[-*+] \[)([ xX>\-])(\])/;
-const HOURS = /^(\s*[-*+]\s+)((?:\d+(?:\.\d+)?h)?(?:\d+m)?)(\s+)(@[\w.-]+)/;
-const TOKENS = /@due\((\d{4}-\d{2}-\d{2})\)|@remind\([^)]*\)|\[\[[^\]]+\]\]|(?<=^|\s)#[A-Za-z][\w/-]*/g;
+const HOURS = /^(\s*[-*+]\s+)((?:\d+(?:\.\d+)?h)?(?:\d+m)?)(\s+)(@[\w.-]+(?:\/[\w.-]+)?)/;
+const TOKENS =
+  /@due\((\d{4}-\d{2}-\d{2})\)|@remind\([^)]*\)|@waiting(?:\([^)]*\))?|@since\([^)]*\)|@done\([^)]*\)|\[\[[^\]]+\]\]|(?<=^|\s)#[A-Za-z][\w/-]*/g;
 
 const mark = (cls: string) => Decoration.mark({ class: cls });
 const lineDeco = (cls: string) => Decoration.line({ class: cls });
@@ -60,6 +62,8 @@ function build(view: EditorView): DecorationSet {
           let cls = "cm-k-tag";
           if (tok.startsWith("@due")) cls = m[1] && m[1] < now && task?.[2] === " " ? "cm-k-due cm-k-overdue" : "cm-k-due";
           else if (tok.startsWith("@remind")) cls = "cm-k-remind";
+          else if (tok.startsWith("@waiting")) cls = "cm-k-waiting";
+          else if (tok.startsWith("@since") || tok.startsWith("@done")) cls = "cm-k-stamp";
           else if (tok.startsWith("[[")) cls = "cm-k-link";
           ranges.push([s, s + tok.length, mark(cls)]);
         }
@@ -109,8 +113,11 @@ export function keelClicks(onOpenLink: (target: string) => void) {
       if (task && e.button === 0) {
         const box = task[1].length - 1;
         if (off >= box && off <= box + 3) {
-          const ch = task[2] === " " ? "x" : " ";
-          view.dispatch({ changes: { from: line.from + box + 1, to: line.from + box + 2, insert: ch } });
+          const checking = task[2] === " ";
+          let next = line.text.slice(0, box + 1) + (checking ? "x" : " ") + line.text.slice(box + 2);
+          next = next.replace(/\s*@done\(\d{4}-\d{2}-\d{2}\)/, "");
+          if (checking) next += ` @done(${today()})`;
+          view.dispatch({ changes: { from: line.from, to: line.to, insert: next } });
           e.preventDefault();
           return true;
         }
@@ -149,6 +156,7 @@ export function keelCompletions(getNames: () => string[], getClients: () => stri
           { label: `due(${d0})`, detail: "today" },
           { label: `due(${addDays(d0, 1)})`, detail: "tomorrow" },
           { label: `due(${addDays(d0, 7)})`, detail: "in a week" },
+          { label: "waiting()", detail: "waiting on someone", apply: "waiting(" },
           { label: "remind(09:00)", detail: "at a time" },
           { label: "remind(daily 09:00)", detail: "recurring" },
           { label: "remind(weekdays 09:00)", detail: "recurring" },
@@ -176,3 +184,47 @@ export const keelHighlight = HighlightStyle.define([
   { tag: t.contentSeparator, class: "cm-k-meta" },
   { tag: t.list, class: "cm-k-meta" },
 ]);
+
+class MermaidWidget extends WidgetType {
+  constructor(readonly code: string) {
+    super();
+  }
+  eq(other: MermaidWidget) {
+    return other.code === this.code;
+  }
+  toDOM() {
+    const el = document.createElement("div");
+    mountMermaid(el, this.code);
+    return el;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
+function mermaidBlocks(state: EditorState): DecorationSet {
+  const b = new RangeSetBuilder<Decoration>();
+  const doc = state.doc;
+  let fence: { mermaid: boolean; code: string[] } | null = null;
+  for (let n = 1; n <= doc.lines; n++) {
+    const line = doc.line(n);
+    const f = line.text.match(/^\s*(?:```|~~~)\s*([\w-]*)/);
+    if (f) {
+      if (!fence) fence = { mermaid: f[1].toLowerCase() === "mermaid", code: [] };
+      else {
+        if (fence.mermaid && fence.code.join("").trim()) {
+          b.add(line.to, line.to, Decoration.widget({ widget: new MermaidWidget(fence.code.join("\n")), block: true, side: 1 }));
+        }
+        fence = null;
+      }
+    } else if (fence) fence.code.push(line.text);
+  }
+  return b.finish();
+}
+
+/** Renders each ```mermaid block as a diagram just below it. */
+export const mermaidPreview = StateField.define<DecorationSet>({
+  create: (state) => mermaidBlocks(state),
+  update: (deco, tr) => (tr.docChanged ? mermaidBlocks(tr.state) : deco),
+  provide: (f) => EditorView.decorations.from(f),
+});

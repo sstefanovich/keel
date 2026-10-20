@@ -1,35 +1,45 @@
 import { addDays, hhmm, isISODate, parseTime, toISO, weekdayOf } from "./dates";
 
 export interface Capture {
-  kind: "hours" | "task" | "reminder" | "log" | "flag";
+  kind: "hours" | "task" | "reminder" | "waiting" | "log" | "flag";
   /** Section of today's log the line goes under ("" for a flag, which gets its own file) */
   heading: "Hours" | "Tasks" | "Log" | "";
   line: string;
 }
 
+const DURATION = /^(\d+(?:\.\d+)?h|\d+m|\d+h\d+m)\s+/i;
 const HOURS_START = /^(\d+(?:\.\d+)?h|\d+m|\d+h\d+m)\s+@[\w.-]+/i;
 const TASK_START = /^(?:todo:?|task:?|t:|\[\s?\]|-\s?\[ \])\s+/i;
 const TIME_IN_TEXT = /(?:^|\s)(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}:\d{2})(?=\s|$)/i;
 const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
-/** Interpret a quick-capture line. Returns null for empty input. */
-export function parseCapture(input: string, now: Date = new Date()): Capture | null {
+/**
+ * Interpret a quick-capture line. Returns null for empty input.
+ * With a focused client, hours without an @client go to it and tasks get its #tag.
+ */
+export function parseCapture(input: string, now: Date = new Date(), focus?: string): Capture | null {
   const text = input.trim();
   if (!text) return null;
+  const tag = (s: string) => (focus && !new RegExp(`(^|\\s)#${focus}(\\s|/|$)`, "i").test(s) ? `${s} #${focus}` : s);
 
   const flag = text.match(/^(?:flag:?|!)\s+(.+)$/i);
   if (flag) return { kind: "flag", heading: "", line: flag[1].trim() };
 
   if (HOURS_START.test(text)) return { kind: "hours", heading: "Hours", line: `- ${text}` };
+  const dur = text.match(DURATION);
+  if (dur && focus) return { kind: "hours", heading: "Hours", line: `- ${dur[1]} @${focus} ${text.slice(dur[0].length)}` };
+
+  const wait = text.match(/^wait(?:ing)?(?:\s+on)?\s+([^:]{1,40}?):\s*(.+)$/i);
+  if (wait) return { kind: "waiting", heading: "Tasks", line: `- [ ] ${tag(wait[2].trim())} @waiting(${wait[1].trim()})` };
 
   const remind = text.match(/^remind\s+me\s+(.*)$/i);
   if (remind) {
     const r = parseReminderPhrase(remind[1], now);
-    if (r) return { kind: "reminder", heading: "Tasks", line: `- [ ] ${r.text} @remind(${r.spec})` };
-    return { kind: "task", heading: "Tasks", line: `- [ ] ${remind[1].replace(/^to\s+/i, "")}` };
+    if (r) return { kind: "reminder", heading: "Tasks", line: `- [ ] ${tag(r.text)} @remind(${r.spec})` };
+    return { kind: "task", heading: "Tasks", line: `- [ ] ${tag(remind[1].replace(/^to\s+/i, ""))}` };
   }
 
-  if (TASK_START.test(text)) return { kind: "task", heading: "Tasks", line: `- [ ] ${text.replace(TASK_START, "")}` };
+  if (TASK_START.test(text)) return { kind: "task", heading: "Tasks", line: `- [ ] ${tag(text.replace(TASK_START, ""))}` };
 
   return { kind: "log", heading: "Log", line: `- ${hhmm(now)} ${text}` };
 }

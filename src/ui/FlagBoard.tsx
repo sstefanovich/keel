@@ -116,14 +116,14 @@ function FlagCard({ flag }: { flag: ParsedFile }) {
 
 /** Sticky notes that stay pinned until lowered. */
 export function FlagBoard({ compact = false }: { compact?: boolean }) {
-  const { hold, bump, reportError } = useHold();
+  const { hold, bump, reportError, focus } = useHold();
   const [adding, setAdding] = useState(false);
-  const flags = hold.flags();
+  const flags = hold.flags(focus);
 
   const hoist = async (text: string) => {
     setAdding(false);
     try {
-      await hold.hoistFlag(text);
+      await hold.hoistFlag(text, "yellow", focus);
       bump();
     } catch (e) {
       reportError(e);

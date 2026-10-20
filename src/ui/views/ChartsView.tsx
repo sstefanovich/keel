@@ -5,18 +5,18 @@ import { useNav } from "../nav";
 
 /** All client & project Charts, with search across every reference item. */
 export function ChartsView() {
-  const { hold } = useHold();
+  const { hold, focus } = useHold();
   const nav = useNav();
   const [q, setQ] = useState("");
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
 
-  const clients = [...hold.clients().values()].sort((a, b) => a.name.localeCompare(b.name));
-  const clientKeys = new Set(clients.map((c) => c.key));
-  const orphans = hold
-    .all()
-    .filter((f) => f.kind === "project" && !clientKeys.has(String(f.frontmatter.client ?? "").toLowerCase()));
-  const results = hold.chartSearch(q);
+  const clients = [...hold.clients().values()].filter((c) => !focus || c.key === focus).sort((a, b) => a.name.localeCompare(b.name));
+  const allKeys = new Set(hold.clients().keys());
+  const orphans = focus
+    ? []
+    : hold.all().filter((f) => f.kind === "project" && !allKeys.has(String(f.frontmatter.client ?? "").toLowerCase()));
+  const results = hold.chartSearch(q, focus);
 
   return (
     <div className="page">

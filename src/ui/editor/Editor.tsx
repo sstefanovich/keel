@@ -8,7 +8,7 @@ import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemir
 import { useEffect, useRef } from "react";
 import { basename } from "../../core/parse";
 import { useHold } from "../HoldContext";
-import { keelClicks, keelCompletions, keelDecorations, keelHighlight } from "./keelSyntax";
+import { keelClicks, keelCompletions, keelDecorations, keelHighlight, mermaidPreview } from "./keelSyntax";
 
 interface Props {
   path: string;
@@ -64,6 +64,7 @@ export function Editor({ path, line, onOpenLink }: Props) {
           markdown({ base: markdownLanguage }),
           syntaxHighlighting(keelHighlight),
           keelDecorations,
+          mermaidPreview,
           keelClicks((t) => linkRef.current(t)),
           autocompletion({
             override: [

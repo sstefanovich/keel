@@ -45,26 +45,29 @@ function FileGroup({ title, files, label, current, onAdd, addLabel, limit = 8 }:
 const byDateDesc = (a: ParsedFile, b: ParsedFile) => (b.date ?? "").localeCompare(a.date ?? "") || b.mtime - a.mtime;
 
 export function Sidebar() {
-  const { hold } = useHold();
+  const { hold, focus, setFocus } = useHold();
   const nav = useNav();
   const v: View = nav.view;
   const current = v.kind === "file" ? v.path : undefined;
   const files = hold.all();
   const t = today();
-  const agenda = hold.agenda(t);
   const todayPath = hold.logPath(t);
 
+  const mine = (f: ParsedFile) => !focus || hold.fileClient(f) === focus;
   const logs = files.filter((f) => f.kind === "log").sort(byDateDesc);
-  const meetings = files.filter((f) => f.kind === "meeting").sort(byDateDesc);
-  const notes = files.filter((f) => f.kind === "note").sort((a, b) => a.title.localeCompare(b.title));
-  const flagCount = hold.flags().length;
+  const meetings = files.filter((f) => f.kind === "meeting" && mine(f)).sort(byDateDesc);
+  const notes = files.filter((f) => f.kind === "note" && (!focus || !hold.fileClient(f) || mine(f))).sort((a, b) => a.title.localeCompare(b.title));
+  const flagCount = hold.flags(focus).length;
+  const waitingCount = hold.waitingOn(focus).length;
+  const agenda = hold.agenda(t, 14, focus);
   // clients, each followed by its projects; projects without a known client at the end
-  const clients = files.filter((f) => f.kind === "client").sort((a, b) => a.title.localeCompare(b.title));
-  const clientKeys = new Set(clients.map((c) => basename(c.path).toLowerCase()));
+  const clientFiles = files.filter((f) => f.kind === "client").sort((a, b) => a.title.localeCompare(b.title));
+  const clientKeys = new Set(clientFiles.map((c) => basename(c.path).toLowerCase()));
   const charts = [
-    ...clients.flatMap((c) => [c, ...hold.projectsOf(basename(c.path).toLowerCase())]),
-    ...files.filter((f) => f.kind === "project" && !clientKeys.has(String(f.frontmatter.client ?? "").toLowerCase())),
+    ...clientFiles.filter(mine).flatMap((c) => [c, ...hold.projectsOf(basename(c.path).toLowerCase())]),
+    ...(focus ? [] : files.filter((f) => f.kind === "project" && !clientKeys.has(String(f.frontmatter.client ?? "").toLowerCase()))),
   ];
+  const clients = [...hold.clients().values()].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <aside className="sidebar">
@@ -76,6 +79,24 @@ export function Sidebar() {
         </svg>
         <span>Keel</span>
       </div>
+
+      {clients.length > 0 && (
+        <div className={`focus-picker${focus ? " on" : ""}`}>
+          <select value={focus ?? ""} onChange={(e) => setFocus(e.target.value || undefined)} aria-label="Focus on a client" title="Focus on one client">
+            <option value="">All clients</option>
+            {clients.map((c) => (
+              <option key={c.key} value={c.key}>
+                Focus: {c.name}
+              </option>
+            ))}
+          </select>
+          {focus && (
+            <button className="icon-btn" onClick={() => setFocus(undefined)} aria-label="Clear focus" title="Clear focus">
+              ×
+            </button>
+          )}
+        </div>
+      )}
 
       <button className="capture-btn" onClick={nav.capture} title="Quick capture (Ctrl+K, or Ctrl+Alt+K anywhere)">
         <span>Capture…</span>
@@ -92,8 +113,14 @@ export function Sidebar() {
         <NavItem active={v.kind === "flags"} onClick={() => nav.go({ kind: "flags" })} badge={flagCount}>
           Flags
         </NavItem>
+        <NavItem active={v.kind === "waiting"} onClick={() => nav.go({ kind: "waiting" })} badge={waitingCount}>
+          Waiting on
+        </NavItem>
         <NavItem active={v.kind === "charts"} onClick={() => nav.go({ kind: "charts" })}>
           Charts
+        </NavItem>
+        <NavItem active={v.kind === "dispatch"} onClick={() => nav.go({ kind: "dispatch" })}>
+          Dispatch
         </NavItem>
         <NavItem active={v.kind === "timesheet"} onClick={() => nav.go({ kind: "timesheet" })}>
           Timesheet

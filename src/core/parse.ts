@@ -19,6 +19,12 @@ export interface Task {
   due?: ISODate;
   remind?: RemindRule;
   tags: string[];
+  /** Who this is waiting on: @waiting(Name), or "Name: …" before a bare @waiting. "" if unknown. */
+  waiting?: string;
+  /** When the item was first logged: @since(date), else the file's date */
+  since?: ISODate;
+  /** Completion date from @done(date) */
+  doneOn?: ISODate;
 }
 
 export interface HoursEntry {
@@ -26,8 +32,21 @@ export interface HoursEntry {
   line: number;
   date: ISODate;
   hours: number;
+  /** The @key as written, lowercased: a client key, a project key, or "client/project" */
   client: string;
   description: string;
+}
+
+/** A fenced code block on a client/project Chart (CLI commands, config, diagrams). */
+export interface Snippet {
+  file: string;
+  /** 0-based line of the opening fence */
+  line: number;
+  section: string;
+  lang: string;
+  code: string;
+  /** Text line just above the fence, if any ("Log in to the tenant:") */
+  title?: string;
 }
 
 export interface Reminder {
@@ -66,6 +85,7 @@ export interface ParsedFile {
   hours: HoursEntry[];
   reminders: Reminder[];
   chart: ChartItem[];
+  snippets: Snippet[];
   links: string[];
   tags: string[];
 }
@@ -74,10 +94,13 @@ const STATUS_CHARS: Record<string, TaskStatus> = { " ": "open", x: "done", X: "d
 export const STATUS_CHAR: Record<TaskStatus, string> = { open: " ", done: "x", migrated: ">", cancelled: "-" };
 
 export const TASK_RE = /^(\s*)[-*+] \[([ xX>\-])\] (.*)$/;
-export const HOURS_RE = /^\s*[-*+]\s+(?:(\d+(?:\.\d+)?)h)?(?:(\d+)m)?\s+@([\w.-]+)\s*(?:[-–:]\s*)?(.*)$/i;
+export const HOURS_RE = /^\s*[-*+]\s+(?:(\d+(?:\.\d+)?)h)?(?:(\d+)m)?\s+@([\w.-]+(?:\/[\w.-]+)?)\s*(?:[-–:]\s*)?(.*)$/i;
 const BULLET_RE = /^\s*[-*+]\s+(.*)$/;
 const DUE_RE = /@due\((\d{4}-\d{2}-\d{2})\)/;
 const REMIND_RE = /@remind\(([^)]*)\)/;
+const WAITING_RE = /@waiting(?:\(([^)]*)\))?/;
+const SINCE_RE = /@since\((\d{4}-\d{2}-\d{2})\)/;
+const DONE_RE = /@done\((\d{4}-\d{2}-\d{2})\)/;
 const TAG_RE = /(?:^|\s)#([A-Za-z][\w/-]*)/g;
 const LINK_RE = /\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/g;
 
@@ -119,7 +142,14 @@ function fileDate(path: string, fm: Record<string, unknown>): ISODate | undefine
 }
 
 function stripTokens(s: string): string {
-  return s.replace(DUE_RE, "").replace(REMIND_RE, "").replace(/\s{2,}/g, " ").trim();
+  return s
+    .replace(DUE_RE, "")
+    .replace(REMIND_RE, "")
+    .replace(WAITING_RE, "")
+    .replace(SINCE_RE, "")
+    .replace(DONE_RE, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function tagsIn(s: string): string[] {
@@ -144,14 +174,29 @@ export function parseFile(path: string, content: string, mtime = 0): ParsedFile 
   const hasChart = kind === "client" || kind === "project";
   let section = "";
 
-  let inFence = false;
+  const snippets: Snippet[] = [];
+  let fence: { line: number; lang: string; code: string[]; title?: string } | null = null;
+
   for (let i = fmLines; i < lines.length; i++) {
     const line = lines[i];
-    if (/^\s*(```|~~~)/.test(line)) {
-      inFence = !inFence;
+    const f = line.match(/^\s*(?:```|~~~)\s*([\w+#.-]*)/);
+    if (f) {
+      if (!fence) {
+        let j = i - 1;
+        while (j >= fmLines && !lines[j].trim()) j--;
+        const prev = j >= fmLines ? lines[j].trim() : "";
+        const title = prev && !/^(#|[-*+]\s|```|~~~|---)/.test(prev) ? prev.replace(/[:*_`]+$/g, "").replace(/^[*_]+/, "").trim() : undefined;
+        fence = { line: i, lang: f[1].toLowerCase(), code: [], title };
+      } else {
+        if (hasChart) snippets.push({ file: path, line: fence.line, section, lang: fence.lang, code: fence.code.join("\n"), title: fence.title });
+        fence = null;
+      }
       continue;
     }
-    if (inFence) continue;
+    if (fence) {
+      fence.code.push(line);
+      continue;
+    }
     if (!title) {
       const h = line.match(/^#\s+(.+)$/);
       if (h) title = h[1].trim();
@@ -171,6 +216,9 @@ export function parseFile(path: string, content: string, mtime = 0): ParsedFile 
       const due = tokens.match(DUE_RE)?.[1];
       const remindSpec = tokens.match(REMIND_RE)?.[1];
       const remind = remindSpec ? parseRemind(remindSpec, date) ?? undefined : undefined;
+      const w = tokens.match(WAITING_RE);
+      const since = tokens.match(SINCE_RE)?.[1];
+      const doneOn = tokens.match(DONE_RE)?.[1];
       const task: Task = {
         file: path,
         line: i,
@@ -181,6 +229,9 @@ export function parseFile(path: string, content: string, mtime = 0): ParsedFile 
         due: isISODate(due) ? due : undefined,
         remind,
         tags: tagsIn(tokens),
+        waiting: w ? (w[1]?.trim() || text.match(/^([^:]{1,40}):\s/)?.[1].trim() || "") : undefined,
+        since: isISODate(since) ? since : date,
+        doneOn: isISODate(doneOn) ? doneOn : undefined,
       };
       tasks.push(task);
       if (remind) reminders.push({ file: path, line: i, text, rule: remind, taskStatus: task.status });
@@ -230,6 +281,7 @@ export function parseFile(path: string, content: string, mtime = 0): ParsedFile 
     hours,
     reminders,
     chart,
+    snippets,
     links: [...links],
     tags: [...tags],
   };

@@ -4,6 +4,8 @@ export type View =
   | { kind: "file"; path: string; line?: number }
   | { kind: "agenda" }
   | { kind: "flags" }
+  | { kind: "waiting" }
+  | { kind: "dispatch" }
   | { kind: "charts" }
   | { kind: "timesheet" }
   | { kind: "calendar" }

@@ -25,10 +25,10 @@ function groupBy<T>(items: T[], key: (t: T) => string): [string, T[]][] {
 }
 
 export function AgendaView() {
-  const { hold } = useHold();
+  const { hold, focus } = useHold();
   const nav = useNav();
   const d = today();
-  const a = hold.agenda(d);
+  const a = hold.agenda(d, 14, focus);
   const now = hhmm(new Date());
 
   return (
