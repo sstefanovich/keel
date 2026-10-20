@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { describeRule } from "../../core/schedule";
 import { formatLong, formatShort, formatTime, hhmm, today } from "../../core/dates";
 import { Task } from "../../core/parse";
+import { FlagBoard } from "../FlagBoard";
 import { useHold } from "../HoldContext";
 import { TaskRow } from "../TaskRow";
 import { useNav } from "../nav";
@@ -36,6 +37,8 @@ export function AgendaView() {
         <h1>Agenda</h1>
         <p className="muted">{formatLong(d)}</p>
       </header>
+
+      <FlagBoard compact />
 
       {a.overdue.length > 0 && (
         <Section title="Overdue" count={a.overdue.length} tone="danger">

@@ -43,8 +43,36 @@ currency: USD
 ---
 # {{title}}
 
-Log hours against this client with \`- 1.5h @{{slug}} what you did\`.
+Log hours with \`- 1.5h @{{slug}} what you did\`. Each bullet below shows on the Chart
+with a copy button: \`- Label: value\`. Keep secrets in a password manager, not here.
 
+## Links
+
+## Contacts
+
+## Azure
+
+## Servers
+
+## Notes
+`,
+  "templates/project.md": `---
+client: {{client}}
+status: active
+---
+# {{title}}
+
+## Links
+
+## Repos
+
+## Environments
+
+## Azure
+
+## Servers
+
+## Decisions
 `,
 };
 
@@ -83,11 +111,25 @@ Everything in your **Hold** is a plain markdown file, so you can open it in any 
 Unfinished tasks in yesterday's log roll over into today's when it's created,
 and the old ones are marked \`[>]\` (migrated).
 
+## Charts (client & project reference)
+Each file in \`clients/\` and \`projects/\` is shown as a **Chart**. Every bullet becomes a row with a
+copy button, grouped by its \`##\` heading:
+- \`- Prod portal: https://portal.acme.com\` (URLs get an open button)
+- \`- Resource group: rg-acme-prod-eus\`
+- \`- [Runbook](https://wiki.acme.com/runbook)\`
+
+A project names its client in frontmatter (\`client: acme\`) and appears on that client's Chart.
+
+## Flags
+A **Flag** is a sticky note that stays pinned on Today and the Agenda until you lower it.
+Hoist one from the Flags board, or with quick capture: \`flag renew the TLS cert\`.
+
 ## Quick capture
 Press **Ctrl+Alt+K** anywhere in Windows:
 - \`2h @acme fixed the login bug\` logs hours
 - \`todo buy printer ink\` or \`[] buy printer ink\` adds a task
 - \`remind me 3pm call the bank\` (also \`tomorrow 9am …\`) adds a reminder
+- \`flag call Sam about the cutover\` hoists a Flag
 - anything else becomes a timestamped line in today's log
 `;
 
@@ -105,10 +147,11 @@ export function safeFileName(title: string): string {
   return title.replace(/[<>:"/\\|?*\x00-\x1f]/g, "").replace(/\s+/g, " ").trim().replace(/[. ]+$/, "");
 }
 
-export function fillTemplate(tpl: string, vars: { date: ISODate; title?: string; now?: Date }): string {
+export function fillTemplate(tpl: string, vars: { date: ISODate; title?: string; now?: Date; client?: string }): string {
   const now = vars.now ?? new Date();
   const title = vars.title ?? "";
   const map: Record<string, string> = {
+    client: vars.client ?? "",
     date: vars.date,
     dateLong: formatLong(vars.date),
     weekday: parseISO(vars.date).toLocaleDateString(undefined, { weekday: "long" }),

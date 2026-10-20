@@ -3,10 +3,14 @@ import { createContext, useContext } from "react";
 export type View =
   | { kind: "file"; path: string; line?: number }
   | { kind: "agenda" }
+  | { kind: "flags" }
+  | { kind: "charts" }
   | { kind: "timesheet" }
   | { kind: "calendar" }
   | { kind: "search"; q?: string }
   | { kind: "settings" };
+
+export type NewKind = "note" | "meeting" | "client" | "project";
 
 export interface Nav {
   view: View;
@@ -16,7 +20,8 @@ export interface Nav {
   openLog: (date: string) => void;
   openLink: (target: string) => void;
   capture: () => void;
-  newItem: (kind: "note" | "meeting" | "client") => void;
+  /** For "project", `client` preselects the client. */
+  newItem: (kind: NewKind, client?: string) => void;
 }
 
 export const NavCtx = createContext<Nav | null>(null);

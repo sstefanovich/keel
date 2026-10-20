@@ -125,6 +125,33 @@ export async function exportText(defaultName: string, content: string): Promise<
   return true;
 }
 
+// ---------- links & clipboard ----------
+
+export async function openUrl(url: string) {
+  if (!isTauri) {
+    window.open(url, "_blank", "noopener");
+    return;
+  }
+  const { openUrl } = await import("@tauri-apps/plugin-opener");
+  await openUrl(url);
+}
+
+export async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // older webviews / non-secure origins: fall back to a hidden textarea
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+}
+
 // ---------- autostart ----------
 
 export async function getAutostart(): Promise<boolean> {

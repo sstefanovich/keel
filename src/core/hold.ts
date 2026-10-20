@@ -1,8 +1,24 @@
-import { ISODate, addDays, today as todayISO } from "./dates";
+import { ISODate, addDays, hhmm, today as todayISO } from "./dates";
 import { HoldFs } from "./fs";
-import { HoursEntry, ParsedFile, Reminder, Task, TaskStatus, appendToSection, basename, parseFile, setTaskChar } from "./parse";
+import {
+  ChartItem,
+  HoursEntry,
+  ParsedFile,
+  Reminder,
+  Task,
+  TaskStatus,
+  appendToSection,
+  basename,
+  parseFile,
+  replaceBody,
+  setFrontmatterField,
+  setTaskChar,
+} from "./parse";
 import { occursOn } from "./schedule";
 import { DEFAULT_REMINDERS, DEFAULT_TEMPLATES, WELCOME_NOTE, fillTemplate, safeFileName, slugify } from "./templates";
+
+export const FLAG_COLORS = ["yellow", "orange", "pink", "blue", "green", "purple"] as const;
+export type FlagColor = (typeof FLAG_COLORS)[number];
 
 export interface Client {
   key: string;
@@ -192,6 +208,65 @@ export class Hold {
       await this.save(path, fillTemplate(await this.template("client"), { date: todayISO(), title: name }));
     }
     return path;
+  }
+
+  async createProject(name: string, client: string): Promise<string> {
+    const path = await this.freePath("projects", name);
+    await this.save(path, fillTemplate(await this.template("project"), { date: todayISO(), title: name, client }));
+    return path;
+  }
+
+  /** Projects whose frontmatter names this client key. */
+  projectsOf(clientKey: string): ParsedFile[] {
+    return this.all()
+      .filter((f) => f.kind === "project" && String(f.frontmatter.client ?? "").toLowerCase() === clientKey)
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }
+
+  /** Every Chart item across clients and projects matching a query (label, value, section or file title). */
+  chartSearch(query: string, limit = 200): { item: ChartItem; file: ParsedFile }[] {
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    const out: { item: ChartItem; file: ParsedFile }[] = [];
+    for (const file of this.all()) {
+      for (const item of file.chart) {
+        const hay = `${item.label ?? ""} ${item.value} ${item.section} ${file.title}`.toLowerCase();
+        if (words.every((w) => hay.includes(w))) out.push({ item, file });
+        if (out.length >= limit) return out;
+      }
+    }
+    return out;
+  }
+
+  // ---------- flags ----------
+
+  /** Flags still flying (not lowered), oldest first. */
+  flags(): ParsedFile[] {
+    return this.all()
+      .filter((f) => f.kind === "flag" && !f.frontmatter.lowered)
+      .sort((a, b) => String(a.frontmatter.created ?? "").localeCompare(String(b.frontmatter.created ?? "")) || a.mtime - b.mtime);
+  }
+
+  loweredFlags(): ParsedFile[] {
+    return this.all()
+      .filter((f) => f.kind === "flag" && !!f.frontmatter.lowered)
+      .sort((a, b) => String(b.frontmatter.lowered).localeCompare(String(a.frontmatter.lowered)));
+  }
+
+  async hoistFlag(text: string, color: FlagColor = "yellow"): Promise<string> {
+    const words = text.split(/\s+/).slice(0, 6).join(" ");
+    const path = await this.freePath("flags", `${todayISO()} ${words}`);
+    const created = `${todayISO()} ${hhmm(new Date())}`;
+    await this.save(path, `---\ncolor: ${color}\ncreated: ${created}\n---\n${text.trim()}\n`);
+    return path;
+  }
+
+  async updateFlag(path: string, change: { body?: string; color?: FlagColor; lowered?: boolean }): Promise<void> {
+    let content = await this.fs.read(path);
+    if (change.body !== undefined) content = replaceBody(content, change.body);
+    if (change.color) content = setFrontmatterField(content, "color", change.color);
+    if (change.lowered !== undefined) content = setFrontmatterField(content, "lowered", change.lowered ? todayISO() : undefined);
+    await this.save(path, content);
   }
 
   /** Append lines to a section of a file (creating today's log if that's the target). */

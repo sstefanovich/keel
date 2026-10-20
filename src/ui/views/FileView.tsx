@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { addDays, formatLong, today } from "../../core/dates";
 import { confirmDialog } from "../../lib/platform";
+import { FlagBoard } from "../FlagBoard";
 import { useHold } from "../HoldContext";
 import { Editor } from "../editor/Editor";
 import { useNav } from "../nav";
+import { ChartView } from "./ChartView";
 
 export function FileView({ path, line }: { path: string; line?: number }) {
   const { hold, bump, reportError } = useHold();
@@ -11,6 +13,10 @@ export function FileView({ path, line }: { path: string; line?: number }) {
   const file = hold.get(path);
   const backlinks = hold.backlinks(path);
   const isLog = file?.kind === "log" && !!file.date;
+  const hasChart = file?.kind === "client" || file?.kind === "project";
+  // charts open on the Chart tab unless we're jumping to a specific line
+  const [mode, setMode] = useState<"chart" | "edit">(hasChart && line == null ? "chart" : "edit");
+  useEffect(() => setMode(hasChart && line == null ? "chart" : "edit"), [path, hasChart, line]);
 
   // Alt+←/→ steps between days in a log
   useEffect(() => {
@@ -62,13 +68,28 @@ export function FileView({ path, line }: { path: string; line?: number }) {
         ) : (
           <span className="file-title">{file.title}</span>
         )}
+        {hasChart && (
+          <div className="seg" role="tablist">
+            <button role="tab" aria-selected={mode === "chart"} className={mode === "chart" ? "on" : ""} onClick={() => setMode("chart")}>
+              Chart
+            </button>
+            <button role="tab" aria-selected={mode === "edit"} className={mode === "edit" ? "on" : ""} onClick={() => setMode("edit")}>
+              Edit
+            </button>
+          </div>
+        )}
         <span className="file-path muted">{path}</span>
         <button className="ghost danger" onClick={remove} title="Delete file">
           Delete
         </button>
       </header>
       <div className="file-body">
-        <Editor key={path} path={path} line={line} onOpenLink={nav.openLink} />
+        {isLog && file.date === today() && <FlagBoard compact />}
+        {mode === "chart" && hasChart ? (
+          <ChartView path={path} />
+        ) : (
+          <Editor key={path} path={path} line={line} onOpenLink={nav.openLink} />
+        )}
         {backlinks.length > 0 && (
           <footer className="backlinks">
             <h4>Linked from</h4>

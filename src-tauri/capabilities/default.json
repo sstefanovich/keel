@@ -10,6 +10,7 @@
     "core:window:allow-hide",
     "notification:default",
     "dialog:default",
+    "opener:default",
     "autostart:default"
   ]
 }

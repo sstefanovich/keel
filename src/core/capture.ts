@@ -1,9 +1,9 @@
 import { addDays, hhmm, isISODate, parseTime, toISO, weekdayOf } from "./dates";
 
 export interface Capture {
-  kind: "hours" | "task" | "reminder" | "log";
-  /** Section of today's log the line goes under */
-  heading: "Hours" | "Tasks" | "Log";
+  kind: "hours" | "task" | "reminder" | "log" | "flag";
+  /** Section of today's log the line goes under ("" for a flag, which gets its own file) */
+  heading: "Hours" | "Tasks" | "Log" | "";
   line: string;
 }
 
@@ -16,6 +16,9 @@ const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", 
 export function parseCapture(input: string, now: Date = new Date()): Capture | null {
   const text = input.trim();
   if (!text) return null;
+
+  const flag = text.match(/^(?:flag:?|!)\s+(.+)$/i);
+  if (flag) return { kind: "flag", heading: "", line: flag[1].trim() };
 
   if (HOURS_START.test(text)) return { kind: "hours", heading: "Hours", line: `- ${text}` };
 

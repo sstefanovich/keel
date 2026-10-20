@@ -3,7 +3,7 @@ import { parseCapture } from "./capture";
 import { parseTime } from "./dates";
 import { MemoryFs } from "./fs";
 import { Hold } from "./hold";
-import { appendToSection, parseFile, setTaskChar } from "./parse";
+import { appendToSection, parseFile, replaceBody, setFrontmatterField, setTaskChar } from "./parse";
 import { occursOn, parseRemind } from "./schedule";
 
 const LOG = `---
@@ -155,6 +155,65 @@ describe("appendToSection", () => {
   });
 });
 
+describe("charts", () => {
+  const CLIENT = `---
+name: Acme Corp
+rate: 150
+---
+# Acme
+
+Intro paragraph with no bullets.
+- General item
+
+## Links
+- Prod portal: https://portal.acme.com/app
+- [Runbook](https://wiki.acme.com/runbook)
+- https://bare.acme.com
+- [ ] a task, not a chart item
+- 2h @acme not a chart item either
+
+## Azure
+- Resource group: \`rg-acme-prod-eus\`
+- Subscription: Acme Prod (1234-abcd)
+  - nested: kept with indent
+`;
+  const f = parseFile("clients/acme.md", CLIENT);
+
+  it("parses label/value, markdown links and bare values per section", () => {
+    expect(f.chart.map((c) => [c.section, c.label, c.value, c.url])).toEqual([
+      ["", undefined, "General item", undefined],
+      ["Links", "Prod portal", "https://portal.acme.com/app", "https://portal.acme.com/app"],
+      ["Links", "Runbook", "https://wiki.acme.com/runbook", "https://wiki.acme.com/runbook"],
+      ["Links", undefined, "https://bare.acme.com", "https://bare.acme.com"],
+      ["Azure", "Resource group", "rg-acme-prod-eus", undefined],
+      ["Azure", "Subscription", "Acme Prod (1234-abcd)", undefined],
+      ["Azure", "nested", "kept with indent", undefined],
+    ]);
+    expect(f.chart[6].indent).toBe(2);
+    expect(f.tasks).toHaveLength(1);
+  });
+
+  it("only clients and projects get charts", () => {
+    expect(parseFile("notes/x.md", "## Links\n- a: b\n").chart).toEqual([]);
+    expect(parseFile("projects/portal.md", "---\nclient: acme\n---\n## Repos\n- api: https://github.com/acme/api\n").chart).toHaveLength(1);
+  });
+});
+
+describe("frontmatter editing", () => {
+  it("sets, replaces and removes keys without touching the body", () => {
+    const c = "---\ncolor: yellow\ncreated: 2026-10-20\n---\nCall Sam\n";
+    expect(setFrontmatterField(c, "color", "blue")).toBe("---\ncolor: blue\ncreated: 2026-10-20\n---\nCall Sam\n");
+    const lowered = setFrontmatterField(c, "lowered", "2026-10-21");
+    expect(lowered).toBe("---\ncolor: yellow\ncreated: 2026-10-20\nlowered: 2026-10-21\n---\nCall Sam\n");
+    expect(setFrontmatterField(lowered, "lowered", undefined)).toBe(c);
+    expect(setFrontmatterField("Body\n", "color", "pink")).toBe("---\ncolor: pink\n---\nBody\n");
+  });
+  it("replaces the body only", () => {
+    expect(replaceBody("---\na: 1\n---\nold\n", "new\nlines")).toBe("---\na: 1\n---\nnew\nlines\n");
+    expect(replaceBody("no fm\n", "x")).toBe("x\n");
+  });
+});
+
 describe("setTaskChar", () => {
   it("only touches the checkbox", () => {
     expect(setTaskChar("  - [ ] do [ ] thing", "done")).toBe("  - [x] do [ ] thing");
@@ -175,6 +234,9 @@ describe("parseCapture", () => {
     ["remind me on friday at 17:00 to submit hours", "Tasks", "- [ ] submit hours @remind(2026-10-23 17:00)"],
     ["remind me to stretch", "Tasks", "- [ ] stretch"],
     ["Sam says the migration slips a week", "Log", "- 10:05 Sam says the migration slips a week"],
+    ["flag renew TLS cert", "", "renew TLS cert"],
+    ["! call Sam", "", "call Sam"],
+    ["flagship release notes", "Log", "- 10:05 flagship release notes"],
   ])("%s", (input, heading, line) => {
     expect(parseCapture(input, now)).toMatchObject({ heading, line });
   });
@@ -261,6 +323,28 @@ describe("Hold", () => {
     expect(a).toBe("meetings/2026-10-19 Acme kickoff.md");
     expect(b).toBe("meetings/2026-10-19 Acme kickoff 2.md");
     expect(hold.get(a)!.date).toBe("2026-10-19");
+  });
+
+  it("hoists, edits, recolors and lowers flags", async () => {
+    const hold = await makeHold();
+    const p = await hold.hoistFlag("Renew the TLS cert\nexpires Friday", "pink");
+    expect(hold.flags().map((f) => f.title)).toEqual(["Renew the TLS cert"]);
+    expect(hold.get(p)!.frontmatter.color).toBe("pink");
+    await hold.updateFlag(p, { body: "Renew the wildcard cert", color: "blue" });
+    expect(hold.get(p)!.body).toBe("Renew the wildcard cert");
+    expect(hold.get(p)!.frontmatter.color).toBe("blue");
+    await hold.updateFlag(p, { lowered: true });
+    expect(hold.flags()).toEqual([]);
+    expect(hold.loweredFlags().map((f) => f.path)).toEqual([p]);
+  });
+
+  it("links projects to clients and searches charts", async () => {
+    const hold = await makeHold({ "clients/acme.md": "# Acme\n## Azure\n- Resource group: rg-acme-prod\n" });
+    const p = await hold.createProject("Portal rebuild", "acme");
+    await hold.appendTo(p, "Servers", "- SQL: sql-portal-prod-01");
+    expect(hold.projectsOf("acme").map((f) => f.path)).toEqual([p]);
+    expect(hold.chartSearch("prod").map((r) => r.item.value)).toEqual(expect.arrayContaining(["rg-acme-prod", "sql-portal-prod-01"]));
+    expect(hold.chartSearch("portal sql").map((r) => r.item.value)).toEqual(["sql-portal-prod-01"]);
   });
 
   it("searches text and tags", async () => {

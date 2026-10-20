@@ -30,7 +30,9 @@ npm run tauri build   # installer in src-tauri/target/release/bundle/nsis
 logs/2026/2026-10-19.md     daily log (Tasks / Hours / Log sections)
 meetings/2026-10-19 Acme kickoff.md
 notes/…                     anything else
-clients/acme.md             frontmatter: name, rate, currency
+clients/acme.md             frontmatter: name, rate, currency; bullets = Chart items
+projects/Portal rebuild.md  frontmatter: client: acme, status; bullets = Chart items
+flags/2026-10-20 ….md       Flags (post-its): frontmatter color, created, lowered
 reminders.md                recurring reminders
 templates/{log,meeting,note,client}.md
 ```
@@ -41,5 +43,7 @@ Line syntax:
 - Reminder: `@remind(14:00)`, `@remind(2026-12-24 18:00)`, `@remind(daily 08:00)`, `weekdays`, `weekends`, `mon,thu 9am`, `monthly 1 09:00`.
 - Hours: `- 2.5h @acme what you did`, `- 45m @acme …`, `- 1h30m @acme …`
 - Links: `[[Note name]]`
+- Chart item (in a client or project file): `- Label: value`, `- [Label](url)` or `- value`, grouped by `##` heading. Values in `` ` `` are copied without the backticks.
+- Flag from quick capture: `flag text` or `! text`
 
 When today's log is created, open top-level tasks from the previous log are carried over, and the old copies are marked `[>]`.

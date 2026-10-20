@@ -1,6 +1,6 @@
 import { ReactNode, useState } from "react";
 import { formatShort, today } from "../core/dates";
-import { ParsedFile } from "../core/parse";
+import { ParsedFile, basename } from "../core/parse";
 import { useHold } from "./HoldContext";
 import { View, useNav } from "./nav";
 
@@ -13,7 +13,7 @@ function NavItem({ active, onClick, children, badge, hint }: { active?: boolean;
   );
 }
 
-function FileGroup({ title, files, label, current, onAdd, limit = 8 }: { title: string; files: ParsedFile[]; label: (f: ParsedFile) => string; current?: string; onAdd?: () => void; limit?: number }) {
+function FileGroup({ title, files, label, current, onAdd, addLabel, limit = 8 }: { title: string; files: ParsedFile[]; label: (f: ParsedFile) => string; current?: string; onAdd?: () => void; addLabel?: string; limit?: number }) {
   const nav = useNav();
   const [all, setAll] = useState(false);
   const shown = all ? files : files.slice(0, limit);
@@ -22,13 +22,13 @@ function FileGroup({ title, files, label, current, onAdd, limit = 8 }: { title: 
       <div className="side-group-head">
         <span>{title}</span>
         {onAdd && (
-          <button className="icon-btn" onClick={onAdd} aria-label={`New ${title.toLowerCase()}`} title={`New ${title.toLowerCase()}`}>
+          <button className="icon-btn" onClick={onAdd} aria-label={addLabel ?? `New ${title.toLowerCase()}`} title={addLabel ?? `New ${title.toLowerCase()}`}>
             +
           </button>
         )}
       </div>
       {shown.map((f) => (
-        <button key={f.path} className={`file-item${current === f.path ? " active" : ""}`} onClick={() => nav.openFile(f.path)} title={f.path}>
+        <button key={f.path} className={`file-item${current === f.path ? " active" : ""}${f.kind === "project" ? " sub" : ""}`} onClick={() => nav.openFile(f.path)} title={f.path}>
           {label(f)}
         </button>
       ))}
@@ -57,7 +57,14 @@ export function Sidebar() {
   const logs = files.filter((f) => f.kind === "log").sort(byDateDesc);
   const meetings = files.filter((f) => f.kind === "meeting").sort(byDateDesc);
   const notes = files.filter((f) => f.kind === "note").sort((a, b) => a.title.localeCompare(b.title));
+  const flagCount = hold.flags().length;
+  // clients, each followed by its projects; projects without a known client at the end
   const clients = files.filter((f) => f.kind === "client").sort((a, b) => a.title.localeCompare(b.title));
+  const clientKeys = new Set(clients.map((c) => basename(c.path).toLowerCase()));
+  const charts = [
+    ...clients.flatMap((c) => [c, ...hold.projectsOf(basename(c.path).toLowerCase())]),
+    ...files.filter((f) => f.kind === "project" && !clientKeys.has(String(f.frontmatter.client ?? "").toLowerCase())),
+  ];
 
   return (
     <aside className="sidebar">
@@ -82,6 +89,12 @@ export function Sidebar() {
         <NavItem active={v.kind === "agenda"} onClick={() => nav.go({ kind: "agenda" })} badge={agenda.overdue.length + agenda.today.length} hint="Ctrl+J">
           Agenda
         </NavItem>
+        <NavItem active={v.kind === "flags"} onClick={() => nav.go({ kind: "flags" })} badge={flagCount}>
+          Flags
+        </NavItem>
+        <NavItem active={v.kind === "charts"} onClick={() => nav.go({ kind: "charts" })}>
+          Charts
+        </NavItem>
         <NavItem active={v.kind === "timesheet"} onClick={() => nav.go({ kind: "timesheet" })}>
           Timesheet
         </NavItem>
@@ -100,7 +113,15 @@ export function Sidebar() {
         <FileGroup title="Meetings" files={meetings} current={current} onAdd={() => nav.newItem("meeting")} label={(f) => f.title.replace(/^\d{4}-\d{2}-\d{2}\s*/, "") || f.title} />
         <FileGroup title="Notes" files={notes} current={current} onAdd={() => nav.newItem("note")} label={(f) => (f.path.split("/").length > 2 ? `${f.path.split("/").slice(1, -1).join("/")}/` : "") + f.title} limit={12} />
         <FileGroup title="Logs" files={logs} current={current} label={(f) => (f.date ? formatShort(f.date) : f.title)} limit={5} />
-        <FileGroup title="Clients" files={clients} current={current} onAdd={() => nav.newItem("client")} label={(f) => f.title} />
+        <FileGroup
+          title="Charts"
+          files={charts}
+          current={current}
+          onAdd={() => nav.newItem("client")}
+          addLabel="New client"
+          label={(f) => f.title}
+          limit={14}
+        />
       </div>
 
       <div className="side-foot">

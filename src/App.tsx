@@ -6,7 +6,9 @@ import { hideWindow, loadSettings, onQuickCapture, openFs, saveSettings } from "
 import { HoldProvider, useHold } from "./ui/HoldContext";
 import { PromptModal, PromptSpec, QuickCapture } from "./ui/Modals";
 import { Sidebar } from "./ui/Sidebar";
-import { Nav, NavCtx, View } from "./ui/nav";
+import { Nav, NavCtx, NewKind, View } from "./ui/nav";
+import { ChartsView } from "./ui/views/ChartsView";
+import { FlagsView } from "./ui/views/FlagsView";
 import { useReminders } from "./ui/useReminders";
 import { AgendaView } from "./ui/views/AgendaView";
 import { CalendarView } from "./ui/views/CalendarView";
@@ -105,10 +107,16 @@ function Shell() {
     const c = parseCapture(text);
     if (!c) return;
     try {
-      const path = await hold.ensureLog(today());
-      await hold.appendTo(path, c.heading, c.line);
+      if (c.kind === "flag") {
+        await hold.hoistFlag(c.line);
+      } else {
+        const path = await hold.ensureLog(today());
+        await hold.appendTo(path, c.heading, c.line);
+      }
       bump();
-      toast(c.kind === "hours" ? "Hours logged" : c.kind === "log" ? "Added to today's log" : c.kind === "reminder" ? "Reminder set" : "Task added");
+      toast(
+        { hours: "Hours logged", log: "Added to today's log", reminder: "Reminder set", task: "Task added", flag: "Flag hoisted" }[c.kind],
+      );
       const hide = capture?.hideAfter;
       setCapture(null);
       if (hide) await hideWindow();
@@ -118,7 +126,7 @@ function Shell() {
   };
 
   const newItem = useCallback(
-    (kind: "note" | "meeting" | "client") => {
+    (kind: NewKind, client?: string) => {
       const make = async (fn: () => Promise<string>) => {
         try {
           const path = await fn();
@@ -145,6 +153,21 @@ function Shell() {
           placeholder: "Acme Corp",
           submitLabel: "Create",
           onSubmit: (v) => make(() => hold.createClient(v)),
+        },
+        project: {
+          title: "New project",
+          label: "Project name",
+          placeholder: "Portal rebuild",
+          choice: {
+            label: "Client",
+            initial: client,
+            options: [
+              ...[...hold.clients().values()].sort((a, b) => a.name.localeCompare(b.name)).map((c) => ({ value: c.key, label: c.name })),
+              { value: "", label: "(no client)" },
+            ],
+          },
+          submitLabel: "Create",
+          onSubmit: (v, _d, c) => make(() => hold.createProject(v, c)),
         },
       };
       setPrompt(specs[kind]);
@@ -189,6 +212,8 @@ function Shell() {
         <main className="main">
           {view.kind === "file" && <FileView path={view.path} line={view.line} />}
           {view.kind === "agenda" && <AgendaView />}
+          {view.kind === "flags" && <FlagsView />}
+          {view.kind === "charts" && <ChartsView />}
           {view.kind === "timesheet" && <TimesheetView />}
           {view.kind === "calendar" && <CalendarView />}
           {view.kind === "search" && <SearchView initial={view.q} />}

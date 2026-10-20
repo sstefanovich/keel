@@ -15,6 +15,7 @@ const KIND_LABEL = {
   task: "Task → today's log",
   reminder: "Reminder → today's log",
   log: "Log entry → today's log",
+  flag: "Flag → pinned on the board",
 };
 
 export function QuickCapture({ onSubmit, onClose }: { onSubmit: (text: string) => Promise<void>; onClose: () => void }) {
@@ -65,13 +66,16 @@ export interface PromptSpec {
   label: string;
   placeholder?: string;
   withDate?: boolean;
+  /** Optional dropdown (e.g. which client a project belongs to) */
+  choice?: { label: string; options: { value: string; label: string }[]; initial?: string };
   submitLabel: string;
-  onSubmit: (value: string, date: string) => Promise<void>;
+  onSubmit: (value: string, date: string, choice: string) => Promise<void>;
 }
 
 export function PromptModal({ spec, onClose }: { spec: PromptSpec; onClose: () => void }) {
   const [value, setValue] = useState("");
   const [date, setDate] = useState(today());
+  const [choice, setChoice] = useState(spec.choice?.initial ?? spec.choice?.options[0]?.value ?? "");
   const input = useRef<HTMLInputElement>(null);
   useEscape(onClose);
   useEffect(() => input.current?.focus(), []);
@@ -79,7 +83,7 @@ export function PromptModal({ spec, onClose }: { spec: PromptSpec; onClose: () =
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!value.trim()) return;
-    await spec.onSubmit(value.trim(), date);
+    await spec.onSubmit(value.trim(), date, choice);
   };
 
   return (
@@ -90,6 +94,18 @@ export function PromptModal({ spec, onClose }: { spec: PromptSpec; onClose: () =
           {spec.label}
           <input ref={input} value={value} placeholder={spec.placeholder} onChange={(e) => setValue(e.target.value)} />
         </label>
+        {spec.choice && (
+          <label>
+            {spec.choice.label}
+            <select value={choice} onChange={(e) => setChoice(e.target.value)}>
+              {spec.choice.options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {spec.withDate && (
           <label>
             Date
