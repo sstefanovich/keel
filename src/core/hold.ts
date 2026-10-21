@@ -91,26 +91,27 @@ export class Hold {
 
   /** Re-read files whose mtime changed; drop deleted ones. Returns true if anything changed. */
   async reindex(): Promise<boolean> {
-    // Keel's own save is mid-flight: catching the file between write and index update
-    // would look like an outside edit and make an open editor reload under the cursor
+    // Keel's own saves must never look like outside edits: a reindex that overlaps one could
+    // read a file just before the save writes it and put older text back in the index, which
+    // makes an open editor "reload" under the cursor. So stage everything, and throw it away
+    // if any save started or finished while this ran (the next poll picks up real changes).
     if (this.writing > 0) return false;
+    const gen = this.writeGen;
     const listing = await this.fs.list();
+    const updates = new Map<string, ParsedFile>();
     const seen = new Set<string>();
-    let changed = false;
     for (const { path, mtime } of listing) {
       seen.add(path);
       const cur = this.files.get(path);
       if (cur && cur.mtime === mtime) continue;
-      this.files.set(path, parseFile(path, await this.fs.read(path), mtime));
-      changed = true;
+      updates.set(path, parseFile(path, await this.fs.read(path), mtime));
+      if (this.writeGen !== gen) return false;
     }
-    for (const path of [...this.files.keys()]) {
-      if (!seen.has(path)) {
-        this.files.delete(path);
-        changed = true;
-      }
-    }
-    return changed;
+    if (this.writing > 0 || this.writeGen !== gen) return false;
+    const removed = [...this.files.keys()].filter((p) => !seen.has(p));
+    for (const [p, f] of updates) this.files.set(p, f);
+    for (const p of removed) this.files.delete(p);
+    return updates.size > 0 || removed.length > 0;
   }
 
   get(path: string): ParsedFile | undefined {
@@ -124,16 +125,20 @@ export class Hold {
   /** Write a file and update its index entry. */
   async save(path: string, content: string): Promise<void> {
     this.writing++;
+    this.writeGen++;
     try {
       await this.fs.write(path, content);
       await this.refresh(path);
     } finally {
       this.writing--;
+      this.writeGen++;
     }
   }
 
   /** Saves in progress; reindex waits for them. */
   private writing = 0;
+  /** Bumped when any save starts or ends, so a reindex can tell it overlapped one. */
+  private writeGen = 0;
 
   async refresh(path: string): Promise<void> {
     const entry = (await this.fs.list()).find((f) => f.path === path);

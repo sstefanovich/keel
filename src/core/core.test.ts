@@ -427,6 +427,26 @@ describe("Hold", () => {
     expect(await hold.reindex()).toBe(false); // index already matches disk
   });
 
+  it("discards a reindex that a save overlapped (no older text back in the index)", async () => {
+    const hold = await makeHold({ "notes/a.md": "# A\nv1\n" });
+    const fs = hold.fs as MemoryFs;
+    // an outside edit makes the next reindex re-read a.md…
+    await fs.write("notes/a.md", "# A\nv2\n");
+    // …but the editor saves v3 right after that reindex has read v2 from disk
+    const read = fs.read.bind(fs);
+    let saving: Promise<void> | undefined;
+    fs.read = async (p) => {
+      const c = await read(p);
+      fs.read = read;
+      saving = hold.save("notes/a.md", "# A\nv3\n");
+      return c;
+    };
+    expect(await hold.reindex()).toBe(false); // overlapped a save: results thrown away
+    await saving;
+    expect(hold.get("notes/a.md")!.content).toBe("# A\nv3\n"); // not rolled back to v2
+    expect(await hold.reindex()).toBe(false); // and the index already matches disk
+  });
+
   it("concurrent ensureLog calls migrate once", async () => {
     const hold = await makeHold({
       "logs/2026/2026-10-16.md": "---\ndate: 2026-10-16\n---\n## Tasks\n- [ ] carry me\n",
