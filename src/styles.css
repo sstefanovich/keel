@@ -1572,3 +1572,38 @@ mark {
   padding-left: 24px;
   color: var(--muted);
 }
+
+/* ---------- log page: editor + work panel side by side ---------- */
+
+.log-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 8px;
+  max-width: 1200px;
+  margin: 0 auto;
+  align-items: start;
+}
+.log-main {
+  min-width: 0;
+}
+.log-side {
+  position: sticky;
+  top: 12px;
+  padding: 14px 16px 14px 0;
+}
+.log-side .work-panel {
+  width: 100%;
+  margin: 0;
+}
+@media (max-width: 1100px) {
+  .log-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .log-side {
+    position: static;
+    padding: 0 32px 24px;
+    max-width: 820px;
+    width: 100%;
+    margin: 0 auto;
+  }
+}

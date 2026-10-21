@@ -384,6 +384,24 @@ describe("Hold", () => {
     expect(hold.get("logs/2026/2026-10-21.md")!.tasks).toHaveLength(1);
   });
 
+  it("doesn't reindex while its own save is in flight", async () => {
+    const hold = await makeHold({ "notes/a.md": "# A\n" });
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const fs = hold.fs as MemoryFs;
+    const write = fs.write.bind(fs);
+    fs.write = async (p, c) => {
+      await write(p, c);
+      await gate; // file is on disk, index not updated yet
+    };
+    const saving = hold.save("notes/a.md", "# A\nmore\n");
+    expect(await hold.reindex()).toBe(false);
+    release();
+    await saving;
+    expect(hold.get("notes/a.md")!.content).toBe("# A\nmore\n");
+    expect(await hold.reindex()).toBe(false); // index already matches disk
+  });
+
   it("concurrent ensureLog calls migrate once", async () => {
     const hold = await makeHold({
       "logs/2026/2026-10-16.md": "---\ndate: 2026-10-16\n---\n## Tasks\n- [ ] carry me\n",

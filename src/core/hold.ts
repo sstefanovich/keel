@@ -89,6 +89,9 @@ export class Hold {
 
   /** Re-read files whose mtime changed; drop deleted ones. Returns true if anything changed. */
   async reindex(): Promise<boolean> {
+    // Keel's own save is mid-flight: catching the file between write and index update
+    // would look like an outside edit and make an open editor reload under the cursor
+    if (this.writing > 0) return false;
     const listing = await this.fs.list();
     const seen = new Set<string>();
     let changed = false;
@@ -118,9 +121,17 @@ export class Hold {
 
   /** Write a file and update its index entry. */
   async save(path: string, content: string): Promise<void> {
-    await this.fs.write(path, content);
-    await this.refresh(path);
+    this.writing++;
+    try {
+      await this.fs.write(path, content);
+      await this.refresh(path);
+    } finally {
+      this.writing--;
+    }
   }
+
+  /** Saves in progress; reindex waits for them. */
+  private writing = 0;
 
   async refresh(path: string): Promise<void> {
     const entry = (await this.fs.list()).find((f) => f.path === path);

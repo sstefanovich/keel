@@ -151,14 +151,20 @@ export function Editor({ path, line, onOpenLink }: Props) {
     const v = view.current;
     const f = hold.get(path);
     if (!v || !f || f.mtime === saved.current.mtime || timer.current !== undefined) return;
-    if (f.content !== v.state.doc.toString()) {
-      const sel = v.state.selection.main.head;
-      v.dispatch({
-        changes: { from: 0, to: v.state.doc.length, insert: f.content },
-        selection: { anchor: Math.min(sel, f.content.length) },
-      });
-      window.clearTimeout(timer.current);
-      timer.current = undefined;
+    const doc = v.state.doc.toString();
+    // typing that hasn't been saved yet (e.g. while a save is in flight): never reload over it
+    if (doc !== saved.current.content) return;
+    if (f.content !== doc) {
+      // replace only the changed span so the cursor and scroll position map through the edit
+      let start = 0;
+      while (start < doc.length && start < f.content.length && doc[start] === f.content[start]) start++;
+      let endOld = doc.length;
+      let endNew = f.content.length;
+      while (endOld > start && endNew > start && doc[endOld - 1] === f.content[endNew - 1]) {
+        endOld--;
+        endNew--;
+      }
+      v.dispatch({ changes: { from: start, to: endOld, insert: f.content.slice(start, endNew) } });
     }
     saved.current = { content: f.content, mtime: f.mtime };
   }, [version, hold, path]);

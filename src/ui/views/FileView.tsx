@@ -50,6 +50,22 @@ export function FileView({ path, line }: { path: string; line?: number }) {
     }
   };
 
+  const backlinkList =
+    backlinks.length > 0 ? (
+      <footer className="backlinks">
+        <h4>Linked from</h4>
+        <ul>
+          {backlinks.map((b) => (
+            <li key={b.path}>
+              <button className="link" onClick={() => nav.openFile(b.path)}>
+                {b.kind === "log" && b.date ? formatLong(b.date) : b.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </footer>
+    ) : null;
+
   return (
     <div className="file-view">
       <header className="file-head">
@@ -86,25 +102,23 @@ export function FileView({ path, line }: { path: string; line?: number }) {
       </header>
       <div className="file-body">
         {isLog && file.date === today() && <FlagBoard compact />}
-        {isLog && <WorkPanel file={file} />}
-        {mode === "chart" && hasChart ? (
-          <ChartView path={path} />
+        {isLog ? (
+          // Work panel beside the editor (below it when narrow): it re-renders as you type
+          // work lines, so it must never sit above the text and shift it under the cursor
+          <div className="log-layout">
+            <div className="log-main">
+              <Editor key={path} path={path} line={line} onOpenLink={nav.openLink} />
+              {backlinkList}
+            </div>
+            <aside className="log-side">
+              <WorkPanel file={file} />
+            </aside>
+          </div>
         ) : (
-          <Editor key={path} path={path} line={line} onOpenLink={nav.openLink} />
-        )}
-        {backlinks.length > 0 && (
-          <footer className="backlinks">
-            <h4>Linked from</h4>
-            <ul>
-              {backlinks.map((b) => (
-                <li key={b.path}>
-                  <button className="link" onClick={() => nav.openFile(b.path)}>
-                    {b.kind === "log" && b.date ? formatLong(b.date) : b.title}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </footer>
+          <>
+            {mode === "chart" && hasChart ? <ChartView path={path} /> : <Editor key={path} path={path} line={line} onOpenLink={nav.openLink} />}
+            {backlinkList}
+          </>
         )}
       </div>
     </div>
