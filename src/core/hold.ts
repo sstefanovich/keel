@@ -318,7 +318,7 @@ export class Hold {
   /** Projects whose frontmatter names this client key. */
   projectsOf(clientKey: string): ParsedFile[] {
     return this.all()
-      .filter((f) => f.kind === "project" && String(f.frontmatter.client ?? "").toLowerCase() === clientKey)
+      .filter((f) => f.kind === "project" && this.fileClient(f) === clientKey)
       .sort((a, b) => a.title.localeCompare(b.title));
   }
 
@@ -398,19 +398,21 @@ export class Hold {
   /** Which client a file belongs to: the client file itself, or a `client:` in frontmatter. */
   fileClient(f: ParsedFile): string | undefined {
     if (f.kind === "client") return basename(f.path).toLowerCase();
-    const c = typeof f.frontmatter.client === "string" ? f.frontmatter.client.trim().toLowerCase() : "";
+    const c = keyValue(f.frontmatter.client).split("/")[0];
     if (c) return c;
     // a note or meeting tied to a project belongs to that project's client
-    const p = f.kind !== "project" ? this.fileProject(f) : undefined;
-    const proj = p ? this.projectByKey(p) : undefined;
+    // ("project: @client/project" names it directly)
+    const raw = f.kind !== "project" ? keyValue(f.frontmatter.project) : "";
+    if (raw.includes("/")) return raw.split("/")[0];
+    const proj = raw ? this.projectByKey(raw) : undefined;
     return proj ? this.fileClient(proj) : undefined;
   }
 
   /** The project a file belongs to: the project file itself, or a `project:` key in frontmatter. */
   fileProject(f: ParsedFile): string | undefined {
     if (f.kind === "project") return slugify(basename(f.path));
-    const p = typeof f.frontmatter.project === "string" ? f.frontmatter.project.trim().toLowerCase().replace(/^@/, "") : "";
-    return p || undefined;
+    const p = keyValue(f.frontmatter.project);
+    return (p.includes("/") ? p.split("/")[1] : p) || undefined;
   }
 
   /** Notes and meetings tied to a project with `project:` in their frontmatter, newest first. */
@@ -606,4 +608,9 @@ export function workHeading(content: string): string {
   if (/^#{1,6}\s+work\s*$/im.test(content)) return "Work";
   if (/^#{1,6}\s+hours\s*$/im.test(content)) return "Hours";
   return "Work";
+}
+
+/** A client/project key from frontmatter: "@Hogan-Lovells" → "hogan-lovells". */
+function keyValue(v: unknown): string {
+  return typeof v === "string" ? v.trim().replace(/^@/, "").toLowerCase() : "";
 }

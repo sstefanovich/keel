@@ -42,7 +42,7 @@ export function ClientsManager() {
   // undefined = not chosen yet (default to the first client); "" = deliberately no client
   const [projectClient, setProjectClient] = useState<string | undefined>(undefined);
   const pc = projectClient === "" || (projectClient && keys.has(projectClient)) ? projectClient : (clients[0]?.key ?? "");
-  const orphans = hold.all().filter((f) => f.kind === "project" && !keys.has(String(f.frontmatter.client ?? "").toLowerCase()));
+  const orphans = hold.all().filter((f) => f.kind === "project" && !keys.has(hold.fileClient(f) ?? ""));
 
   const run = async (fn: () => Promise<unknown>, msg?: string) => {
     try {
@@ -78,7 +78,7 @@ export function ClientsManager() {
 
   const projectRow = (p: ParsedFile) => {
     const status = typeof p.frontmatter.status === "string" ? p.frontmatter.status : "active";
-    const owner = String(p.frontmatter.client ?? "").toLowerCase();
+    const owner = hold.fileClient(p) ?? "";
     return (
       <tr key={p.path} className="project-row">
         <td>

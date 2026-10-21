@@ -701,6 +701,32 @@ date: 2026-10-21
     expect(hold.get(proj)!.frontmatter.client).toBeUndefined();
   });
 
+  it("accepts @mentions as frontmatter values", async () => {
+    const hold = await makeHold({
+      "clients/hogan-lovells.md": "---\nname: Hogan Lovells\n---\n",
+      "clients/alex-lee.md": "---\nname: Alex Lee\n---\n",
+      "projects/FLIS Retain PA.md": "---\nclient: @hogan-lovells\nstatus: active\n---\n# FLIS\n",
+      "notes/a.md": "---\nproject: @flis-retain-pa\ncreated: 2026-10-21\n---\n# A\n",
+      "notes/b.md": "---\nclient: @Alex-Lee   \ntags: [@x, plain]\n---\n# B\n",
+      "notes/c.md": "---\nproject: @hogan-lovells/flis-retain-pa\n---\n# C\n",
+      "meetings/2026-10-21 m.md": "---\ndate: 2026-10-21\nattendees:\n  - @jordan\n  - Priya\nclient: \"@alex-lee\"\n---\n# M\n",
+    });
+    const a = hold.get("notes/a.md")!;
+    expect(a.frontmatter).toEqual({ project: "@flis-retain-pa", created: "2026-10-21" }); // nothing lost
+    expect([hold.fileProject(a), hold.fileClient(a)]).toEqual(["flis-retain-pa", "hogan-lovells"]);
+    expect(hold.fileClient(hold.get("notes/b.md")!)).toBe("alex-lee");
+    expect(hold.get("notes/b.md")!.frontmatter.tags).toEqual(["@x", "plain"]);
+    const c = hold.get("notes/c.md")!;
+    expect([hold.fileProject(c), hold.fileClient(c)]).toEqual(["flis-retain-pa", "hogan-lovells"]);
+    const m = hold.get("meetings/2026-10-21 m.md")!;
+    expect(m.date).toBe("2026-10-21");
+    expect(m.frontmatter.attendees).toEqual(["@jordan", "Priya"]);
+    expect(hold.fileClient(m)).toBe("alex-lee");
+    // a project whose client is written as @key still lists under that client
+    expect(hold.projectsOf("hogan-lovells").map((p) => p.title)).toEqual(["FLIS"]);
+    expect(hold.notesOf("flis-retain-pa").map((n) => n.title).sort()).toEqual(["A", "C"]);
+  });
+
   it("ties notes to a project with project: frontmatter", async () => {
     const hold = await makeHold({
       "clients/hogan-lovells.md": "---\nname: Hogan Lovells\n---\n",

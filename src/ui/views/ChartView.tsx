@@ -60,7 +60,7 @@ export function ChartView({ path }: { path: string }) {
           .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || b.mtime - a.mtime);
   const client = file.kind === "client" ? hold.clients().get(key) : undefined;
   const projects = file.kind === "client" ? hold.projectsOf(key) : [];
-  const parentKey = file.kind === "project" ? String(file.frontmatter.client ?? "").toLowerCase() : "";
+  const parentKey = file.kind === "project" ? (hold.fileClient(file) ?? "") : "";
   const parent = parentKey ? hold.clients().get(parentKey) : undefined;
   // projects inherit the client's tenant/subscription for portal links
   const parentChart = parent?.path ? hold.get(parent.path)?.chart ?? [] : [];

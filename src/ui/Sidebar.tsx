@@ -106,7 +106,7 @@ export function Sidebar() {
     ...clientFiles
       .filter(mine)
       .flatMap((c) => [c, ...hold.projectsOf(basename(c.path).toLowerCase()).filter((p) => p.frontmatter.status !== "done")]),
-    ...(focus ? [] : files.filter((f) => f.kind === "project" && !clientKeys.has(String(f.frontmatter.client ?? "").toLowerCase()))),
+    ...(focus ? [] : files.filter((f) => f.kind === "project" && !clientKeys.has(hold.fileClient(f) ?? ""))),
   ];
   const clients = [...hold.clients().values()].sort((a, b) => a.name.localeCompare(b.name));
 

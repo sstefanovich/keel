@@ -140,6 +140,19 @@ export function basename(path: string): string {
   return path.split("/").pop()!.replace(/\.md$/i, "");
 }
 
+/**
+ * YAML can't start a plain value with "@", so "project: @flis-retain-pa" would make the whole
+ * frontmatter unreadable. Quote such values (and @items in inline lists) before parsing.
+ */
+function quoteMentions(yamlText: string): string {
+  return yamlText
+    .replace(/^(\s*[\w-]+:[ \t]*)(@[^\s#,\[\]{}"']+)[ \t]*$/gm, '$1"$2"')
+    .replace(/^(\s*[\w-]+:[ \t]*\[)([^\]\n]*)\]/gm, (_m, head: string, items: string) =>
+      `${head}${items.replace(/(^|,)(\s*)(@[^\s,\]"']+)/g, '$1$2"$3"')}]`,
+    )
+    .replace(/^(\s*-[ \t]+)(@[^\s#"']+)[ \t]*$/gm, '$1"$2"');
+}
+
 /** Splits leading YAML frontmatter. Returns the number of lines it occupied. */
 export function splitFrontmatter(content: string, parse = true): { data: Record<string, unknown>; lines: number } {
   const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/);
@@ -148,7 +161,7 @@ export function splitFrontmatter(content: string, parse = true): { data: Record<
   if (!parse) return { data: {}, lines };
   let data: Record<string, unknown> = {};
   try {
-    const parsed = parseYaml(m[1]);
+    const parsed = parseYaml(quoteMentions(m[1]));
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) data = parsed as Record<string, unknown>;
   } catch {
     // malformed frontmatter: treat as empty rather than failing the whole file

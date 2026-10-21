@@ -161,6 +161,29 @@ export function keelCompletions(getNames: () => string[], getTargets: () => Work
     const line = ctx.state.doc.lineAt(ctx.pos);
     const lineText = line.text;
 
+    // frontmatter "client: @…" suggests clients, "project: @…" suggests projects
+    const fm = lineText.slice(0, ctx.pos - line.from).match(/^\s*(client|project):\s*@([\w.-]*)(\/[\w.-]*)?$/i);
+    if (fm) {
+      const wantProject = fm[1].toLowerCase() === "project";
+      if (wantProject && fm[3] !== undefined) {
+        const client = fm[2].toLowerCase();
+        return {
+          from: ctx.pos - (fm[3].length - 1),
+          options: getTargets()
+            .filter((t) => t.project && t.client === client)
+            .map((t) => ({ label: t.project!, detail: t.detail, type: "class" })),
+          validFor: /^[\w.-]*$/,
+        };
+      }
+      return {
+        from: at.from + 1,
+        options: getTargets()
+          .filter((t) => (wantProject ? !!t.project : !t.project && !!t.client))
+          .map((t) => ({ label: t.key, detail: t.detail, type: wantProject ? "class" : "variable" })),
+        validFor: /^[\w.-]*$/,
+      };
+    }
+
     // a bullet that isn't a task: "- @", "- 6h @", "- 6 hours @", "- @contoso/" → projects and clients
     if (!TASK.test(lineText) && /^\s*[-*+]\s+(?:\S+\s+){0,3}@[\w.-]*(?:\/[\w.-]*)?$/.test(lineText.slice(0, ctx.pos - line.from))) {
       const typed = at.text.slice(1);

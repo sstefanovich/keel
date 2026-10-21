@@ -15,7 +15,7 @@ export function ChartsView() {
   const allKeys = new Set(hold.clients().keys());
   const orphans = focus
     ? []
-    : hold.all().filter((f) => f.kind === "project" && !allKeys.has(String(f.frontmatter.client ?? "").toLowerCase()));
+    : hold.all().filter((f) => f.kind === "project" && !allKeys.has(hold.fileClient(f) ?? ""));
   const results = hold.chartSearch(q, focus);
 
   return (
