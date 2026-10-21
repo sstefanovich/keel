@@ -1,15 +1,15 @@
 import { ISODate, addDays, formatShort } from "./dates";
 import { Hold, round2 } from "./hold";
 
-/** One project (or a client's general time) across a Mon–Sun week. */
+/** One project (or a client's general time) across a 7-day timesheet week. */
 export interface WeekRow {
   client: string;
   clientName: string;
   project?: string;
   label: string;
-  /** Hours per day, Mon..Sun */
+  /** Hours per day, in week order (days[0] first) */
   hours: number[];
-  /** What was done per day, Mon..Sun */
+  /** What was done per day, in week order */
   items: string[][];
   total: number;
 }
@@ -25,8 +25,8 @@ export interface Week {
  * The timesheet for a week, one row per project: daily hours plus the items done
  * each day (bullets under "- 6h @project" lines and ticked tasks tagged to it).
  */
-export function buildWeek(hold: Hold, monday: ISODate, client?: string): Week {
-  const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+export function buildWeek(hold: Hold, start: ISODate, client?: string): Week {
+  const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const clients = hold.clients();
   const rows = new Map<string, WeekRow>();
   const row = (c: string, p?: string): WeekRow => {
@@ -84,7 +84,7 @@ export function weekTsv(w: Week): string {
   return [head, ...lines, ["Total", ...w.dayTotals.map(fmt), fmt(w.total)]].map((l) => l.join("\t")).join("\r\n");
 }
 
-/** One row's hours as tab-separated Mon..Sun values (paste across a form row). */
+/** One row's hours as tab-separated values in week order (paste across a form row). */
 export function rowTsv(r: WeekRow): string {
   return r.hours.map(fmt).join("\t");
 }

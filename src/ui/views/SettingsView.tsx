@@ -4,12 +4,15 @@ import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 import { useTheme } from "../theme";
 import { ClientsManager } from "../ClientsManager";
+import { WEEKDAY_NAMES } from "../../core/dates";
+import { setWeekStart, useWeekStart } from "../weekStart";
 
 export function SettingsView({ section }: { section?: string }) {
   const { dir, reportError } = useHold();
   const nav = useNav();
   const [autostart, setAuto] = useState(false);
   const { pref, theme, setPref } = useTheme();
+  const weekStart = useWeekStart();
 
   useEffect(() => {
     getAutostart().then(setAuto).catch(() => {});
@@ -55,6 +58,23 @@ export function SettingsView({ section }: { section?: string }) {
       <section className="panel" id="settings-clients">
         <h2>Clients & projects</h2>
         <ClientsManager />
+      </section>
+
+      <section className="panel">
+        <h2>Timesheet</h2>
+        <label className="setting-row">
+          Weeks start on
+          <select value={weekStart} onChange={(e) => setWeekStart(Number(e.target.value))} aria-label="Timesheet week starts on">
+            {WEEKDAY_NAMES.map((n, i) => (
+              <option key={n} value={i}>
+                {n}
+              </option>
+            ))}
+          </select>
+          <span className="muted small">
+            {WEEKDAY_NAMES[weekStart]} – {WEEKDAY_NAMES[(weekStart + 6) % 7]}, used by the Timesheet and Dispatch
+          </span>
+        </label>
       </section>
 
       <section className="panel">

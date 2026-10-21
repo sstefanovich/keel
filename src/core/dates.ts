@@ -32,11 +32,12 @@ export function weekdayOf(iso: ISODate): number {
   return parseISO(iso).getDay();
 }
 
-/** Monday of the week containing iso. */
-export function startOfWeek(iso: ISODate): ISODate {
-  const wd = weekdayOf(iso);
-  return addDays(iso, wd === 0 ? -6 : 1 - wd);
+/** First day of the week containing iso. weekStart: 0 = Sunday … 6 = Saturday (default Monday). */
+export function startOfWeek(iso: ISODate, weekStart = 1): ISODate {
+  return addDays(iso, -((weekdayOf(iso) - weekStart + 7) % 7));
 }
+
+export const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export function startOfMonth(iso: ISODate): ISODate {
   return iso.slice(0, 8) + "01";

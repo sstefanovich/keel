@@ -5,18 +5,19 @@ import { safeFileName } from "../../core/templates";
 import { copyRich, copyText } from "../../lib/platform";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
+import { useWeekStart } from "../weekStart";
 
 type Period = "this-week" | "last-week" | "last-2-weeks" | "custom";
 
-function range(p: Period, custom: [ISODate, ISODate]): [ISODate, ISODate] {
-  const mon = startOfWeek(today());
+function range(p: Period, custom: [ISODate, ISODate], weekStart: number): [ISODate, ISODate] {
+  const s = startOfWeek(today(), weekStart);
   switch (p) {
     case "this-week":
-      return [mon, addDays(mon, 6)];
+      return [s, addDays(s, 6)];
     case "last-week":
-      return [addDays(mon, -7), addDays(mon, -1)];
+      return [addDays(s, -7), addDays(s, -1)];
     case "last-2-weeks":
-      return [addDays(mon, -14), addDays(mon, -1)];
+      return [addDays(s, -14), addDays(s, -1)];
     case "custom":
       return custom;
   }
@@ -31,6 +32,7 @@ export function DispatchView() {
   const [period, setPeriod] = useState<Period>("this-week");
   const [custom, setCustom] = useState<[ISODate, ISODate]>([addDays(today(), -13), today()]);
   const [includeHours, setIncludeHours] = useState(true);
+  const weekStart = useWeekStart();
 
   if (!clients.length) {
     return (
@@ -44,7 +46,7 @@ export function DispatchView() {
   }
 
   const key = hold.clients().has(client) ? client : clients[0].key;
-  const [from, to] = range(period, custom);
+  const [from, to] = range(period, custom, weekStart);
   const report = buildReport(hold, key, from, to);
   const opts = { includeHours };
   const md = reportMarkdown(report, opts);

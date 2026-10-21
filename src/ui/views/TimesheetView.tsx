@@ -1,19 +1,21 @@
 import { ReactNode, useState } from "react";
-import { ISODate, addDays, addMonths, endOfMonth, formatShort, startOfMonth, startOfWeek, today } from "../../core/dates";
+import { ISODate, addDays, addMonths, endOfMonth, formatShort, startOfMonth, startOfWeek, today, weekdayOf } from "../../core/dates";
 import { round2 } from "../../core/hold";
 import { copyText, exportText } from "../../lib/platform";
 import { buildWeek, dayItems, rowReport, rowTsv, weekTsv } from "../../core/week";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
+import { useWeekStart } from "../weekStart";
 
 type Preset = "this-week" | "last-week" | "this-month" | "last-month" | "this-year" | "custom";
 
-function rangeFor(p: Preset, d: ISODate): [ISODate, ISODate] {
+function rangeFor(p: Preset, d: ISODate, weekStart: number): [ISODate, ISODate] {
+  const s = startOfWeek(d, weekStart);
   switch (p) {
     case "this-week":
-      return [startOfWeek(d), addDays(startOfWeek(d), 6)];
+      return [s, addDays(s, 6)];
     case "last-week":
-      return [addDays(startOfWeek(d), -7), addDays(startOfWeek(d), -1)];
+      return [addDays(s, -7), addDays(s, -1)];
     case "this-month":
       return [startOfMonth(d), endOfMonth(d)];
     case "last-month": {
@@ -31,9 +33,10 @@ const fmtHours = (h: number) => `${round2(h)}h`;
 function TotalsView({ toggle }: { toggle: ReactNode }) {
   const { hold, bump, reportError, toast, focus } = useHold();
   const nav = useNav();
+  const weekStart = useWeekStart();
   const [preset, setPreset] = useState<Preset>("this-week");
-  const [custom, setCustom] = useState<[ISODate, ISODate]>(() => rangeFor("this-month", today()));
-  const [from, to] = preset === "custom" ? custom : rangeFor(preset, today());
+  const [custom, setCustom] = useState<[ISODate, ISODate]>(() => rangeFor("this-month", today(), weekStart));
+  const [from, to] = preset === "custom" ? custom : rangeFor(preset, today(), weekStart);
   const ts = hold.timesheet(from, to, focus);
 
   const projectCount = ts.byClient.reduce((n, c) => n + c.byProject.filter((p) => p.key).length, 0);
@@ -236,9 +239,12 @@ const cell = (h: number) => (h ? String(round2(h)) : "");
 function WeekSheet({ toggle }: { toggle: ReactNode }) {
   const { hold, toast, focus } = useHold();
   const nav = useNav();
-  const [monday, setMonday] = useState(() => startOfWeek(today()));
-  const week = buildWeek(hold, monday, focus);
+  const weekStart = useWeekStart();
+  // weeks relative to the current one, so changing the start day in Settings re-aligns at once
+  const [offset, setOffset] = useState(0);
   const t = today();
+  const week = buildWeek(hold, addDays(startOfWeek(t, weekStart), offset * 7), focus);
+  const isWeekend = (d: string) => [0, 6].includes(weekdayOf(d));
 
   const copy = async (text: string, what: string) => {
     await copyText(text);
@@ -256,11 +262,13 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
         </div>
         <div className="toolbar">
           {toggle}
-          <button onClick={() => setMonday(addDays(monday, -7))} aria-label="Previous week">
+          <button onClick={() => setOffset(offset - 1)} aria-label="Previous week">
             ‹
           </button>
-          <button onClick={() => setMonday(startOfWeek(t))}>This week</button>
-          <button onClick={() => setMonday(addDays(monday, 7))} aria-label="Next week">
+          <button onClick={() => setOffset(0)} disabled={offset === 0}>
+            This week
+          </button>
+          <button onClick={() => setOffset(offset + 1)} aria-label="Next week">
             ›
           </button>
           <button onClick={() => copy(weekTsv(week), "the week grid")} disabled={!week.rows.length} title="Tab-separated, pastes into Excel or a form grid">
@@ -281,8 +289,8 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
               <thead>
                 <tr>
                   <th>Project</th>
-                  {week.days.map((d, i) => (
-                    <th key={d} className={`num${i >= 5 ? " weekend" : ""}${d === t ? " today" : ""}`}>
+                  {week.days.map((d) => (
+                    <th key={d} className={`num${isWeekend(d) ? " weekend" : ""}${d === t ? " today" : ""}`}>
                       <button className="link" onClick={() => nav.openLog(d)} title="Open this day's log">
                         {formatShort(d).replace(",", "")}
                       </button>
@@ -302,7 +310,7 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
                     {r.hours.map((h, i) => {
                       const missing = !h && r.items[i].length > 0;
                       return (
-                        <td key={i} className={`num${i >= 5 ? " weekend" : ""}${missing ? " missing" : ""}`}>
+                        <td key={i} className={`num${isWeekend(week.days[i]) ? " weekend" : ""}${missing ? " missing" : ""}`}>
                           {missing ? (
                             <button className="link small" onClick={() => nav.openLog(week.days[i])} title="Work listed but no hours entered">
                               ?
@@ -317,7 +325,7 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
                     })}
                     <td className="num week-total">{cell(r.total)}</td>
                     <td>
-                      <button className="ghost small" onClick={() => copy(rowTsv(r), `${r.label} hours`)} title="Mon–Sun hours, tab-separated">
+                      <button className="ghost small" onClick={() => copy(rowTsv(r), `${r.label} hours`)} title="This row's hours for the week, tab-separated">
                         Copy row
                       </button>
                     </td>
@@ -328,7 +336,7 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
                 <tr>
                   <td>Total</td>
                   {week.dayTotals.map((h, i) => (
-                    <td key={i} className={`num${i >= 5 ? " weekend" : ""}`}>
+                    <td key={i} className={`num${isWeekend(week.days[i]) ? " weekend" : ""}`}>
                       {cell(h)}
                     </td>
                   ))}

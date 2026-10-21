@@ -3,7 +3,7 @@ import { azureContext, azurePortalUrl } from "./azure";
 import { parseCapture } from "./capture";
 import { buildReport, reportHtml, reportMarkdown } from "./report";
 import { buildWeek, rowReport, rowTsv, weekTsv } from "./week";
-import { parseTime, today } from "./dates";
+import { parseTime, startOfWeek, today } from "./dates";
 import { MemoryFs } from "./fs";
 import { Hold } from "./hold";
 import { appendToSection, parseFile, replaceBody, setFrontmatterField, setTaskChar, yamlScalar } from "./parse";
@@ -46,6 +46,20 @@ describe("parseTime", () => {
     ["25:00", null],
     ["13pm", null],
   ])("%s → %s", (input, out) => expect(parseTime(input)).toBe(out));
+});
+
+describe("startOfWeek", () => {
+  it("defaults to Monday", () => {
+    expect(startOfWeek("2026-10-21")).toBe("2026-10-19"); // Wed → Mon
+    expect(startOfWeek("2026-10-25")).toBe("2026-10-19"); // Sun → previous Mon
+  });
+  it("supports Saturday–Friday weeks", () => {
+    expect(startOfWeek("2026-10-21", 6)).toBe("2026-10-17"); // Wed → Sat
+    expect(startOfWeek("2026-10-17", 6)).toBe("2026-10-17"); // Sat is the first day
+    expect(startOfWeek("2026-10-23", 6)).toBe("2026-10-17"); // Fri is the last day
+    expect(startOfWeek("2026-10-24", 6)).toBe("2026-10-24"); // next Sat starts a new week
+    expect(startOfWeek("2026-11-01", 6)).toBe("2026-10-31"); // across a month boundary
+  });
 });
 
 describe("parseFile", () => {
@@ -609,6 +623,19 @@ date: 2026-10-21
     expect(rowTsv(portal)).toBe("6\t7.5\t\t\t\t\t");
     expect(weekTsv(w).split("\r\n")[2]).toBe("Portal rebuild (Contoso)\t6\t7.5\t\t\t\t\t\t13.5");
     expect(buildWeek(hold, "2026-10-19", "globex").rows.map((r) => r.label)).toEqual(["globex"]);
+  });
+
+  it("builds a Saturday–Friday week", async () => {
+    const hold = await makeHold({
+      "logs/2026/2026-10-17.md": "---\ndate: 2026-10-17\n---\n- 2h @acme\n", // Sat: in
+      "logs/2026/2026-10-23.md": "---\ndate: 2026-10-23\n---\n- 3h @acme\n", // Fri: in
+      "logs/2026/2026-10-24.md": "---\ndate: 2026-10-24\n---\n- 5h @acme\n", // next Sat: out
+    });
+    const w = buildWeek(hold, startOfWeek("2026-10-21", 6));
+    expect(w.days[0]).toBe("2026-10-17");
+    expect(w.days[6]).toBe("2026-10-23");
+    expect(w.rows[0].hours).toEqual([2, 0, 0, 0, 0, 0, 3]);
+    expect(weekTsv(w).split("\r\n")[0]).toBe("Project\tSat, Oct 17\tSun, Oct 18\tMon, Oct 19\tTue, Oct 20\tWed, Oct 21\tThu, Oct 22\tFri, Oct 23\tTotal");
   });
 
   it("keeps a waiting item's original date when it rolls over", async () => {
