@@ -1,3 +1,4 @@
+import { CLAUDE_GUIDE } from "./claudeGuide";
 import { ISODate, addDays, hhmm, today as todayISO } from "./dates";
 import { HoldFs } from "./fs";
 import {
@@ -76,6 +77,7 @@ export class Hold {
     const seed: Record<string, string> = {
       ...DEFAULT_TEMPLATES,
       "reminders.md": DEFAULT_REMINDERS,
+      "CLAUDE.md": CLAUDE_GUIDE,
       "notes/Welcome to Keel.md": WELCOME_NOTE,
     };
     const listing = await this.fs.list();

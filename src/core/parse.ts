@@ -131,6 +131,8 @@ export function kindOf(path: string): FileKind {
   if (path.startsWith("flags/")) return "flag";
   if (path.startsWith("templates/")) return "template";
   if (path === "reminders.md") return "reminders";
+  // guide for Claude Code: treated like a template so its examples aren't read as tasks or notes
+  if (path === "CLAUDE.md") return "template";
   return "note";
 }
 

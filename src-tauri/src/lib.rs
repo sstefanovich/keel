@@ -1,4 +1,5 @@
 mod hold;
+mod pty;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -42,6 +43,7 @@ pub fn run() {
     use tauri_plugin_global_shortcut::ShortcutState;
 
     tauri::Builder::default()
+        .manage(pty::Ptys::default())
         // must be first: a second launch just focuses the running instance
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
         .plugin(tauri_plugin_notification::init())
@@ -112,6 +114,11 @@ pub fn run() {
             hold::hold_remove,
             hold::hold_rename,
             hold::save_export,
+            pty::claude_path,
+            pty::pty_spawn,
+            pty::pty_write,
+            pty::pty_resize,
+            pty::pty_kill,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Keel");

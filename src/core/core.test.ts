@@ -367,6 +367,17 @@ describe("Hold", () => {
     expect(hold.get("reminders.md")).toBeDefined();
     expect(hold.get("templates/log.md")).toBeDefined();
     expect(hold.get("notes/Welcome to Keel.md")).toBeDefined();
+    // CLAUDE.md is seeded but its examples aren't tasks, hours or notes
+    expect(hold.get("CLAUDE.md")?.kind).toBe("template");
+    expect(hold.tasks().some((t) => t.file === "CLAUDE.md")).toBe(false);
+    expect(hold.search("retention policy")).toEqual([]);
+  });
+
+  it("adds CLAUDE.md to an existing hold but never overwrites the user's copy", async () => {
+    const hold = await makeHold({ "notes/x.md": "# x\n", "CLAUDE.md": "# my own rules\n" });
+    expect(await hold.fs.read("CLAUDE.md")).toBe("# my own rules\n");
+    const hold2 = await makeHold({ "notes/x.md": "# x\n" });
+    expect(await hold2.fs.read("CLAUDE.md")).toContain("# Keel hold: guide for Claude");
   });
 
   it("creating today's log migrates open top-level tasks from the last log", async () => {

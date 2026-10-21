@@ -10,6 +10,7 @@ import { Nav, NavCtx, NewKind, View } from "./ui/nav";
 import { ChartsView } from "./ui/views/ChartsView";
 import { DispatchView } from "./ui/views/DispatchView";
 import { FlagsView } from "./ui/views/FlagsView";
+import { ClaudePanel } from "./ui/ClaudePanel";
 import { WaitingView } from "./ui/views/WaitingView";
 import { useReminders } from "./ui/useReminders";
 import { AgendaView } from "./ui/views/AgendaView";
@@ -187,9 +188,17 @@ function Shell() {
     [hold, bump, openFile, reportError, focus],
   );
 
+  // Claude panel: mounted on first open, then only hidden, so its session survives toggling
+  const [claudeOpen, setClaudeOpen] = useState(false);
+  const [claudeMounted, setClaudeMounted] = useState(false);
+  const toggleClaude = useCallback(() => {
+    setClaudeMounted(true);
+    setClaudeOpen((o) => !o);
+  }, []);
+
   const nav: Nav = useMemo(
-    () => ({ view, go: setView, openFile, openToday, openLog, openLink, capture: () => startCapture(), newItem }),
-    [view, openFile, openToday, openLog, openLink, startCapture, newItem],
+    () => ({ view, go: setView, openFile, openToday, openLog, openLink, capture: () => startCapture(), newItem, claudeOpen, toggleClaude }),
+    [view, openFile, openToday, openLog, openLink, startCapture, newItem, claudeOpen, toggleClaude],
   );
 
   // start on today's log
@@ -204,6 +213,13 @@ function Shell() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      if (e.key === "`") {
+        e.preventDefault();
+        toggleClaude();
+        return;
+      }
+      // inside the Claude terminal, its own keys (Ctrl+T, Ctrl+J, …) win
+      if ((e.target as Element | null)?.closest?.(".claude-panel")) return;
       const k = e.key.toLowerCase();
       const act: Record<string, () => void> = e.shiftKey
         ? { f: () => setView({ kind: "search" }), m: () => newItem("meeting") }
@@ -215,23 +231,26 @@ function Shell() {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [startCapture, openToday, newItem]);
+  }, [startCapture, openToday, newItem, toggleClaude]);
 
   return (
     <NavCtx.Provider value={nav}>
       <div className="app">
         <Sidebar />
         <main className="main">
-          {view.kind === "file" && <FileView path={view.path} line={view.line} />}
-          {view.kind === "agenda" && <AgendaView />}
-          {view.kind === "flags" && <FlagsView />}
-          {view.kind === "waiting" && <WaitingView />}
-          {view.kind === "dispatch" && <DispatchView />}
-          {view.kind === "charts" && <ChartsView />}
-          {view.kind === "timesheet" && <TimesheetView />}
-          {view.kind === "calendar" && <CalendarView />}
-          {view.kind === "search" && <SearchView initial={view.q} />}
-          {view.kind === "settings" && <SettingsView section={view.section} />}
+          <div className="main-content">
+            {view.kind === "file" && <FileView path={view.path} line={view.line} />}
+            {view.kind === "agenda" && <AgendaView />}
+            {view.kind === "flags" && <FlagsView />}
+            {view.kind === "waiting" && <WaitingView />}
+            {view.kind === "dispatch" && <DispatchView />}
+            {view.kind === "charts" && <ChartsView />}
+            {view.kind === "timesheet" && <TimesheetView />}
+            {view.kind === "calendar" && <CalendarView />}
+            {view.kind === "search" && <SearchView initial={view.q} />}
+            {view.kind === "settings" && <SettingsView section={view.section} />}
+          </div>
+          {claudeMounted && <ClaudePanel open={claudeOpen} onClose={() => setClaudeOpen(false)} />}
         </main>
       </div>
       {capture && <QuickCapture onSubmit={submitCapture} onClose={() => setCapture(null)} focus={focus} />}

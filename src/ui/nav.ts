@@ -24,6 +24,9 @@ export interface Nav {
   capture: () => void;
   /** For "project", `client` preselects the client. */
   newItem: (kind: NewKind, client?: string) => void;
+  /** The Claude terminal panel */
+  claudeOpen: boolean;
+  toggleClaude: () => void;
 }
 
 export const NavCtx = createContext<Nav | null>(null);

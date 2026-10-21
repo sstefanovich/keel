@@ -1685,3 +1685,110 @@ mark {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- Claude panel ---------- */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.main-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.brand .claude-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+}
+.brand .claude-btn:hover {
+  background: color-mix(in srgb, #d97757 14%, transparent);
+  border-color: color-mix(in srgb, #d97757 40%, transparent);
+}
+.brand .claude-btn.on {
+  background: color-mix(in srgb, #d97757 20%, transparent);
+  border-color: #d97757;
+}
+
+.claude-panel {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  min-height: 160px;
+}
+.claude-panel.hidden {
+  display: none;
+}
+.claude-resize {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+  z-index: 2;
+}
+.claude-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  min-height: 32px;
+}
+.claude-title {
+  font-weight: 600;
+}
+.claude-cwd {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.claude-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.claude-term {
+  position: absolute;
+  inset: 6px 4px 4px 10px;
+}
+:root[data-theme="dark"] .claude-panel,
+:root[data-theme="dark"] .claude-body {
+  background: #0f1319;
+}
+:root:not([data-theme="dark"]) .claude-body {
+  background: #ffffff;
+}
+.claude-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 28px;
+  background: var(--surface);
+}
+.claude-overlay pre {
+  margin: 0;
+  padding: 6px 10px;
+  background: var(--code-bg);
+  border-radius: 6px;
+  font-family: var(--mono);
+}

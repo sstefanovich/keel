@@ -24,6 +24,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
     if (!isLog) return;
     const onKey = (e: KeyboardEvent) => {
       if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+      if ((e.target as Element | null)?.closest?.(".claude-panel")) return; // word-jumps in the terminal
       e.preventDefault();
       nav.openLog(addDays(file!.date!, e.key === "ArrowLeft" ? -1 : 1));
     };

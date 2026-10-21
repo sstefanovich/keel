@@ -108,6 +108,7 @@ export function SettingsView({ section }: { section?: string }) {
             {[
               ["Ctrl+Alt+K", "Quick capture, from anywhere in Windows"],
               ["Ctrl+K", "Quick capture (inside Keel)"],
+              ["Ctrl+`", "Show / hide Claude"],
               ["Ctrl+T", "Today's log"],
               ["Ctrl+J", "Agenda"],
               ["Ctrl+N", "New note"],

@@ -5,6 +5,7 @@ import { useHold } from "./HoldContext";
 import { View, useNav } from "./nav";
 import { ThemePref, useTheme } from "./theme";
 import { LogTree } from "./LogTree";
+import { ClaudeIcon } from "./ClaudePanel";
 
 function NavItem({ active, onClick, children, badge, hint }: { active?: boolean; onClick: () => void; children: ReactNode; badge?: number; hint?: string }) {
   return (
@@ -118,6 +119,15 @@ export function Sidebar() {
           <path d="M16 3v8M16 4l7 7h-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinejoin="round" />
         </svg>
         <span>Keel</span>
+        <button
+          className={`claude-btn${nav.claudeOpen ? " on" : ""}`}
+          onClick={nav.toggleClaude}
+          title={`${nav.claudeOpen ? "Hide" : "Ask"} Claude (Ctrl+\`)`}
+          aria-label={nav.claudeOpen ? "Hide Claude" : "Open Claude"}
+          aria-pressed={nav.claudeOpen}
+        >
+          <ClaudeIcon size={18} />
+        </button>
       </div>
 
       <div className={`focus-picker${focus ? " on" : ""}`}>
