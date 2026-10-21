@@ -278,3 +278,79 @@ export const mermaidPreview = StateField.define<DecorationSet>({
   update: (deco, tr) => (tr.docChanged || tr.effects.some((e) => e.is(refreshMermaid)) ? mermaidBlocks(tr.state) : deco),
   provide: (f) => EditorView.decorations.from(f),
 });
+
+/** Where the leading frontmatter block is: from its first "---" line to the closing one. */
+function frontmatterRange(state: EditorState): { from: number; to: number; lines: string[] } | null {
+  const doc = state.doc;
+  if (doc.lines < 2 || doc.line(1).text.trim() !== "---") return null;
+  for (let n = 2; n <= Math.min(doc.lines, 200); n++) {
+    if (doc.line(n).text.trim() === "---") {
+      const lines: string[] = [];
+      for (let i = 2; i < n; i++) lines.push(doc.line(i).text);
+      return { from: doc.line(1).from, to: doc.line(n).to, lines };
+    }
+  }
+  return null;
+}
+
+class PropertiesWidget extends WidgetType {
+  constructor(readonly lines: string[]) {
+    super();
+  }
+  eq(other: PropertiesWidget) {
+    return other.lines.join("\n") === this.lines.join("\n");
+  }
+  toDOM(view: EditorView) {
+    const box = document.createElement("div");
+    box.className = "cm-k-props";
+    box.title = "Properties (frontmatter). Click to edit";
+    const props = this.lines
+      .map((l) => l.match(/^([\w-]+):\s*(.*)$/))
+      .filter((m): m is RegExpMatchArray => !!m && !!m[2].trim() && m[2].trim() !== "[]");
+    if (!props.length) {
+      const empty = document.createElement("span");
+      empty.className = "cm-k-prop-empty";
+      empty.textContent = "Properties";
+      box.append(empty);
+    }
+    for (const [, key, raw] of props) {
+      const chip = document.createElement("span");
+      chip.className = "cm-k-prop";
+      const k = document.createElement("span");
+      k.className = "cm-k-prop-key";
+      k.textContent = key;
+      const v = document.createElement("span");
+      v.className = "cm-k-prop-val";
+      v.textContent = raw.trim().replace(/^["']|["']$/g, "").replace(/^\[(.*)\]$/, "$1");
+      chip.append(k, v);
+      box.append(chip);
+    }
+    box.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      // put the cursor at the end of the first property line, which expands the raw block
+      const line = view.state.doc.line(Math.min(2, view.state.doc.lines));
+      view.dispatch({ selection: { anchor: line.to } });
+      view.focus();
+    });
+    return box;
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
+function propertiesDecorations(state: EditorState): DecorationSet {
+  const fm = frontmatterRange(state);
+  if (!fm) return Decoration.none;
+  // while the cursor is inside the block, show it raw for editing
+  const inside = state.selection.ranges.some((r) => r.to >= fm.from && r.from <= fm.to + 1);
+  if (inside) return Decoration.none;
+  return Decoration.set([Decoration.replace({ widget: new PropertiesWidget(fm.lines), block: true }).range(fm.from, fm.to)]);
+}
+
+/** Shows the frontmatter as a compact row of property chips unless the cursor is in it. */
+export const propertiesView = StateField.define<DecorationSet>({
+  create: (state) => propertiesDecorations(state),
+  update: (deco, tr) => (tr.docChanged || tr.selection ? propertiesDecorations(tr.state) : deco),
+  provide: (f) => EditorView.decorations.from(f),
+});

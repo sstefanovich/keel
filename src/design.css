@@ -665,3 +665,92 @@ kbd {
     transition: none;
   }
 }
+
+/* ---------- editor: properties bar (collapsed frontmatter) ---------- */
+
+.cm-k-props {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 14px;
+  padding: 6px 8px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  cursor: text;
+  font-family: var(--font);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.cm-k-props:hover {
+  border-color: var(--border-strong);
+  background: var(--hover);
+}
+.cm-k-prop {
+  display: inline-flex;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.cm-k-prop-key {
+  padding: 1px 7px;
+  color: var(--muted);
+  background: var(--code-bg);
+}
+.cm-k-prop-val {
+  padding: 1px 8px;
+  color: var(--text-2);
+  max-width: 320px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cm-k-prop-empty {
+  color: var(--muted);
+}
+
+/* ---------- file header: save status ---------- */
+
+.save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 64px;
+}
+.save-status.saved {
+  color: var(--ok);
+}
+.save-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+.save-status.saving .save-dot {
+  background: var(--accent);
+  animation: keel-pulse 0.9s ease-in-out infinite;
+}
+@keyframes keel-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+button.icon-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- flags above today's log, aligned with the editor column ---------- */
+
+.log-main > .flag-board {
+  max-width: 820px;
+  margin: 16px auto 0;
+  padding: 0 32px;
+}
+.log-main > .flag-board.empty-board {
+  margin-top: 10px;
+}

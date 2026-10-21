@@ -4,7 +4,8 @@ import { confirmDialog } from "../../lib/platform";
 import { FlagBoard } from "../FlagBoard";
 import { WorkPanel } from "../WorkPanel";
 import { useHold } from "../HoldContext";
-import { Editor } from "../editor/Editor";
+import { Editor, SaveStatus } from "../editor/Editor";
+import { Check, Trash2 } from "lucide-react";
 import { useNav } from "../nav";
 import { ChartView } from "./ChartView";
 
@@ -19,6 +20,8 @@ export function FileView({ path, line }: { path: string; line?: number }) {
   const ownerKey = file && file.kind !== "project" ? hold.fileProject(file) : undefined;
   const ownerProject = ownerKey ? { name: hold.projectName(ownerKey), path: hold.projectByKey(ownerKey)?.path } : undefined;
   // charts open on the Chart tab unless we're jumping to a specific line
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  useEffect(() => setSaveStatus("saved"), [path]);
   const [mode, setMode] = useState<"chart" | "edit">(hasChart && line == null ? "chart" : "edit");
   useEffect(() => setMode(hasChart && line == null ? "chart" : "edit"), [path, hasChart, line]);
 
@@ -108,19 +111,28 @@ export function FileView({ path, line }: { path: string; line?: number }) {
             </button>
           </div>
         )}
-        <span className="file-path muted">{path}</span>
-        <button className="ghost danger" onClick={remove} title="Delete file">
+        <span className="file-path muted" title={path}>
+          {path}
+        </span>
+        {(mode === "edit" || !hasChart) && (
+          <span className={`save-status ${saveStatus}`} role="status" aria-live="polite">
+            {saveStatus === "saved" ? <Check size={13} aria-hidden="true" /> : <span className="save-dot" aria-hidden="true" />}
+            {saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Edited"}
+          </span>
+        )}
+        <button className="ghost danger icon-text" onClick={remove} title="Delete file">
+          <Trash2 size={14} aria-hidden="true" />
           Delete
         </button>
       </header>
       <div className="file-body">
-        {isLog && file.date === today() && <FlagBoard compact />}
         {isLog ? (
           // Work panel beside the editor (below it when narrow): it re-renders as you type
           // work lines, so it must never sit above the text and shift it under the cursor
           <div className="log-layout">
             <div className="log-main">
-              <Editor key={path} path={path} line={line} onOpenLink={nav.openLink} />
+              {file.date === today() && <FlagBoard compact />}
+              <Editor key={path} path={path} line={line} onOpenLink={(t) => nav.openLink(t)} onStatus={setSaveStatus} />
               {backlinkList}
             </div>
             <aside className="log-side">
@@ -129,7 +141,11 @@ export function FileView({ path, line }: { path: string; line?: number }) {
           </div>
         ) : (
           <>
-            {mode === "chart" && hasChart ? <ChartView path={path} /> : <Editor key={path} path={path} line={line} onOpenLink={nav.openLink} />}
+            {mode === "chart" && hasChart ? (
+              <ChartView path={path} />
+            ) : (
+              <Editor key={path} path={path} line={line} onOpenLink={(t) => nav.openLink(t)} onStatus={setSaveStatus} />
+            )}
             {backlinkList}
           </>
         )}

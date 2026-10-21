@@ -8,7 +8,7 @@ import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemir
 import { useEffect, useRef } from "react";
 import { basename } from "../../core/parse";
 import { useHold } from "../HoldContext";
-import { keelClicks, keelCompletions, keelDecorations, keelHighlight, mermaidPreview, refreshMermaid } from "./keelSyntax";
+import { keelClicks, keelCompletions, keelDecorations, keelHighlight, mermaidPreview, propertiesView, refreshMermaid } from "./keelSyntax";
 import { workTargets } from "../workTargets";
 import { onThemeChange } from "../theme";
 
@@ -16,11 +16,12 @@ interface Props {
   path: string;
   line?: number;
   onOpenLink: (target: string) => void;
+  /** Save state for the header: unsaved typing, a save in flight, or everything saved */
+  onStatus?: (s: SaveStatus) => void;
 }
 
 const SAVE_DELAY = 500;
 
-/** Markdown editor for one file. Autosaves; reloads when the file changes on disk. */
 const flushers = new Set<() => Promise<void>>();
 
 /** Save any unsaved typing in open editors. Await this before writing to a file an editor may have open. */
@@ -28,7 +29,12 @@ export async function flushEditors(): Promise<void> {
   await Promise.all([...flushers].map((f) => f()));
 }
 
-export function Editor({ path, line, onOpenLink }: Props) {
+export type SaveStatus = "saved" | "pending" | "saving";
+
+/** Markdown editor for one file. Autosaves; reloads when the file changes on disk. */
+export function Editor({ path, line, onOpenLink, onStatus }: Props) {
+  const statusRef = useRef(onStatus);
+  statusRef.current = onStatus;
   const { hold, version, bump, reportError } = useHold();
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
@@ -45,9 +51,11 @@ export function Editor({ path, line, onOpenLink }: Props) {
     const content = v.state.doc.toString();
     if (content === saved.current.content) return;
     saved.current.content = content;
+    statusRef.current?.("saving");
     try {
       await hold.save(path, content);
       saved.current.mtime = hold.get(path)?.mtime ?? 0;
+      if (v.state.doc.toString() === content) statusRef.current?.("saved");
       bump();
     } catch (e) {
       reportError(e);
@@ -74,6 +82,7 @@ export function Editor({ path, line, onOpenLink }: Props) {
           syntaxHighlighting(keelHighlight),
           keelDecorations,
           mermaidPreview,
+          propertiesView,
           keelClicks((t) => linkRef.current(t)),
           autocompletion({
             override: [
@@ -95,6 +104,7 @@ export function Editor({ path, line, onOpenLink }: Props) {
           EditorView.contentAttributes.of({ spellcheck: "true" }),
           EditorView.updateListener.of((u) => {
             if (!u.docChanged) return;
+            if (u.transactions.some((tr) => tr.isUserEvent("input") || tr.isUserEvent("delete") || tr.isUserEvent("undo") || tr.isUserEvent("redo") || tr.isUserEvent("move"))) statusRef.current?.("pending");
             window.clearTimeout(timer.current);
             timer.current = window.setTimeout(flush, SAVE_DELAY);
           }),
