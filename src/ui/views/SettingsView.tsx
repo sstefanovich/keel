@@ -3,8 +3,9 @@ import { getAutostart, isTauri, loadSettings, notify, pickFolder, saveSettings, 
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 import { useTheme } from "../theme";
+import { ClientsManager } from "../ClientsManager";
 
-export function SettingsView() {
+export function SettingsView({ section }: { section?: string }) {
   const { dir, reportError } = useHold();
   const nav = useNav();
   const [autostart, setAuto] = useState(false);
@@ -13,6 +14,10 @@ export function SettingsView() {
   useEffect(() => {
     getAutostart().then(setAuto).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (section) document.getElementById(`settings-${section}`)?.scrollIntoView({ block: "start" });
+  }, [section]);
 
   const changeHold = async () => {
     const picked = await pickFolder(dir);
@@ -31,7 +36,7 @@ export function SettingsView() {
   };
 
   return (
-    <div className="page narrow">
+    <div className="page settings-page">
       <header className="page-head">
         <h1>Settings</h1>
       </header>
@@ -45,6 +50,11 @@ export function SettingsView() {
             Change…
           </button>
         </div>
+      </section>
+
+      <section className="panel" id="settings-clients">
+        <h2>Clients & projects</h2>
+        <ClientsManager />
       </section>
 
       <section className="panel">

@@ -13,6 +13,7 @@ import {
   replaceBody,
   setFrontmatterField,
   setTaskChar,
+  yamlScalar,
 } from "./parse";
 import { occursOn } from "./schedule";
 import { DEFAULT_REMINDERS, DEFAULT_TEMPLATES, WELCOME_NOTE, fillTemplate, safeFileName, slugify } from "./templates";
@@ -227,6 +228,15 @@ export class Hold {
     const path = await this.freePath("projects", name);
     await this.save(path, fillTemplate(await this.template("project"), { date: todayISO(), title: name, client }));
     return path;
+  }
+
+  /** Set or clear several frontmatter fields of one file. */
+  async updateFrontmatter(path: string, fields: Record<string, string | number | undefined>): Promise<void> {
+    let content = await this.fs.read(path);
+    for (const [k, v] of Object.entries(fields)) {
+      content = setFrontmatterField(content, k, v === undefined || v === "" ? undefined : yamlScalar(v));
+    }
+    await this.save(path, content);
   }
 
   /** Projects whose frontmatter names this client key. */

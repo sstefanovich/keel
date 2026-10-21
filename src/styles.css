@@ -1391,3 +1391,51 @@ mark {
   background: var(--accent-soft);
   color: var(--accent);
 }
+
+/* ---------- settings: clients & projects ---------- */
+
+.settings-page {
+  max-width: 900px;
+}
+.manage-table td {
+  vertical-align: middle;
+}
+.manage-table input,
+.manage-table select {
+  width: 100%;
+  min-width: 0;
+  padding: 3px 6px;
+}
+.manage-table input.rate {
+  width: 90px;
+  text-align: right;
+}
+.manage-table input.currency {
+  width: 70px;
+  text-transform: uppercase;
+}
+.manage-table .client-row td {
+  padding-top: 10px;
+}
+.manage-table .project-row td:first-child {
+  padding-left: 18px;
+}
+.manage-table .key {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.manage-table .actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.manage-table tbody + tbody {
+  border-top: 2px solid var(--border);
+}
+.manage-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.manage-add input {
+  flex: 1;
+}

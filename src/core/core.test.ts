@@ -5,7 +5,7 @@ import { buildReport, reportHtml, reportMarkdown } from "./report";
 import { parseTime, today } from "./dates";
 import { MemoryFs } from "./fs";
 import { Hold } from "./hold";
-import { appendToSection, parseFile, replaceBody, setFrontmatterField, setTaskChar } from "./parse";
+import { appendToSection, parseFile, replaceBody, setFrontmatterField, setTaskChar, yamlScalar } from "./parse";
 import { occursOn, parseRemind } from "./schedule";
 
 const LOG = `---
@@ -262,6 +262,17 @@ describe("frontmatter editing", () => {
     expect(setFrontmatterField(lowered, "lowered", undefined)).toBe(c);
     expect(setFrontmatterField("Body\n", "color", "pink")).toBe("---\ncolor: pink\n---\nBody\n");
   });
+  it("quotes values YAML would misread", () => {
+    expect(yamlScalar("Acme Corp")).toBe("Acme Corp");
+    expect(yamlScalar("Acme: EU")).toBe('"Acme: EU"');
+    expect(yamlScalar("#1 client")).toBe('"#1 client"');
+    expect(yamlScalar("yes")).toBe('"yes"');
+    expect(yamlScalar("2026")).toBe('"2026"');
+    expect(yamlScalar(150)).toBe("150");
+    const round = parseFile("clients/a.md", setFrontmatterField("---\nname: x\n---\n", "name", yamlScalar('Say "hi": now')));
+    expect(round.frontmatter.name).toBe('Say "hi": now');
+  });
+
   it("replaces the body only", () => {
     expect(replaceBody("---\na: 1\n---\nold\n", "new\nlines")).toBe("---\na: 1\n---\nnew\nlines\n");
     expect(replaceBody("no fm\n", "x")).toBe("x\n");
@@ -496,6 +507,17 @@ describe("Hold", () => {
     await hold.updateFlag(p, { lowered: true });
     expect(hold.flags()).toEqual([]);
     expect(hold.loweredFlags().map((f) => f.path)).toEqual([p]);
+  });
+
+  it("updates and clears frontmatter fields", async () => {
+    const hold = await makeHold();
+    const p = await hold.createClient("Acme Corp");
+    await hold.updateFrontmatter(p, { name: "Acme: EMEA", rate: 165, currency: "EUR" });
+    expect(hold.clients().get("acme-corp")).toMatchObject({ name: "Acme: EMEA", rate: 165, currency: "EUR" });
+    const proj = await hold.createProject("Portal", "acme-corp");
+    await hold.updateFrontmatter(proj, { client: "", status: "done" });
+    expect(hold.get(proj)!.frontmatter).toMatchObject({ status: "done" });
+    expect(hold.get(proj)!.frontmatter.client).toBeUndefined();
   });
 
   it("links projects to clients and searches charts", async () => {

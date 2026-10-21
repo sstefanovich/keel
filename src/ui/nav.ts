@@ -10,7 +10,7 @@ export type View =
   | { kind: "timesheet" }
   | { kind: "calendar" }
   | { kind: "search"; q?: string }
-  | { kind: "settings" };
+  | { kind: "settings"; section?: string };
 
 export type NewKind = "note" | "meeting" | "client" | "project";
 

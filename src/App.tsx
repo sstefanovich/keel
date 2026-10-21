@@ -221,7 +221,7 @@ function Shell() {
           {view.kind === "timesheet" && <TimesheetView />}
           {view.kind === "calendar" && <CalendarView />}
           {view.kind === "search" && <SearchView initial={view.q} />}
-          {view.kind === "settings" && <SettingsView />}
+          {view.kind === "settings" && <SettingsView section={view.section} />}
         </main>
       </div>
       {capture && <QuickCapture onSubmit={submitCapture} onClose={() => setCapture(null)} focus={focus} />}

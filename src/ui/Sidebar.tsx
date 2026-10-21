@@ -43,6 +43,9 @@ function FileGroup({ title, files, label, current, onAdd, addLabel, limit = 8 }:
   );
 }
 
+/** Focus-picker entry that opens Settings → Clients & projects instead of focusing. */
+const MANAGE = "__manage";
+
 const NEXT_PREF: Record<ThemePref, ThemePref> = { system: "light", light: "dark", dark: "system" };
 const PREF_LABEL: Record<ThemePref, string> = { system: "System theme", light: "Light theme", dark: "Dark theme" };
 
@@ -98,7 +101,9 @@ export function Sidebar() {
   const clientFiles = files.filter((f) => f.kind === "client").sort((a, b) => a.title.localeCompare(b.title));
   const clientKeys = new Set(clientFiles.map((c) => basename(c.path).toLowerCase()));
   const charts = [
-    ...clientFiles.filter(mine).flatMap((c) => [c, ...hold.projectsOf(basename(c.path).toLowerCase())]),
+    ...clientFiles
+      .filter(mine)
+      .flatMap((c) => [c, ...hold.projectsOf(basename(c.path).toLowerCase()).filter((p) => p.frontmatter.status !== "done")]),
     ...(focus ? [] : files.filter((f) => f.kind === "project" && !clientKeys.has(String(f.frontmatter.client ?? "").toLowerCase()))),
   ];
   const clients = [...hold.clients().values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -114,23 +119,30 @@ export function Sidebar() {
         <span>Keel</span>
       </div>
 
-      {clients.length > 0 && (
-        <div className={`focus-picker${focus ? " on" : ""}`}>
-          <select value={focus ?? ""} onChange={(e) => setFocus(e.target.value || undefined)} aria-label="Focus on a client" title="Focus on one client">
-            <option value="">All clients</option>
-            {clients.map((c) => (
-              <option key={c.key} value={c.key}>
-                Focus: {c.name}
-              </option>
-            ))}
-          </select>
-          {focus && (
-            <button className="icon-btn" onClick={() => setFocus(undefined)} aria-label="Clear focus" title="Clear focus">
-              ×
-            </button>
-          )}
-        </div>
-      )}
+      <div className={`focus-picker${focus ? " on" : ""}`}>
+        <select
+          value={focus ?? ""}
+          onChange={(e) => {
+            if (e.target.value === MANAGE) nav.go({ kind: "settings", section: "clients" });
+            else setFocus(e.target.value || undefined);
+          }}
+          aria-label="Focus on a client"
+          title="Focus on one client"
+        >
+          <option value="">All clients</option>
+          {clients.map((c) => (
+            <option key={c.key} value={c.key}>
+              Focus: {c.name}
+            </option>
+          ))}
+          <option value={MANAGE}>{clients.length ? "Manage clients…" : "Add a client…"}</option>
+        </select>
+        {focus && (
+          <button className="icon-btn" onClick={() => setFocus(undefined)} aria-label="Clear focus" title="Clear focus">
+            ×
+          </button>
+        )}
+      </div>
 
       <button className="capture-btn" onClick={nav.capture} title="Quick capture (Ctrl+K, or Ctrl+Alt+K anywhere)">
         <span>Capture…</span>

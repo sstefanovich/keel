@@ -374,6 +374,13 @@ export function setFrontmatterField(content: string, key: string, value: string 
   return lines.join(eol);
 }
 
+/** A YAML scalar for a frontmatter value, quoted when plain text would be misread ("Acme: EU", "#1", "yes"). */
+export function yamlScalar(v: string | number): string {
+  if (typeof v === "number") return String(v);
+  const plain = /^[^\s#&*!|>'"%@`\[\]{},?:-][^#]*$/.test(v) && !/:\s|\s$/.test(v) && !/^(true|false|yes|no|null|~|on|off|-?\d[\d.]*)$/i.test(v);
+  return plain ? v : JSON.stringify(v);
+}
+
 /** Replace everything after the frontmatter. */
 export function replaceBody(content: string, body: string): string {
   const eol = content.includes("\r\n") ? "\r\n" : "\n";
