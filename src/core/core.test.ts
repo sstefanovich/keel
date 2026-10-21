@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { azureContext, azurePortalUrl } from "./azure";
-import { parseCapture } from "./capture";
+import { parseCapture, parseDayPrefix } from "./capture";
 import { buildReport, reportHtml, reportMarkdown } from "./report";
 import { buildWeek, dayItems, rowReport, rowTsv, weekTsv } from "./week";
 import { parseTime, startOfWeek, today } from "./dates";
@@ -345,6 +345,48 @@ describe("parseCapture work entries", () => {
   });
 });
 
+describe("parseCapture: kinds, overrides, days and notes", () => {
+  const now = new Date(2026, 9, 21, 10, 5); // Wed 2026-10-21 10:05
+
+  it("detects ask and note targets", () => {
+    expect(parseCapture("? what did I do on FLIS this week", now)).toMatchObject({ kind: "ask", ask: "what did I do on FLIS this week" });
+    expect(parseCapture("> Retention design: decided on 7-year hold", now)).toMatchObject({
+      kind: "note",
+      note: "Retention design",
+      line: "- decided on 7-year hold",
+    });
+    expect(parseCapture("> no colon here", now)).toMatchObject({ kind: "note", error: expect.any(String) });
+  });
+
+  it("targets other days", () => {
+    expect(parseDayPrefix("yesterday 6h @flis", "2026-10-21")).toEqual({ date: "2026-10-20", rest: "6h @flis" });
+    expect(parseDayPrefix("fri: @vbs timeline", "2026-10-21").date).toBe("2026-10-16"); // last Friday
+    expect(parseDayPrefix("wed: x", "2026-10-21").date).toBeUndefined(); // today
+    expect(parseDayPrefix("2026-10-19: x", "2026-10-21").date).toBe("2026-10-19");
+    expect(parseDayPrefix("Monday's deploy failed", "2026-10-21").date).toBeUndefined(); // needs a colon
+    expect(parseCapture("yesterday 6h @flis-retain-pa", now)).toMatchObject({ kind: "work", date: "2026-10-20", work: { key: "flis-retain-pa", hours: 6 } });
+    expect(parseCapture("fri: todo send recap", now)).toMatchObject({ kind: "task", date: "2026-10-16", line: "- [ ] send recap" });
+    // past-day log lines carry no clock time
+    expect(parseCapture("yesterday shipped the release", now)).toMatchObject({ kind: "log", date: "2026-10-20", line: "- shipped the release" });
+    // a day prefix on a reminder sets its date
+    expect(parseCapture("fri: remind me 3pm file hours", now)?.line).toBe("- [ ] file hours @remind(2026-10-16 15:00)");
+  });
+
+  it("lets Tab force a kind, with an error when the text doesn't fit", () => {
+    expect(parseCapture("buy printer ink", now, undefined, "task")).toMatchObject({ kind: "task", auto: "log", line: "- [ ] buy printer ink" });
+    expect(parseCapture("buy printer ink", now, undefined, "flag")).toMatchObject({ kind: "flag", line: "buy printer ink" });
+    expect(parseCapture("todo buy ink", now, undefined, "flag")).toMatchObject({ line: "todo buy ink" });
+    expect(parseCapture("firewall rules", now, undefined, "waiting")).toMatchObject({ line: "- [ ] firewall rules @waiting" });
+    expect(parseCapture("Jordan: firewall rules", now, undefined, "waiting")).toMatchObject({ line: "- [ ] firewall rules @waiting(Jordan)" });
+    expect(parseCapture("buy ink", now, undefined, "work")?.error).toBeTruthy();
+    expect(parseCapture("buy ink", now, "acme", "work")).toMatchObject({ work: { key: "acme", item: "buy ink" } });
+    expect(parseCapture("call the bank", now, undefined, "reminder")?.error).toBeTruthy();
+    expect(parseCapture("call the bank 3pm", now, undefined, "reminder")?.line).toBe("- [ ] call the bank @remind(15:00)");
+    expect(parseCapture("Retention design: 7 years", now, undefined, "note")).toMatchObject({ note: "Retention design", line: "- 7 years" });
+    expect(parseCapture("how many hours this week", now, undefined, "ask")).toMatchObject({ ask: "how many hours this week" });
+  });
+});
+
 describe("parseCapture with a focused client", () => {
   const now = new Date(2026, 9, 19, 10, 5);
   it.each([
@@ -425,6 +467,15 @@ describe("Hold", () => {
     await saving;
     expect(hold.get("notes/a.md")!.content).toBe("# A\nmore\n");
     expect(await hold.reindex()).toBe(false); // index already matches disk
+  });
+
+  it("appends captures to a note by name, creating it if needed", async () => {
+    const hold = await makeHold({ "notes/Retention design.md": "# Retention design\n\nSome text.\n\n\n" });
+    await hold.appendToNote("retention design", "- decided on 7-year hold");
+    expect(await hold.fs.read("notes/Retention design.md")).toBe("# Retention design\n\nSome text.\n- decided on 7-year hold\n");
+    const p = await hold.appendToNote("Brand new idea", "- first thought");
+    expect(p).toBe("notes/Brand new idea.md");
+    expect(hold.get(p)!.content.trimEnd().endsWith("- first thought")).toBe(true);
   });
 
   it("discards a reindex that a save overlapped (no older text back in the index)", async () => {

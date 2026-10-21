@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { parseCapture } from "./core/capture";
-import { today } from "./core/dates";
+import { Capture } from "./core/capture";
+import { formatShort, today } from "./core/dates";
 import { Hold } from "./core/hold";
 import { basename } from "./core/parse";
 import { slugify } from "./core/templates";
@@ -13,6 +13,7 @@ import { ChartsView } from "./ui/views/ChartsView";
 import { DispatchView } from "./ui/views/DispatchView";
 import { FlagsView } from "./ui/views/FlagsView";
 import { ClaudePanel } from "./ui/ClaudePanel";
+import { sendToClaude } from "./ui/claudeBridge";
 import { WaitingView } from "./ui/views/WaitingView";
 import { useReminders } from "./ui/useReminders";
 import { AgendaView } from "./ui/views/AgendaView";
@@ -108,31 +109,32 @@ function Shell() {
     setCapture({ hideAfter });
   }, []);
 
-  const submitCapture = async (text: string) => {
-    const c = parseCapture(text, undefined, focus);
-    if (!c) return;
+  const submitCapture = async (c: Capture) => {
     try {
-      if (c.kind === "flag") {
+      const day = c.date ?? today();
+      const onDay = c.date ? ` (${formatShort(c.date)})` : "";
+      let message: string;
+      if (c.kind === "ask") {
+        setClaudeMounted(true);
+        setClaudeOpen(true);
+        sendToClaude(c.ask!);
+        message = "Sent to Claude";
+      } else if (c.kind === "flag") {
         await hold.hoistFlag(c.line, "yellow", focus);
-      } else if (c.work) {
-        await hold.logWork(today(), c.work.key, c.work);
+        message = "Flag hoisted";
+      } else if (c.kind === "note") {
+        const path = await hold.appendToNote(c.note!, c.line);
+        message = `Added to ${hold.get(path)?.title ?? c.note}`;
       } else {
-        const path = await hold.ensureLog(today());
-        await hold.appendTo(path, c.heading, c.line);
+        if (c.work) await hold.logWork(day, c.work.key, c.work);
+        else await hold.appendTo(await hold.ensureLog(day), c.heading, c.line);
+        const what = { log: "Added to the log", task: "Task added", work: c.work?.hours ? "Hours logged" : "Added to work", waiting: "Added to waiting on", reminder: "Reminder set" };
+        message = what[c.kind] + onDay;
       }
       bump();
-      toast(
-        {
-          hours: "Hours logged",
-          work: "Added to today's work",
-          log: "Added to today's log",
-          reminder: "Reminder set",
-          task: "Task added",
-          flag: "Flag hoisted",
-          waiting: "Added to waiting on",
-        }[c.kind],
-      );
-      const hide = capture?.hideAfter;
+      toast(message);
+      // from the global hotkey with Keel hidden: hide again, unless Claude's answer is coming
+      const hide = capture?.hideAfter && c.kind !== "ask";
       setCapture(null);
       if (hide) await hideWindow();
     } catch (e) {

@@ -375,6 +375,15 @@ export class Hold {
     await this.save(path, content);
   }
 
+  /** Add a line to the end of a note, found by name or title like a [[link]]; creates the note if needed. */
+  async appendToNote(name: string, line: string): Promise<string> {
+    const path = this.resolveLink(name) ?? (await this.createNote(name));
+    const content = await this.fs.read(path);
+    const eol = content.includes("\r\n") ? "\r\n" : "\n";
+    await this.save(path, `${content.replace(/\s+$/, "")}${eol}${line}${eol}`);
+    return path;
+  }
+
   /** Append lines to a section of a file (creating today's log if that's the target). */
   async appendTo(path: string, heading: string, text: string): Promise<void> {
     const content = await this.fs.read(path);

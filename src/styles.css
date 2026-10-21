@@ -1815,3 +1815,48 @@ mark {
   font-size: 12px;
   white-space: nowrap;
 }
+
+/* ---------- quick capture type chips ---------- */
+
+.capture-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 12px 4px;
+}
+.capture-kind {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 12px;
+  padding: 1px 10px;
+  font-size: 12px;
+}
+.capture-kind.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+/* the kind Keel detected, when Tab picked another */
+.capture-kind.auto {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+.capture-preview.error {
+  color: var(--warn);
+}
+.chip-ask {
+  background: color-mix(in srgb, #d97757 18%, transparent);
+  color: #c4623f;
+}
+.chip-note,
+.chip-work {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.chip-flag,
+.chip-waiting,
+.chip-log {
+  background: var(--code-bg);
+  color: var(--muted);
+}

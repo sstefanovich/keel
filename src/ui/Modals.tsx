@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { parseCapture } from "../core/capture";
-import { today } from "../core/dates";
+import { CAPTURE_KINDS, Capture, CaptureKind, parseCapture } from "../core/capture";
+import { formatShort, today } from "../core/dates";
+import { useHold } from "./HoldContext";
 
 function useEscape(onClose: () => void) {
   useEffect(() => {
@@ -10,32 +11,53 @@ function useEscape(onClose: () => void) {
   }, [onClose]);
 }
 
-const KIND_LABEL = {
-  hours: "Hours → today's work",
-  work: "Done item → today's work",
-  task: "Task → today's log",
-  reminder: "Reminder → today's log",
-  log: "Log entry → today's log",
-  flag: "Flag → pinned on the board",
-  waiting: "Waiting on → today's log",
+const KIND_INFO: Record<CaptureKind, { label: string; hint: string }> = {
+  log: { label: "Log", hint: "a timestamped line in the day's log" },
+  task: { label: "Task", hint: "todo buy printer ink" },
+  work: { label: "Work", hint: "6h @project · @project what you did" },
+  waiting: { label: "Waiting", hint: "wait Jordan: firewall rules" },
+  reminder: { label: "Remind", hint: "remind me 3pm call the bank" },
+  flag: { label: "Flag", hint: "flag renew the TLS cert" },
+  note: { label: "Note", hint: "> Note name: what to add" },
+  ask: { label: "Ask", hint: "? what did I do on FLIS this week" },
 };
 
-export function QuickCapture({ onSubmit, onClose, focus }: { onSubmit: (text: string) => Promise<void>; onClose: () => void; focus?: string }) {
+/** Quick capture: one box that logs, adds tasks/work/flags, appends to notes, or asks Claude. */
+export function QuickCapture({ onSubmit, onClose, focus }: { onSubmit: (c: Capture) => Promise<void>; onClose: () => void; focus?: string }) {
+  const { hold } = useHold();
   const [text, setText] = useState("");
+  const [force, setForce] = useState<CaptureKind | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   useEscape(onClose);
   useEffect(() => input.current?.focus(), []);
-  const parsed = parseCapture(text, undefined, focus);
+  const parsed = parseCapture(text, undefined, focus, force);
+  const current = parsed?.kind ?? force ?? "log";
 
   const submit = async () => {
-    if (!parsed || busy) return;
+    if (!parsed || parsed.error || busy) return;
     setBusy(true);
     try {
-      await onSubmit(text);
+      await onSubmit(parsed);
     } finally {
       setBusy(false);
     }
+  };
+
+  const cycle = (dir: 1 | -1) => {
+    const i = CAPTURE_KINDS.indexOf(current);
+    const next = CAPTURE_KINDS[(i + dir + CAPTURE_KINDS.length) % CAPTURE_KINDS.length];
+    setForce(next === parsed?.auto ? undefined : next);
+  };
+
+  const where = (c: Capture): string => {
+    if (c.kind === "ask") return "Claude";
+    if (c.kind === "flag") return "the Flags board";
+    if (c.kind === "note") {
+      const path = c.note ? hold.resolveLink(c.note) : undefined;
+      return path ? `note “${hold.get(path)?.title ?? c.note}”` : `new note “${c.note}”`;
+    }
+    return c.date ? `${formatShort(c.date)} log` : "today's log";
   };
 
   return (
@@ -44,18 +66,48 @@ export function QuickCapture({ onSubmit, onClose, focus }: { onSubmit: (text: st
         <input
           ref={input}
           value={text}
-          placeholder="2h @acme refactor · todo buy ink · remind me 3pm call bank · or just a thought"
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="Type anything · Tab changes the type · ? asks Claude · > Note: adds to a note · yesterday …"
+          onChange={(e) => {
+            setText(e.target.value);
+            if (!e.target.value.trim()) setForce(undefined);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void submit();
+            else if (e.key === "Tab") {
+              e.preventDefault();
+              cycle(e.shiftKey ? -1 : 1);
+            }
+          }}
         />
-        <div className="capture-preview">
+        <div className="capture-kinds" role="radiogroup" aria-label="Capture type">
+          {CAPTURE_KINDS.map((k) => (
+            <button
+              key={k}
+              role="radio"
+              aria-checked={current === k}
+              className={`capture-kind${current === k ? " on" : ""}${parsed?.auto === k && force && force !== k ? " auto" : ""}`}
+              title={`${KIND_INFO[k].label}: ${KIND_INFO[k].hint}`}
+              onMouseDown={(e) => e.preventDefault()} // keep focus in the input
+              onClick={() => setForce(k === parsed?.auto ? undefined : k)}
+            >
+              {KIND_INFO[k].label}
+            </button>
+          ))}
+        </div>
+        <div className={`capture-preview${parsed?.error ? " error" : ""}`}>
           {parsed ? (
-            <>
-              <span className={`chip chip-${parsed.kind}`}>{KIND_LABEL[parsed.kind]}</span>
-              <code>{parsed.line}</code>
-            </>
+            parsed.error ? (
+              <span>{parsed.error}</span>
+            ) : (
+              <>
+                <span className={`chip chip-${parsed.kind}`}>→ {where(parsed)}</span>
+                <code>{parsed.kind === "ask" ? `“${parsed.ask}”` : parsed.line}</code>
+              </>
+            )
           ) : (
-            <span className="muted">Enter to save · Esc to cancel</span>
+            <span className="muted">
+              Enter to save · Tab / Shift+Tab to change type · Esc to cancel · e.g. <code>{KIND_INFO[current].hint}</code>
+            </span>
           )}
         </div>
       </div>
