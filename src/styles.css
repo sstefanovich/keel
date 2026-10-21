@@ -1658,3 +1658,30 @@ mark {
 .work-name {
   overflow-wrap: anywhere;
 }
+
+/* ---------- sidebar log tree ---------- */
+
+.file-item.tree-day,
+.file-item.tree-branch {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.tree-branch {
+  color: var(--text);
+}
+.tree-caret {
+  display: inline-block;
+  width: 10px;
+  transition: transform 0.12s;
+  color: var(--muted);
+}
+.tree-caret.open {
+  transform: rotate(90deg);
+}
+.tree-hours {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

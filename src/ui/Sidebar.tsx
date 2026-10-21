@@ -1,9 +1,10 @@
 import { ReactNode, useState } from "react";
-import { formatShort, today } from "../core/dates";
+import { today } from "../core/dates";
 import { ParsedFile, basename } from "../core/parse";
 import { useHold } from "./HoldContext";
 import { View, useNav } from "./nav";
 import { ThemePref, useTheme } from "./theme";
+import { LogTree } from "./LogTree";
 
 function NavItem({ active, onClick, children, badge, hint }: { active?: boolean; onClick: () => void; children: ReactNode; badge?: number; hint?: string }) {
   return (
@@ -185,7 +186,7 @@ export function Sidebar() {
       <div className="side-scroll">
         <FileGroup title="Meetings" files={meetings} current={current} onAdd={() => nav.newItem("meeting")} label={(f) => f.title.replace(/^\d{4}-\d{2}-\d{2}\s*/, "") || f.title} />
         <FileGroup title="Notes" files={notes} current={current} onAdd={() => nav.newItem("note")} label={(f) => (f.path.split("/").length > 2 ? `${f.path.split("/").slice(1, -1).join("/")}/` : "") + f.title} limit={12} />
-        <FileGroup title="Logs" files={logs} current={current} label={(f) => (f.date ? formatShort(f.date) : f.title)} limit={5} />
+        <LogTree logs={logs} current={current} />
         <FileGroup
           title="Charts"
           files={charts}
