@@ -5,7 +5,8 @@ import { FlagBoard } from "../FlagBoard";
 import { WorkPanel } from "../WorkPanel";
 import { useHold } from "../HoldContext";
 import { Editor, SaveStatus } from "../editor/Editor";
-import { Check, Trash2 } from "lucide-react";
+import { Check, FileX, Trash2 } from "lucide-react";
+import { EmptyState } from "../EmptyState";
 import { useNav } from "../nav";
 import { ChartView } from "./ChartView";
 
@@ -41,7 +42,11 @@ export function FileView({ path, line }: { path: string; line?: number }) {
   if (!file) {
     return (
       <div className="page">
-        <p className="empty">This file no longer exists: {path}</p>
+        <EmptyState icon={FileX} title="This file no longer exists" actions={<button onClick={() => nav.openToday()}>Go to today</button>}>
+          <p>
+            <code>{path}</code> was moved or deleted outside Keel.
+          </p>
+        </EmptyState>
       </div>
     );
   }

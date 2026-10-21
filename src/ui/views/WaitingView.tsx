@@ -3,6 +3,8 @@ import { Task } from "../../core/parse";
 import { copyText } from "../../lib/platform";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
+import { Hourglass } from "lucide-react";
+import { EmptyState } from "../EmptyState";
 
 const days = (since?: string) => (since ? Math.max(0, Math.round((parseISO(today()).getTime() - parseISO(since).getTime()) / 86_400_000)) : 0);
 
@@ -49,7 +51,14 @@ export function WaitingView() {
         </p>
       </header>
 
-      {!items.length && <p className="empty panel">Nobody owes you anything right now.</p>}
+      {!items.length && (
+        <EmptyState icon={Hourglass} title="Nobody owes you anything right now" actions={<button onClick={nav.capture}>Capture a waiting item…</button>}>
+          <p>
+            When you're waiting on someone, add <code>@waiting(Jordan)</code> to a task, or quick capture <code>wait Jordan: firewall rules</code>.
+            It shows up here with how long it's been.
+          </p>
+        </EmptyState>
+      )}
 
       {ordered.map(([who, tasks]) => (
         <section key={who} className="panel">

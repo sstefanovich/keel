@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChartRow } from "../ChartRow";
+import { Compass, SearchX } from "lucide-react";
+import { EmptyState } from "../EmptyState";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 
@@ -52,7 +54,7 @@ export function ChartsView() {
               onContext={() => nav.openFile(file.path)}
             />
           ))}
-          {!results.length && <p className="empty">No chart items match.</p>}
+          {!results.length && <EmptyState compact icon={SearchX} title="No chart items match." />}
         </section>
       ) : (
         <div className="chart-cards">
@@ -95,9 +97,20 @@ export function ChartsView() {
             </section>
           )}
           {!clients.length && !orphans.length && (
-            <p className="empty">
-              No clients yet. Create one, then add items like <code>- Resource group: rg-acme-prod</code>. Every bullet gets a copy button.
-            </p>
+            <EmptyState
+              icon={Compass}
+              title="Chart your first client"
+              actions={
+                <button className="primary" onClick={() => nav.newItem("client")}>
+                  New client
+                </button>
+              }
+            >
+              <p>
+                A Chart keeps a client's or project's reference details: URLs, servers, resource groups, contacts and CLI snippets, each one
+                click-to-copy. Add a line like <code>- Resource group: rg-acme-prod</code>.
+              </p>
+            </EmptyState>
           )}
         </div>
       )}

@@ -3,6 +3,8 @@ import { ISODate, addDays, startOfWeek, today } from "../../core/dates";
 import { buildReport, reportHtml, reportMarkdown } from "../../core/report";
 import { safeFileName } from "../../core/templates";
 import { copyRich, copyText } from "../../lib/platform";
+import { Send } from "lucide-react";
+import { EmptyState } from "../EmptyState";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 import { useWeekStart } from "../weekStart";
@@ -40,7 +42,17 @@ export function DispatchView() {
         <header className="page-head">
           <h1>Dispatch</h1>
         </header>
-        <p className="empty panel">Create a client first. Dispatch builds their weekly status update from your logs, meetings and tasks.</p>
+        <EmptyState
+          icon={Send}
+          title="Add a client to send their first dispatch"
+          actions={
+            <button className="primary" onClick={() => nav.go({ kind: "settings", section: "clients" })}>
+              Add a client
+            </button>
+          }
+        >
+          <p>Dispatch builds a client's weekly status update (hours by project, what you finished, meetings, what you're waiting on) from your logs, meetings and tasks.</p>
+        </EmptyState>
       </div>
     );
   }

@@ -816,3 +816,68 @@ button.icon-text {
   border: 1px dashed color-mix(in srgb, var(--accent) 50%, transparent);
   opacity: 0.85;
 }
+
+/* ---------- empty states ---------- */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 44px 24px 40px;
+  margin: 8px 0 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+.empty-state h2 {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 650;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+.empty-body {
+  max-width: 460px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.empty-body p {
+  margin: 0 0 6px;
+}
+.empty-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.empty-compact {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--muted);
+  padding: 4px 0;
+}
+.empty-compact svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--ok);
+}
+.empty-compact b {
+  color: var(--text-2);
+  font-weight: 600;
+}

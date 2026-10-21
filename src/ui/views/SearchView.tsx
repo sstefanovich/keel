@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
+import { Search, SearchX } from "lucide-react";
+import { EmptyState } from "../EmptyState";
 
 function highlight(text: string, q: string) {
   const i = text.toLowerCase().indexOf(q.toLowerCase());
@@ -44,7 +46,19 @@ export function SearchView({ initial = "" }: { initial?: string }) {
           onKeyDown={(e) => e.key === "Enter" && hits[0] && nav.openFile(hits[0].path, hits[0].line)}
         />
       </header>
-      {q.trim() && !hits.length && <p className="empty">No matches.</p>}
+      {q.trim() && !hits.length && (
+        <EmptyState icon={SearchX} title={`Nothing matches “${q.trim()}”`}>
+          <p>{focus ? "Focus is on: try clearing it in the sidebar to search every client." : "Try fewer words, or a #tag."}</p>
+        </EmptyState>
+      )}
+      {!q.trim() && (
+        <EmptyState icon={Search} title="Search your whole Keel folder">
+          <p>
+            Finds text in every note, log, meeting, client and project. Type <code>#tag</code> for tagged files. To jump to a file by name,{" "}
+            <kbd>Ctrl</kbd>+<kbd>P</kbd> is quicker.
+          </p>
+        </EmptyState>
+      )}
       {[...groups].map(([path, hs]) => (
         <section key={path} className="panel search-group">
           <h3>

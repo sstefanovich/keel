@@ -3,6 +3,8 @@ import { describeRule } from "../../core/schedule";
 import { formatLong, formatShort, formatTime, hhmm, today } from "../../core/dates";
 import { Task } from "../../core/parse";
 import { FlagBoard } from "../FlagBoard";
+import { BellOff, CircleCheck } from "lucide-react";
+import { EmptyState } from "../EmptyState";
 import { useHold } from "../HoldContext";
 import { TaskRow } from "../TaskRow";
 import { openOpts, useNav } from "../nav";
@@ -51,9 +53,11 @@ export function AgendaView() {
           {a.today.length ? (
             <ul className="tasks">{a.today.map((t) => <TaskRow key={t.file + t.line} task={t} />)}</ul>
           ) : (
-            <p className="empty">
-              Nothing for today. <button className="link" onClick={(e) => nav.openToday(openOpts(e))}>Open today's log</button>
-            </p>
+            <EmptyState compact icon={CircleCheck} title="Nothing on for today.">
+              <button className="link" onClick={(e) => nav.openToday(openOpts(e))}>
+                Open today's log
+              </button>
+            </EmptyState>
           )}
         </Section>
 
@@ -71,7 +75,7 @@ export function AgendaView() {
               ))}
             </ul>
           ) : (
-            <p className="empty">No reminders today.</p>
+            <EmptyState compact icon={BellOff} title="No reminders today." />
           )}
         </Section>
       </div>
@@ -85,7 +89,7 @@ export function AgendaView() {
             </div>
           ))
         ) : (
-          <p className="empty">Nothing due in the next two weeks.</p>
+          <EmptyState compact icon={CircleCheck} title="Nothing due in the next two weeks." />
         )}
       </Section>
 
@@ -102,7 +106,7 @@ export function AgendaView() {
             </div>
           ))
         ) : (
-          <p className="empty">All clear.</p>
+          <EmptyState compact icon={CircleCheck} title="All clear." />
         )}
       </Section>
     </div>

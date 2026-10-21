@@ -6,6 +6,8 @@ import { TaskListStyle, WeekRow, buildWeek, dayItems, rowReport, rowTsv, weekTsv
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 import { useWeekStart } from "../weekStart";
+import { Clock } from "lucide-react";
+import { EmptyState } from "../EmptyState";
 
 type Preset = "this-week" | "last-week" | "this-month" | "last-month" | "this-year" | "custom";
 
@@ -112,9 +114,11 @@ function TotalsView({ toggle }: { toggle: ReactNode }) {
       </div>
 
       {ts.entries.length === 0 ? (
-        <p className="empty panel">
-          No hours in this period. Add projects under <b>Work</b> in a day's log, or quick capture <code>6h @project</code> with Ctrl+K.
-        </p>
+        <EmptyState icon={Clock} title="No hours in this period" actions={<button onClick={() => nav.openToday()}>Open today's log</button>}>
+          <p>
+            Add projects under <b>Work</b> in a day's log, or quick capture <code>6h @project</code> with Ctrl+K.
+          </p>
+        </EmptyState>
       ) : (
         <>
           <section className="panel">
@@ -308,10 +312,23 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
       )}
 
       {!week.rows.length ? (
-        <p className="empty panel">
-          No work logged this week. In each day's log, add a project under <b>Work</b> (or quick capture <code>6h @project</code>), then list
-          what you did under it.
-        </p>
+        <EmptyState
+          icon={Clock}
+          title={offset === 0 ? "No work logged this week yet" : "No work logged that week"}
+          actions={
+            <>
+              <button className="primary" onClick={() => nav.openToday()}>
+                Open today's log
+              </button>
+              <button onClick={nav.capture}>Capture hours…</button>
+            </>
+          }
+        >
+          <p>
+            In each day's log, add a project under <b>Work</b> with the day's hours (or quick capture <code>6h @project</code>), and list what you
+            did under it. This grid fills in as you go.
+          </p>
+        </EmptyState>
       ) : (
         <>
           <section className="panel week-grid-panel">
