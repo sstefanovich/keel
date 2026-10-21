@@ -89,18 +89,23 @@ export function rowTsv(r: WeekRow): string {
   return r.hours.map(fmt).join("\t");
 }
 
+/** How copied task lists look: "- item" lines or bare lines. */
+export type TaskListStyle = "bullets" | "plain";
+
+const listLine = (x: string, style: TaskListStyle) => (style === "bullets" ? `- ${x}` : x);
+
 /** Plain-text daily report for one project: each day's hours and items. */
-export function rowReport(w: Week, r: WeekRow): string {
+export function rowReport(w: Week, r: WeekRow, style: TaskListStyle = "bullets"): string {
   const parts: string[] = [];
   w.days.forEach((d, i) => {
     if (!r.items[i].length && !r.hours[i]) return;
     const head = `${formatShort(d)}${r.hours[i] ? ` (${round2(r.hours[i])}h)` : ""}`;
-    parts.push([head, ...r.items[i].map((x) => `- ${x}`)].join("\n"));
+    parts.push([head, ...r.items[i].map((x) => listLine(x, style))].join("\n"));
   });
   return parts.join("\n\n");
 }
 
-/** Just the items for one day, one per line (for a per-day field in a form). */
-export function dayItems(r: WeekRow, dayIndex: number): string {
-  return r.items[dayIndex].map((x) => `- ${x}`).join("\n");
+/** Just the items for one project on one day, one per line (for a per-day field in a form). */
+export function dayItems(r: WeekRow, dayIndex: number, style: TaskListStyle = "bullets"): string {
+  return r.items[dayIndex].map((x) => listLine(x, style)).join("\n");
 }

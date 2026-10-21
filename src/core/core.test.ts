@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { azureContext, azurePortalUrl } from "./azure";
 import { parseCapture } from "./capture";
 import { buildReport, reportHtml, reportMarkdown } from "./report";
-import { buildWeek, rowReport, rowTsv, weekTsv } from "./week";
+import { buildWeek, dayItems, rowReport, rowTsv, weekTsv } from "./week";
 import { parseTime, startOfWeek, today } from "./dates";
 import { MemoryFs } from "./fs";
 import { Hold } from "./hold";
@@ -621,6 +621,9 @@ date: 2026-10-21
     expect(w.total).toBe(15.5);
     expect(rowReport(w, portal)).toBe("Mon, Oct 19 (6h)\n- API gateway design\n\nTue, Oct 20 (7.5h)\n- Auth PR review\n- Cost model");
     expect(rowTsv(portal)).toBe("6\t7.5\t\t\t\t\t");
+    expect(dayItems(portal, 1)).toBe("- Auth PR review\n- Cost model");
+    expect(dayItems(portal, 1, "plain")).toBe("Auth PR review\nCost model");
+    expect(rowReport(w, portal, "plain")).toBe("Mon, Oct 19 (6h)\nAPI gateway design\n\nTue, Oct 20 (7.5h)\nAuth PR review\nCost model");
     expect(weekTsv(w).split("\r\n")[2]).toBe("Portal rebuild (Contoso)\t6\t7.5\t\t\t\t\t\t13.5");
     expect(buildWeek(hold, "2026-10-19", "globex").rows.map((r) => r.label)).toEqual(["globex"]);
   });

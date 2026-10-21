@@ -2,7 +2,7 @@ import { ReactNode, useState } from "react";
 import { ISODate, addDays, addMonths, endOfMonth, formatShort, startOfMonth, startOfWeek, today, weekdayOf } from "../../core/dates";
 import { round2 } from "../../core/hold";
 import { copyText, exportText } from "../../lib/platform";
-import { buildWeek, dayItems, rowReport, rowTsv, weekTsv } from "../../core/week";
+import { TaskListStyle, WeekRow, buildWeek, dayItems, rowReport, rowTsv, weekTsv } from "../../core/week";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 import { useWeekStart } from "../weekStart";
@@ -246,10 +246,28 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
   const week = buildWeek(hold, addDays(startOfWeek(t, weekStart), offset * 7), focus);
   const isWeekend = (d: string) => [0, 6].includes(weekdayOf(d));
 
+  const [style, setStyleState] = useState<TaskListStyle>(() => {
+    try {
+      return localStorage.getItem("keel.taskListStyle") === "plain" ? "plain" : "bullets";
+    } catch {
+      return "bullets";
+    }
+  });
+  const setStyle = (s: TaskListStyle) => {
+    setStyleState(s);
+    try {
+      localStorage.setItem("keel.taskListStyle", s);
+    } catch {
+      // ignore
+    }
+  };
+
   const copy = async (text: string, what: string) => {
     await copyText(text);
     toast(`Copied ${what}`);
   };
+  const copyTasks = (r: WeekRow, i: number) =>
+    copy(dayItems(r, i, style), `${r.items[i].length} task${r.items[i].length === 1 ? "" : "s"}: ${r.label}, ${formatShort(week.days[i])}`);
 
   return (
     <div className="page week-page">
@@ -274,8 +292,20 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
           <button onClick={() => copy(weekTsv(week), "the week grid")} disabled={!week.rows.length} title="Tab-separated, pastes into Excel or a form grid">
             Copy grid
           </button>
+          <label className="check-inline" title="How copied task lists are formatted">
+            Tasks as
+            <select value={style} onChange={(e) => setStyle(e.target.value as TaskListStyle)} aria-label="Copy tasks as">
+              <option value="bullets">- bullets</option>
+              <option value="plain">plain lines</option>
+            </select>
+          </label>
         </div>
       </header>
+      {week.rows.length > 0 && (
+        <p className="muted small week-hint">
+          Click hours to copy them; click <span className="cell-tasks demo">☰</span> to copy that project's tasks for that day.
+        </p>
+      )}
 
       {!week.rows.length ? (
         <p className="empty panel">
@@ -308,18 +338,31 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
                       {r.project && <span className="muted small"> · {r.clientName}</span>}
                     </td>
                     {r.hours.map((h, i) => {
-                      const missing = !h && r.items[i].length > 0;
+                      const n = r.items[i].length;
+                      const missing = !h && n > 0;
                       return (
                         <td key={i} className={`num${isWeekend(week.days[i]) ? " weekend" : ""}${missing ? " missing" : ""}`}>
-                          {missing ? (
-                            <button className="link small" onClick={() => nav.openLog(week.days[i])} title="Work listed but no hours entered">
-                              ?
-                            </button>
-                          ) : h ? (
-                            <button className="cell-copy" onClick={() => copy(cell(h), `${cell(h)}h`)} title="Click to copy">
-                              {cell(h)}
-                            </button>
-                          ) : null}
+                          <span className="cell">
+                            {missing ? (
+                              <button className="link small" onClick={() => nav.openLog(week.days[i])} title="Work listed but no hours entered">
+                                ?
+                              </button>
+                            ) : h ? (
+                              <button className="cell-copy" onClick={() => copy(cell(h), `${cell(h)}h`)} title="Copy hours">
+                                {cell(h)}
+                              </button>
+                            ) : null}
+                            {n > 0 && (
+                              <button
+                                className="cell-tasks"
+                                onClick={() => copyTasks(r, i)}
+                                title={`Copy ${n} task${n === 1 ? "" : "s"} for ${r.label} on ${formatShort(week.days[i])}:\n${r.items[i].join("\n")}`}
+                                aria-label={`Copy tasks for ${r.label} on ${formatShort(week.days[i])}`}
+                              >
+                                ☰
+                              </button>
+                            )}
+                          </span>
                         </td>
                       );
                     })}
@@ -354,7 +397,7 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
                   {r.label}
                   {r.project && <span className="muted"> · {r.clientName}</span>} <span className="count">{cell(r.total) || 0}h</span>
                 </h2>
-                <button className="ghost small" onClick={() => copy(rowReport(week, r), `${r.label} report`)}>
+                <button className="ghost small" onClick={() => copy(rowReport(week, r, style), `${r.label} report`)}>
                   Copy report
                 </button>
               </div>
@@ -367,8 +410,8 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
                       </button>
                       <span className={`chip${r.hours[i] ? "" : " chip-warn"}`}>{r.hours[i] ? `${cell(r.hours[i])}h` : "no hours"}</span>
                       {r.items[i].length > 0 && (
-                        <button className="ghost small" onClick={() => copy(dayItems(r, i), `${formatShort(d)} items`)}>
-                          Copy day
+                        <button className="small copy-tasks-btn" onClick={() => copyTasks(r, i)}>
+                          Copy tasks
                         </button>
                       )}
                     </div>

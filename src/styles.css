@@ -1607,3 +1607,37 @@ mark {
     margin: 0 auto;
   }
 }
+
+/* ---------- timesheet: per-cell task copy ---------- */
+
+.week-grid .cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.cell-tasks {
+  border: 0;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 0 5px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.cell-tasks:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.cell-tasks.demo {
+  display: inline-block;
+}
+.week-hint {
+  margin: -8px 0 10px;
+}
+.copy-tasks-btn {
+  margin-left: auto;
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
