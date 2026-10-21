@@ -6,11 +6,10 @@ import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/sea
 import { EditorState } from "@codemirror/state";
 import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemirror/view";
 import { useEffect, useRef } from "react";
-import { Hold } from "../../core/hold";
 import { basename } from "../../core/parse";
-import { slugify } from "../../core/templates";
 import { useHold } from "../HoldContext";
-import { WorkTarget, keelClicks, keelCompletions, keelDecorations, keelHighlight, mermaidPreview, refreshMermaid } from "./keelSyntax";
+import { keelClicks, keelCompletions, keelDecorations, keelHighlight, mermaidPreview, refreshMermaid } from "./keelSyntax";
+import { workTargets } from "../workTargets";
 import { onThemeChange } from "../theme";
 
 interface Props {
@@ -22,29 +21,6 @@ interface Props {
 const SAVE_DELAY = 500;
 
 /** Markdown editor for one file. Autosaves; reloads when the file changes on disk. */
-/** Active projects first (with their client), then clients, then other keys already used in hours lines. */
-function workTargets(hold: Hold): WorkTarget[] {
-  const clients = hold.clients();
-  const projects = hold
-    .all()
-    .filter((f) => f.kind === "project" && f.frontmatter.status !== "done")
-    .map((p) => {
-      const client = hold.fileClient(p);
-      const key = slugify(basename(p.path));
-      return { key, project: key, client, detail: `${p.title} · ${client ? (clients.get(client)?.name ?? client) : "no client"}` };
-    })
-    .sort((a, b) => a.detail.localeCompare(b.detail));
-  const clientTargets = [...clients.values()]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((c) => ({ key: c.key, client: c.key, detail: `${c.name} (client)` }));
-  const known = new Set([...projects.map((p) => p.key), ...clientTargets.map((c) => c.key)]);
-  const others = [...new Set(hold.all().flatMap((f) => f.hours.map((h) => h.client)))]
-    .filter((k) => !known.has(k) && !k.includes("/"))
-    .sort()
-    .map((k) => ({ key: k, detail: "used before" }));
-  return [...projects, ...clientTargets, ...others];
-}
-
 const flushers = new Set<() => Promise<void>>();
 
 /** Save any unsaved typing in open editors. Await this before writing to a file an editor may have open. */

@@ -3,6 +3,7 @@ import { azureContext, azurePortalUrl } from "./azure";
 import { parseCapture, parseDayPrefix } from "./capture";
 import { buildReport, reportHtml, reportMarkdown } from "./report";
 import { buildWeek, dayItems, rowReport, rowTsv, weekTsv } from "./week";
+import { mentionAt } from "../ui/workTargets";
 import { parseTime, startOfWeek, today } from "./dates";
 import { MemoryFs } from "./fs";
 import { Hold } from "./hold";
@@ -384,6 +385,36 @@ describe("parseCapture: kinds, overrides, days and notes", () => {
     expect(parseCapture("call the bank 3pm", now, undefined, "reminder")?.line).toBe("- [ ] call the bank @remind(15:00)");
     expect(parseCapture("Retention design: 7 years", now, undefined, "note")).toMatchObject({ note: "Retention design", line: "- 7 years" });
     expect(parseCapture("how many hours this week", now, undefined, "ask")).toMatchObject({ ask: "how many hours this week" });
+  });
+});
+
+describe("@ suggestions for quick capture", () => {
+  const targets = [
+    { key: "flis-retain-pa", project: "flis-retain-pa", client: "hogan-lovells", detail: "FLIS Retain / PA · Hogan Lovells" },
+    { key: "mdi-retainer-fy27-pa", project: "mdi-retainer-fy27-pa", client: "alex-lee", detail: "MDI Retainer FY27 / PA · Alex Lee" },
+    { key: "vbs-2026-2027-pa", project: "vbs-2026-2027-pa", client: "alex-lee", detail: "VBS 2026-2027 / PA · Alex Lee" },
+    { key: "alex-lee", client: "alex-lee", detail: "Alex Lee (client)" },
+    { key: "hogan-lovells", client: "hogan-lovells", detail: "Hogan Lovells (client)" },
+  ];
+  const at = (text: string, caret = text.length) => mentionAt(text, caret, targets);
+
+  it("only triggers on an @ word at the caret", () => {
+    expect(at("6h flis")).toBeNull();
+    expect(at("email me@acme")).toBeNull(); // not after a space
+    expect(at("6h @")!.options.map((o) => o.insert)).toHaveLength(5);
+  });
+  it("matches key prefixes first, then names", () => {
+    expect(at("6h @al")!.options.map((o) => o.insert)).toEqual(["@alex-lee", "@mdi-retainer-fy27-pa", "@vbs-2026-2027-pa"]);
+    expect(at("@hogan")!.options[0].insert).toBe("@hogan-lovells");
+    expect(at("@retain")!.options.map((o) => o.insert)).toEqual(["@flis-retain-pa", "@mdi-retainer-fy27-pa"]);
+  });
+  it("narrows @client/ to that client's projects and reports the span to replace", () => {
+    const r = at("yesterday 2h @alex-lee/v did stuff", "yesterday 2h @alex-lee/v".length)!;
+    expect(r.options.map((o) => o.insert)).toEqual(["@alex-lee/vbs-2026-2027-pa"]);
+    expect([r.from, r.to]).toEqual(["yesterday 2h ".length, "yesterday 2h @alex-lee/v".length]);
+    // caret in the middle of a word replaces the whole word
+    const mid = at("@flis-ret did", 4)!;
+    expect([mid.from, mid.to]).toEqual([0, "@flis-ret".length]);
   });
 });
 

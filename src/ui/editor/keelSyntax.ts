@@ -6,6 +6,7 @@ import { tags as t } from "@lezer/highlight";
 import { addDays, today } from "../../core/dates";
 import { mountMermaid } from "../mermaid";
 import { currentTheme } from "../theme";
+import type { WorkTarget } from "../workTargets";
 
 const TASK = /^(\s*[-*+] \[)([ xX>\-])(\])/;
 const HOURS =
@@ -133,17 +134,6 @@ export function keelClicks(onOpenLink: (target: string) => void) {
   });
 }
 
-/** Something hours can be logged against, for @ suggestions. */
-export interface WorkTarget {
-  /** What gets inserted after @ */
-  key: string;
-  /** Shown beside it, e.g. "Project · Contoso" */
-  detail: string;
-  /** Client key, for narrowing "@contoso/…" */
-  client?: string;
-  /** Project key (when this is a project) */
-  project?: string;
-}
 
 /** Autocomplete for [[links]], @project/@client on work lines, and @due/@remind/@waiting on tasks. */
 export function keelCompletions(getNames: () => string[], getTargets: () => WorkTarget[]) {

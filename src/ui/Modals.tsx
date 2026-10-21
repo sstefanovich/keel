@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CAPTURE_KINDS, Capture, CaptureKind, parseCapture } from "../core/capture";
 import { formatShort, today } from "../core/dates";
 import { useHold } from "./HoldContext";
+import { mentionAt, workTargets } from "./workTargets";
 
 function useEscape(onClose: () => void) {
   useEffect(() => {
@@ -33,6 +34,28 @@ export function QuickCapture({ onSubmit, onClose, focus }: { onSubmit: (c: Captu
   useEffect(() => input.current?.focus(), []);
   const parsed = parseCapture(text, undefined, focus, force);
   const current = parsed?.kind ?? force ?? "log";
+
+  // @project / @client suggestions for the word at the caret
+  const [caret, setCaret] = useState(0);
+  const [sel, setSel] = useState(0);
+  const [dismissedAt, setDismissedAt] = useState<number | null>(null);
+  const targets = useMemo(() => workTargets(hold), [hold]);
+  const mention = mentionAt(text, caret, targets);
+  const suggestions = mention && mention.options.length && dismissedAt !== mention.from ? mention : null;
+  const syncCaret = () => setCaret(input.current?.selectionStart ?? text.length);
+
+  const accept = (i: number) => {
+    if (!suggestions) return;
+    const opt = suggestions.options[i];
+    const after = text.slice(suggestions.to);
+    const insert = after.startsWith(" ") ? opt.insert : `${opt.insert} `;
+    const next = text.slice(0, suggestions.from) + insert + after;
+    const pos = suggestions.from + insert.length;
+    setText(next);
+    setCaret(pos);
+    setSel(0);
+    requestAnimationFrame(() => input.current?.setSelectionRange(pos, pos));
+  };
 
   const submit = async () => {
     if (!parsed || parsed.error || busy) return;
@@ -69,9 +92,32 @@ export function QuickCapture({ onSubmit, onClose, focus }: { onSubmit: (c: Captu
           placeholder="Type anything · Tab changes the type · ? asks Claude · > Note: adds to a note · yesterday …"
           onChange={(e) => {
             setText(e.target.value);
+            setCaret(e.target.selectionStart ?? e.target.value.length);
+            setSel(0);
             if (!e.target.value.trim()) setForce(undefined);
           }}
+          onSelect={syncCaret}
           onKeyDown={(e) => {
+            if (suggestions) {
+              const n = suggestions.options.length;
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                setSel((s) => (s + (e.key === "ArrowDown" ? 1 : -1) + n) % n);
+                return;
+              }
+              if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) {
+                e.preventDefault();
+                accept(Math.min(sel, n - 1));
+                return;
+              }
+              if (e.key === "Escape") {
+                // close the list, not the whole capture box
+                e.preventDefault();
+                e.stopPropagation();
+                setDismissedAt(suggestions.from);
+                return;
+              }
+            }
             if (e.key === "Enter") void submit();
             else if (e.key === "Tab") {
               e.preventDefault();
@@ -79,6 +125,25 @@ export function QuickCapture({ onSubmit, onClose, focus }: { onSubmit: (c: Captu
             }
           }}
         />
+        {suggestions && (
+          <ul className="mention-list" role="listbox" aria-label="Projects and clients">
+            {suggestions.options.map((o, i) => (
+              <li key={o.insert}>
+                <button
+                  role="option"
+                  aria-selected={i === sel}
+                  className={i === sel ? "on" : ""}
+                  onMouseDown={(e) => e.preventDefault()} // keep focus in the input
+                  onMouseEnter={() => setSel(i)}
+                  onClick={() => accept(i)}
+                >
+                  <code>{o.insert}</code>
+                  <span className="muted small">{o.target.detail}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="capture-kinds" role="radiogroup" aria-label="Capture type">
           {CAPTURE_KINDS.map((k) => (
             <button

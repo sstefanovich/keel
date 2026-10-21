@@ -1860,3 +1860,42 @@ mark {
   background: var(--code-bg);
   color: var(--muted);
 }
+
+/* ---------- quick capture @ suggestions ---------- */
+
+.mention-list {
+  list-style: none;
+  margin: 0 8px 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.mention-list button {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  gap: 10px;
+  border: 0;
+  background: none;
+  text-align: left;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.mention-list button.on {
+  background: var(--accent-soft);
+}
+.mention-list code {
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.mention-list .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
