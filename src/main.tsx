@@ -1,5 +1,6 @@
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./styles.css";
+import "./ui/theme"; // applies the saved light/dark choice and follows the OS when set to System
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(<App />);

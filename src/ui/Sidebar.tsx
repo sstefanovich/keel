@@ -3,6 +3,7 @@ import { formatShort, today } from "../core/dates";
 import { ParsedFile, basename } from "../core/parse";
 import { useHold } from "./HoldContext";
 import { View, useNav } from "./nav";
+import { ThemePref, useTheme } from "./theme";
 
 function NavItem({ active, onClick, children, badge, hint }: { active?: boolean; onClick: () => void; children: ReactNode; badge?: number; hint?: string }) {
   return (
@@ -42,7 +43,40 @@ function FileGroup({ title, files, label, current, onAdd, addLabel, limit = 8 }:
   );
 }
 
-const byDateDesc = (a: ParsedFile, b: ParsedFile) => (b.date ?? "").localeCompare(a.date ?? "") || b.mtime - a.mtime;
+const NEXT_PREF: Record<ThemePref, ThemePref> = { system: "light", light: "dark", dark: "system" };
+const PREF_LABEL: Record<ThemePref, string> = { system: "System theme", light: "Light theme", dark: "Dark theme" };
+
+/** Cycles System → Light → Dark. */
+function ThemeToggle() {
+  const { pref, setPref } = useTheme();
+  return (
+    <button
+      className="theme-toggle"
+      onClick={() => setPref(NEXT_PREF[pref])}
+      title={`${PREF_LABEL[pref]}: click for ${PREF_LABEL[NEXT_PREF[pref]].toLowerCase()}`}
+      aria-label={`${PREF_LABEL[pref]}. Switch to ${PREF_LABEL[NEXT_PREF[pref]].toLowerCase()}`}
+    >
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {pref === "light" && (
+          <>
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+          </>
+        )}
+        {pref === "dark" && <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />}
+        {pref === "system" && (
+          <>
+            <rect x="3" y="4" width="18" height="12" rx="2" />
+            <path d="M8 20h8M12 16v4" />
+          </>
+        )}
+      </svg>
+      <span>{pref === "system" ? "System" : pref === "light" ? "Light" : "Dark"}</span>
+    </button>
+  );
+}
+
+const byDateDesc =(a: ParsedFile, b: ParsedFile) => (b.date ?? "").localeCompare(a.date ?? "") || b.mtime - a.mtime;
 
 export function Sidebar() {
   const { hold, focus, setFocus } = useHold();
@@ -155,6 +189,7 @@ export function Sidebar() {
         <NavItem active={v.kind === "settings"} onClick={() => nav.go({ kind: "settings" })}>
           Settings
         </NavItem>
+        <ThemeToggle />
       </div>
     </aside>
   );

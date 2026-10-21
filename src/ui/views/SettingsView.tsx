@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { getAutostart, isTauri, loadSettings, notify, pickFolder, saveSettings, setAutostart } from "../../lib/platform";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
+import { useTheme } from "../theme";
 
 export function SettingsView() {
   const { dir, reportError } = useHold();
   const nav = useNav();
   const [autostart, setAuto] = useState(false);
+  const { pref, theme, setPref } = useTheme();
 
   useEffect(() => {
     getAutostart().then(setAuto).catch(() => {});
@@ -42,6 +44,20 @@ export function SettingsView() {
           <button onClick={changeHold} disabled={!isTauri}>
             Change…
           </button>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Appearance</h2>
+        <div className="setting-row">
+          <div className="seg" role="radiogroup" aria-label="Theme">
+            {(["system", "light", "dark"] as const).map((p) => (
+              <button key={p} role="radio" aria-checked={pref === p} className={pref === p ? "on" : ""} onClick={() => setPref(p)}>
+                {p === "system" ? "System" : p === "light" ? "Light" : "Dark"}
+              </button>
+            ))}
+          </div>
+          {pref === "system" && <span className="muted small">Following Windows: currently {theme}</span>}
         </div>
       </section>
 

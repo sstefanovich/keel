@@ -1,10 +1,11 @@
 import { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
 import { HighlightStyle } from "@codemirror/language";
-import { EditorState, RangeSetBuilder, StateField } from "@codemirror/state";
+import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { addDays, today } from "../../core/dates";
 import { mountMermaid } from "../mermaid";
+import { currentTheme } from "../theme";
 
 const TASK = /^(\s*[-*+] \[)([ xX>\-])(\])/;
 const HOURS = /^(\s*[-*+]\s+)((?:\d+(?:\.\d+)?h)?(?:\d+m)?)(\s+)(@[\w.-]+(?:\/[\w.-]+)?)/;
@@ -185,12 +186,16 @@ export const keelHighlight = HighlightStyle.define([
   { tag: t.list, class: "cm-k-meta" },
 ]);
 
+/** Dispatched when the app theme changes so diagrams re-render in the new colors. */
+export const refreshMermaid = StateEffect.define<null>();
+
 class MermaidWidget extends WidgetType {
+  readonly theme = currentTheme();
   constructor(readonly code: string) {
     super();
   }
   eq(other: MermaidWidget) {
-    return other.code === this.code;
+    return other.code === this.code && other.theme === this.theme;
   }
   toDOM() {
     const el = document.createElement("div");
@@ -225,6 +230,6 @@ function mermaidBlocks(state: EditorState): DecorationSet {
 /** Renders each ```mermaid block as a diagram just below it. */
 export const mermaidPreview = StateField.define<DecorationSet>({
   create: (state) => mermaidBlocks(state),
-  update: (deco, tr) => (tr.docChanged ? mermaidBlocks(tr.state) : deco),
+  update: (deco, tr) => (tr.docChanged || tr.effects.some((e) => e.is(refreshMermaid)) ? mermaidBlocks(tr.state) : deco),
   provide: (f) => EditorView.decorations.from(f),
 });

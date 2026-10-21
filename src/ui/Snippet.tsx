@@ -3,12 +3,14 @@ import { Snippet } from "../core/parse";
 import { copyText } from "../lib/platform";
 import { useHold } from "./HoldContext";
 import { mountMermaid } from "./mermaid";
+import { useTheme } from "./theme";
 
 export function MermaidDiagram({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
   useEffect(() => {
     if (ref.current) mountMermaid(ref.current, code);
-  }, [code]);
+  }, [code, theme]);
   return <div ref={ref} />;
 }
 

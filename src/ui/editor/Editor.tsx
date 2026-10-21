@@ -8,7 +8,8 @@ import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemir
 import { useEffect, useRef } from "react";
 import { basename } from "../../core/parse";
 import { useHold } from "../HoldContext";
-import { keelClicks, keelCompletions, keelDecorations, keelHighlight, mermaidPreview } from "./keelSyntax";
+import { keelClicks, keelCompletions, keelDecorations, keelHighlight, mermaidPreview, refreshMermaid } from "./keelSyntax";
+import { onThemeChange } from "../theme";
 
 interface Props {
   path: string;
@@ -104,6 +105,9 @@ export function Editor({ path, line, onOpenLink }: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
+
+  // re-render diagrams in the new colors when the theme changes
+  useEffect(() => onThemeChange(() => view.current?.dispatch({ effects: refreshMermaid.of(null) })), []);
 
   // jump when asked to open the same file at another line
   useEffect(() => {

@@ -22,27 +22,26 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #12161d;
-    --surface: #181d26;
-    --sidebar: #0f1319;
-    --border: #2a3140;
-    --text: #e3e8ef;
-    --muted: #8b96a8;
-    --accent: #5aa6d6;
-    --accent-soft: #1b3346;
-    --accent-text: #0b1620;
-    --danger: #f2877b;
-    --danger-soft: #3a1f1d;
-    --warn: #e0a54a;
-    --ok: #6cc28f;
-    --tag: #b79ce6;
-    --tag-soft: #2b2340;
-    --code-bg: #222936;
-    --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    color-scheme: dark;
-  }
+/* data-theme is always "light" or "dark", resolved from the user's choice (System follows the OS); see ui/theme.ts */
+:root[data-theme="dark"] {
+  --bg: #12161d;
+  --surface: #181d26;
+  --sidebar: #0f1319;
+  --border: #2a3140;
+  --text: #e3e8ef;
+  --muted: #8b96a8;
+  --accent: #5aa6d6;
+  --accent-soft: #1b3346;
+  --accent-text: #0b1620;
+  --danger: #f2877b;
+  --danger-soft: #3a1f1d;
+  --warn: #e0a54a;
+  --ok: #6cc28f;
+  --tag: #b79ce6;
+  --tag-soft: #2b2340;
+  --code-bg: #222936;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
 }
 
 * {
@@ -935,16 +934,14 @@ mark {
   --flag-purple: #e6dbff;
   --flag-text: #2a2618;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --flag-yellow: #4d4519;
-    --flag-orange: #50341c;
-    --flag-pink: #4f2434;
-    --flag-blue: #1d3a55;
-    --flag-green: #23422a;
-    --flag-purple: #362a55;
-    --flag-text: #f1ecdc;
-  }
+:root[data-theme="dark"] {
+  --flag-yellow: #4d4519;
+  --flag-orange: #50341c;
+  --flag-pink: #4f2434;
+  --flag-blue: #1d3a55;
+  --flag-green: #23422a;
+  --flag-purple: #362a55;
+  --flag-text: #f1ecdc;
 }
 
 .flag-board {
@@ -1367,4 +1364,30 @@ mark {
   padding: 0;
   background: none;
   font-size: inherit;
+}
+
+/* ---------- theme toggle ---------- */
+
+.side-foot {
+  flex-direction: row;
+  align-items: center;
+}
+.side-foot .nav-item {
+  flex: 1;
+}
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 5px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  flex: none;
+}
+.theme-toggle:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
 }

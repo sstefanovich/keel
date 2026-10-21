@@ -1,24 +1,29 @@
 /** Lazy Mermaid rendering with a small cache (the library is large, so it loads on first diagram). */
+import { currentTheme } from "./theme";
 
 type Mermaid = typeof import("mermaid").default;
 
 let lib: Promise<Mermaid> | null = null;
+let initializedFor: string | null = null;
 let n = 0;
 const cache = new Map<string, Promise<string>>();
 
-const dark = () => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
-
 function load(): Promise<Mermaid> {
-  lib ??= import("mermaid").then((m) => {
-    m.default.initialize({ startOnLoad: false, securityLevel: "strict", theme: dark() ? "dark" : "default", fontFamily: "Segoe UI, sans-serif" });
-    return m.default;
+  lib ??= import("mermaid").then((m) => m.default);
+  return lib.then((m) => {
+    // re-initialize when the app theme changes so new renders match it
+    const theme = currentTheme();
+    if (initializedFor !== theme) {
+      m.initialize({ startOnLoad: false, securityLevel: "strict", theme: theme === "dark" ? "dark" : "default", fontFamily: "Segoe UI, sans-serif" });
+      initializedFor = theme;
+    }
+    return m;
   });
-  return lib;
 }
 
 /** Resolves to SVG markup; rejects with Mermaid's parse error message. */
 export function renderMermaid(code: string): Promise<string> {
-  const key = `${dark()}|${code}`;
+  const key = `${currentTheme()}|${code}`;
   let p = cache.get(key);
   if (!p) {
     p = load().then(async (m) => (await m.render(`keel-mmd-${++n}`, code)).svg);
