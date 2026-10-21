@@ -3,7 +3,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirro
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxHighlighting } from "@codemirror/language";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
-import { EditorState } from "@codemirror/state";
+import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemirror/view";
 import { useEffect, useRef } from "react";
 import { basename } from "../../core/parse";
@@ -11,11 +11,12 @@ import { useHold } from "../HoldContext";
 import { keelClicks, keelCompletions, keelDecorations, keelHighlight, mermaidPreview, propertiesView, refreshMermaid } from "./keelSyntax";
 import { workTargets } from "../workTargets";
 import { onThemeChange } from "../theme";
+import { LivePreviewOptions, livePreview, livePreviewEnabled, onLivePreviewChange } from "./livePreview";
 
 interface Props {
   path: string;
   line?: number;
-  onOpenLink: (target: string) => void;
+  onOpenLink: (target: string, newTab?: boolean) => void;
   /** Save state for the header: unsaved typing, a save in flight, or everything saved */
   onStatus?: (s: SaveStatus) => void;
 }
@@ -41,6 +42,11 @@ export function Editor({ path, line, onOpenLink, onStatus }: Props) {
   const saved = useRef({ content: "", mtime: 0 });
   const timer = useRef<number | undefined>(undefined);
   const linkRef = useRef(onOpenLink);
+  const previewSlot = useRef(new Compartment());
+  const previewOpts: LivePreviewOptions = {
+    open: (target, newTab) => linkRef.current(target, newTab),
+    exists: (target) => !!hold.resolveLink(target),
+  };
   linkRef.current = onOpenLink;
 
   const flush = async () => {
@@ -84,6 +90,7 @@ export function Editor({ path, line, onOpenLink, onStatus }: Props) {
           mermaidPreview,
           propertiesView,
           keelClicks((t) => linkRef.current(t)),
+          previewSlot.current.of(livePreviewEnabled() ? livePreview(previewOpts) : []),
           autocompletion({
             override: [
               keelCompletions(
@@ -123,6 +130,16 @@ export function Editor({ path, line, onOpenLink, onStatus }: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
+
+  // live preview on/off from Settings, applied to the open editor straight away
+  useEffect(
+    () =>
+      onLivePreviewChange(() =>
+        view.current?.dispatch({ effects: previewSlot.current.reconfigure(livePreviewEnabled() ? livePreview(previewOpts) : []) }),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   // re-render diagrams in the new colors when the theme changes
   useEffect(() => onThemeChange(() => view.current?.dispatch({ effects: refreshMermaid.of(null) })), []);

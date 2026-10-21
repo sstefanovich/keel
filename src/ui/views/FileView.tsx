@@ -132,7 +132,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
           <div className="log-layout">
             <div className="log-main">
               {file.date === today() && <FlagBoard compact />}
-              <Editor key={path} path={path} line={line} onOpenLink={(t) => nav.openLink(t)} onStatus={setSaveStatus} />
+              <Editor key={path} path={path} line={line} onOpenLink={(t, newTab) => nav.openLink(t, { newTab })} onStatus={setSaveStatus} />
               {backlinkList}
             </div>
             <aside className="log-side">
@@ -144,7 +144,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
             {mode === "chart" && hasChart ? (
               <ChartView path={path} />
             ) : (
-              <Editor key={path} path={path} line={line} onOpenLink={(t) => nav.openLink(t)} onStatus={setSaveStatus} />
+              <Editor key={path} path={path} line={line} onOpenLink={(t, newTab) => nav.openLink(t, { newTab })} onStatus={setSaveStatus} />
             )}
             {backlinkList}
           </>

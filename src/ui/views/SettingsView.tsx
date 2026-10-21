@@ -6,6 +6,7 @@ import { useTheme } from "../theme";
 import { ClientsManager } from "../ClientsManager";
 import { WEEKDAY_NAMES } from "../../core/dates";
 import { setWeekStart, useWeekStart } from "../weekStart";
+import { livePreviewEnabled, setLivePreview } from "../editor/livePreview";
 
 export function SettingsView({ section }: { section?: string }) {
   const { dir, reportError } = useHold();
@@ -13,6 +14,7 @@ export function SettingsView({ section }: { section?: string }) {
   const [autostart, setAuto] = useState(false);
   const { pref, theme, setPref } = useTheme();
   const weekStart = useWeekStart();
+  const [preview, setPreview] = useState(livePreviewEnabled);
 
   useEffect(() => {
     getAutostart().then(setAuto).catch(() => {});
@@ -89,6 +91,17 @@ export function SettingsView({ section }: { section?: string }) {
           </div>
           {pref === "system" && <span className="muted small">Following Windows: currently {theme}</span>}
         </div>
+        <label className="setting-row check">
+          <input
+            type="checkbox"
+            checked={preview}
+            onChange={(e) => {
+              setLivePreview(e.target.checked);
+              setPreview(e.target.checked);
+            }}
+          />
+          Live preview: hide markdown symbols (#, **, links) except on the line you're editing, and show task boxes as checkboxes
+        </label>
       </section>
 
       <section className="panel">

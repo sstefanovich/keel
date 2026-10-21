@@ -754,3 +754,65 @@ button.icon-text {
 .log-main > .flag-board.empty-board {
   margin-top: 10px;
 }
+
+/* ---------- editor live preview ---------- */
+
+.cm-lp-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0 7px 0 1px;
+  vertical-align: -2px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--accent-text);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
+}
+.cm-lp-check:hover {
+  border-color: var(--accent);
+}
+.cm-lp-check svg {
+  width: 13px;
+  height: 13px;
+}
+.cm-lp-check.done {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.cm-lp-check.moved,
+.cm-lp-check.cancelled {
+  cursor: default;
+  color: var(--muted);
+  border-style: dashed;
+  font-weight: 700;
+}
+.cm-lp-bullet {
+  display: inline-block;
+  width: 0.75em;
+  color: var(--muted);
+  font-weight: 700;
+}
+.cm-lp-link {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 5px;
+  padding: 0 5px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.cm-lp-link:hover {
+  text-decoration: underline;
+}
+.cm-lp-link.missing {
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--accent) 50%, transparent);
+  opacity: 0.85;
+}
