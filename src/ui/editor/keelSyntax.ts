@@ -53,6 +53,10 @@ function build(view: EditorView): DecorationSet {
           ranges.push([s, s + h[2].length, mark("cm-k-dur")]);
           const c = s + h[2].length + h[3].length;
           ranges.push([c, c + h[4].length, mark("cm-k-client")]);
+        } else {
+          // "- @project" waiting for its hours
+          const bare = text.match(/^(\s*[-*+]\s+)(@[\w.-]+(?:\/[\w.-]+)?)\s*$/);
+          if (bare) ranges.push([line.from + bare[1].length, line.from + bare[1].length + bare[2].length, mark("cm-k-client")]);
         }
       }
 

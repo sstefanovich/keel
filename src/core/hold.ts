@@ -2,6 +2,7 @@ import { ISODate, addDays, hhmm, today as todayISO } from "./dates";
 import { HoldFs } from "./fs";
 import {
   ChartItem,
+  HOURS_RE,
   HoursEntry,
   ParsedFile,
   Reminder,
@@ -228,6 +229,66 @@ export class Hold {
     const path = await this.freePath("projects", name);
     await this.save(path, fillTemplate(await this.template("project"), { date: todayISO(), title: name, client }));
     return path;
+  }
+
+  // ---------- daily work blocks ("- 6h @project" with done items indented under it) ----------
+
+  /** Log hours and/or a done item against a project for a day; adds to the day's block if there is one. */
+  async logWork(date: ISODate, key: string, add: { hours?: number; item?: string }): Promise<void> {
+    const path = await this.ensureLog(date);
+    const k = key.replace(/^@/, "").toLowerCase();
+    const block = this.get(path)?.hours.find((h) => h.client === k);
+    if (block) {
+      if (add.hours) await this.setWorkHours(block, block.hours + add.hours);
+      if (add.item) await this.addWorkItem(this.get(path)!.hours.find((h) => h.client === k)!, add.item);
+      return;
+    }
+    const head = add.hours ? `- ${round2(add.hours)}h @${k}` : `- @${k}`;
+    const content = await this.fs.read(path);
+    await this.appendTo(path, workHeading(content), add.item ? `${head}\n  - ${add.item}` : head);
+  }
+
+  /** Rewrite a block's hours (0 leaves "- @key" to fill in later). */
+  async setWorkHours(entry: HoursEntry, hours: number): Promise<void> {
+    await this.editLines(entry.file, (lines) => {
+      const m = lines[entry.line]?.match(HOURS_RE);
+      if (!m) throw new Error("That hours line changed on disk; reopen the log and try again.");
+      const dur = hours > 0 ? `${round2(hours)}h ` : "";
+      lines[entry.line] = `${m[1]}- ${dur}@${m[4]}${m[5] ? ` ${m[5]}` : ""}`;
+    });
+  }
+
+  /** Add a done item under a block (after its last child). */
+  async addWorkItem(entry: HoursEntry, text: string): Promise<void> {
+    await this.editLines(entry.file, (lines) => {
+      const m = lines[entry.line]?.match(HOURS_RE);
+      if (!m) throw new Error("That hours line changed on disk; reopen the log and try again.");
+      lines.splice(entry.end + 1, 0, `${m[1]}  - ${text.trim()}`);
+    });
+  }
+
+  private async editLines(path: string, edit: (lines: string[]) => void): Promise<void> {
+    const content = await this.fs.read(path);
+    const eol = content.includes("\r\n") ? "\r\n" : "\n";
+    const lines = content.split(/\r?\n/);
+    edit(lines);
+    await this.save(path, lines.join(eol));
+  }
+
+  /** The client and (if any) project a task's work counts toward. */
+  taskProject(t: Task): { client: string; project?: string } | undefined {
+    const f = this.files.get(t.file);
+    if (f?.kind === "project") {
+      const client = this.fileClient(f);
+      return client ? { client, project: slugify(basename(f.path)) } : undefined;
+    }
+    const clients = this.clients();
+    for (const tag of t.tags) {
+      if (tag.includes("/") || this.projectByKey(tag)) return this.resolveHours(tag);
+      if (clients.has(tag)) return { client: tag };
+    }
+    const c = this.taskClient(t);
+    return c ? { client: c } : undefined;
   }
 
   /** Set or clear several frontmatter fields of one file. */
@@ -513,3 +574,10 @@ export class Hold {
 }
 
 export const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Section that holds a log's work blocks: "Work" in new logs, "Hours" in older ones. */
+export function workHeading(content: string): string {
+  if (/^#{1,6}\s+work\s*$/im.test(content)) return "Work";
+  if (/^#{1,6}\s+hours\s*$/im.test(content)) return "Hours";
+  return "Work";
+}

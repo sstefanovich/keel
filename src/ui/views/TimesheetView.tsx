@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { ISODate, addDays, addMonths, endOfMonth, formatShort, startOfMonth, startOfWeek, today } from "../../core/dates";
 import { round2 } from "../../core/hold";
-import { exportText } from "../../lib/platform";
+import { copyText, exportText } from "../../lib/platform";
+import { buildWeek, dayItems, rowReport, rowTsv, weekTsv } from "../../core/week";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 
@@ -35,7 +36,7 @@ function money(n: number, currency: string) {
   }
 }
 
-export function TimesheetView() {
+function TotalsView({ toggle }: { toggle: ReactNode }) {
   const { hold, bump, reportError, toast, focus } = useHold();
   const nav = useNav();
   const [preset, setPreset] = useState<Preset>("this-week");
@@ -76,6 +77,7 @@ export function TimesheetView() {
           </p>
         </div>
         <div className="toolbar">
+          {toggle}
           <select value={preset} onChange={(e) => setPreset(e.target.value as Preset)} aria-label="Period">
             <option value="this-week">This week</option>
             <option value="last-week">Last week</option>
@@ -196,6 +198,191 @@ export function TimesheetView() {
               })}
             </table>
           </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+type Mode = "week" | "totals";
+
+export function TimesheetView() {
+  const [mode, setMode] = useState<Mode>(() => {
+    try {
+      return localStorage.getItem("keel.timesheetMode") === "totals" ? "totals" : "week";
+    } catch {
+      return "week";
+    }
+  });
+  const choose = (m: Mode) => {
+    setMode(m);
+    try {
+      localStorage.setItem("keel.timesheetMode", m);
+    } catch {
+      // ignore
+    }
+  };
+  const toggle = (
+    <div className="seg" role="tablist">
+      <button role="tab" aria-selected={mode === "week"} className={mode === "week" ? "on" : ""} onClick={() => choose("week")}>
+        Week
+      </button>
+      <button role="tab" aria-selected={mode === "totals"} className={mode === "totals" ? "on" : ""} onClick={() => choose("totals")}>
+        Totals
+      </button>
+    </div>
+  );
+  return mode === "week" ? <WeekSheet toggle={toggle} /> : <TotalsView toggle={toggle} />;
+}
+
+const cell = (h: number) => (h ? String(round2(h)) : "");
+
+/** Projects × days grid for entering into a timesheet system, plus per-project daily reports. */
+function WeekSheet({ toggle }: { toggle: ReactNode }) {
+  const { hold, toast, focus } = useHold();
+  const nav = useNav();
+  const [monday, setMonday] = useState(() => startOfWeek(today()));
+  const week = buildWeek(hold, monday, focus);
+  const t = today();
+
+  const copy = async (text: string, what: string) => {
+    await copyText(text);
+    toast(`Copied ${what}`);
+  };
+
+  return (
+    <div className="page week-page">
+      <header className="page-head row">
+        <div>
+          <h1>Timesheet</h1>
+          <p className="muted">
+            Week of {formatShort(week.days[0])} – {formatShort(week.days[6])}
+          </p>
+        </div>
+        <div className="toolbar">
+          {toggle}
+          <button onClick={() => setMonday(addDays(monday, -7))} aria-label="Previous week">
+            ‹
+          </button>
+          <button onClick={() => setMonday(startOfWeek(t))}>This week</button>
+          <button onClick={() => setMonday(addDays(monday, 7))} aria-label="Next week">
+            ›
+          </button>
+          <button onClick={() => copy(weekTsv(week), "the week grid")} disabled={!week.rows.length} title="Tab-separated, pastes into Excel or a form grid">
+            Copy grid
+          </button>
+        </div>
+      </header>
+
+      {!week.rows.length ? (
+        <p className="empty panel">
+          No work logged this week. In each day's log, add a project under <b>Work</b> (or quick capture <code>6h @project</code>), then list
+          what you did under it.
+        </p>
+      ) : (
+        <>
+          <section className="panel week-grid-panel">
+            <table className="table week-grid">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  {week.days.map((d, i) => (
+                    <th key={d} className={`num${i >= 5 ? " weekend" : ""}${d === t ? " today" : ""}`}>
+                      <button className="link" onClick={() => nav.openLog(d)} title="Open this day's log">
+                        {formatShort(d).replace(",", "")}
+                      </button>
+                    </th>
+                  ))}
+                  <th className="num">Total</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {week.rows.map((r) => (
+                  <tr key={`${r.client}/${r.project ?? ""}`}>
+                    <td>
+                      <span className="week-label">{r.label}</span>
+                      {r.project && <span className="muted small"> · {r.clientName}</span>}
+                    </td>
+                    {r.hours.map((h, i) => {
+                      const missing = !h && r.items[i].length > 0;
+                      return (
+                        <td key={i} className={`num${i >= 5 ? " weekend" : ""}${missing ? " missing" : ""}`}>
+                          {missing ? (
+                            <button className="link small" onClick={() => nav.openLog(week.days[i])} title="Work listed but no hours entered">
+                              ?
+                            </button>
+                          ) : h ? (
+                            <button className="cell-copy" onClick={() => copy(cell(h), `${cell(h)}h`)} title="Click to copy">
+                              {cell(h)}
+                            </button>
+                          ) : null}
+                        </td>
+                      );
+                    })}
+                    <td className="num week-total">{cell(r.total)}</td>
+                    <td>
+                      <button className="ghost small" onClick={() => copy(rowTsv(r), `${r.label} hours`)} title="Mon–Sun hours, tab-separated">
+                        Copy row
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>Total</td>
+                  {week.dayTotals.map((h, i) => (
+                    <td key={i} className={`num${i >= 5 ? " weekend" : ""}`}>
+                      {cell(h)}
+                    </td>
+                  ))}
+                  <td className="num week-total">{cell(week.total)}</td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </section>
+
+          {week.rows.map((r) => (
+            <section key={`report-${r.client}/${r.project ?? ""}`} className="panel week-report">
+              <div className="row-between">
+                <h2>
+                  {r.label}
+                  {r.project && <span className="muted"> · {r.clientName}</span>} <span className="count">{cell(r.total) || 0}h</span>
+                </h2>
+                <button className="ghost small" onClick={() => copy(rowReport(week, r), `${r.label} report`)}>
+                  Copy report
+                </button>
+              </div>
+              {week.days.map((d, i) =>
+                !r.items[i].length && !r.hours[i] ? null : (
+                  <div key={d} className="week-day">
+                    <div className="week-day-head">
+                      <button className="link" onClick={() => nav.openLog(d)}>
+                        {formatShort(d)}
+                      </button>
+                      <span className={`chip${r.hours[i] ? "" : " chip-warn"}`}>{r.hours[i] ? `${cell(r.hours[i])}h` : "no hours"}</span>
+                      {r.items[i].length > 0 && (
+                        <button className="ghost small" onClick={() => copy(dayItems(r, i), `${formatShort(d)} items`)}>
+                          Copy day
+                        </button>
+                      )}
+                    </div>
+                    {r.items[i].length ? (
+                      <ul>
+                        {r.items[i].map((x, j) => (
+                          <li key={j}>{x}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="muted small">Nothing listed for this day.</p>
+                    )}
+                  </div>
+                ),
+              )}
+            </section>
+          ))}
         </>
       )}
     </div>

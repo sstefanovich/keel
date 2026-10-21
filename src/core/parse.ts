@@ -35,6 +35,10 @@ export interface HoursEntry {
   /** The @key as written, lowercased: a client key, a project key, or "client/project" */
   client: string;
   description: string;
+  /** What was done: the description plus bullets (and ticked tasks) indented under the line */
+  items: string[];
+  /** Last line of the block (the hours line itself if it has no children) */
+  end: number;
 }
 
 /** A fenced code block on a client/project Chart (CLI commands, config, diagrams). */
@@ -94,7 +98,10 @@ const STATUS_CHARS: Record<string, TaskStatus> = { " ": "open", x: "done", X: "d
 export const STATUS_CHAR: Record<TaskStatus, string> = { open: " ", done: "x", migrated: ">", cancelled: "-" };
 
 export const TASK_RE = /^(\s*)[-*+] \[([ xX>\-])\] (.*)$/;
-export const HOURS_RE = /^\s*[-*+]\s+(?:(\d+(?:\.\d+)?)h)?(?:(\d+)m)?\s+@([\w.-]+(?:\/[\w.-]+)?)\s*(?:[-–:]\s*)?(.*)$/i;
+/** "- 6h @key description" / "- 1h30m @client/project" / "- @key" — groups: indent, hours, minutes, key, description */
+export const HOURS_RE = /^(\s*)[-*+]\s+(?:(?:(\d+(?:\.\d+)?)h)?(?:(\d+)m)?\s+)?@([\w.-]+(?:\/[\w.-]+)?)\s*(?:[-–:]\s*)?(.*)$/i;
+
+const indentOf = (s: string) => s.replace(/\t/g, "    ").match(/^\s*/)![0].length;
 const BULLET_RE = /^\s*[-*+]\s+(.*)$/;
 const DUE_RE = /@due\((\d{4}-\d{2}-\d{2})\)/;
 const REMIND_RE = /@remind\(([^)]*)\)/;
@@ -176,6 +183,8 @@ export function parseFile(path: string, content: string, mtime = 0): ParsedFile 
 
   const snippets: Snippet[] = [];
   let fence: { line: number; lang: string; code: string[]; title?: string } | null = null;
+  // the hours line whose indented children we're collecting
+  let block: { entry: HoursEntry; indent: number } | null = null;
 
   for (let i = fmLines; i < lines.length; i++) {
     const line = lines[i];
@@ -201,6 +210,18 @@ export function parseFile(path: string, content: string, mtime = 0): ParsedFile 
       const h = line.match(/^#\s+(.+)$/);
       if (h) title = h[1].trim();
     }
+    // bullets indented under an hours line are what was done for that project that day
+    if (block && line.trim()) {
+      const child = indentOf(line) > block.indent ? line.match(BULLET_RE) : null;
+      if (child) {
+        block.entry.end = i;
+        const ct = line.match(TASK_RE);
+        // plain bullets and ticked tasks count as work done; open or carried-over tasks don't
+        const text = ct ? (/[xX]/.test(ct[2]) ? stripTokens(ct[3]) : "") : stripTokens(child[1]);
+        if (text) block.entry.items.push(text);
+      } else block = null;
+    }
+
     // tokens inside `inline code` are examples, not data
     const scan = line.replace(/`[^`]*`/g, (m) => " ".repeat(m.length));
     for (const m of scan.matchAll(LINK_RE)) links.add(m[1].trim());
@@ -239,10 +260,23 @@ export function parseFile(path: string, content: string, mtime = 0): ParsedFile 
     }
 
     const h = scan.match(HOURS_RE);
-    if (h && (h[1] || h[2])) {
-      const amount = (h[1] ? Number(h[1]) : 0) + (h[2] ? Number(h[2]) / 60 : 0);
-      if (amount > 0 && date) {
-        hours.push({ file: path, line: i, date, hours: amount, client: h[3].toLowerCase(), description: h[4].trim() });
+    // "- 6h @key …" always; a bare "- @key" (hours to fill in later) only when nothing follows it
+    if (h && (h[2] || h[3] || !h[5].trim())) {
+      const amount = (h[2] ? Number(h[2]) : 0) + (h[3] ? Number(h[3]) / 60 : 0);
+      if (date) {
+        const description = line.match(HOURS_RE)?.[5].trim() ?? "";
+        const entry: HoursEntry = {
+          file: path,
+          line: i,
+          end: i,
+          date,
+          hours: amount,
+          client: h[4].toLowerCase(),
+          description,
+          items: description ? [stripTokens(description)] : [],
+        };
+        hours.push(entry);
+        block = { entry, indent: indentOf(line) };
       }
       continue;
     }

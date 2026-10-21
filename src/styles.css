@@ -1439,3 +1439,140 @@ mark {
 .manage-add input {
   flex: 1;
 }
+
+/* ---------- work panel (per-day project hours & items) ---------- */
+
+.work-panel {
+  max-width: 820px;
+  margin: 14px auto 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  width: calc(100% - 64px);
+}
+.work-panel header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.work-panel h3 {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.work-panel header select {
+  font-size: 13px;
+}
+.work-block {
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.work-block:first-of-type {
+  border-top: 0;
+}
+.work-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.work-name {
+  flex: 1;
+  font-weight: 600;
+}
+.work-name.unknown {
+  color: var(--warn);
+}
+.work-hours {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.work-hours input {
+  width: 70px;
+  text-align: right;
+  padding: 2px 6px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.work-hours input.missing {
+  border-color: var(--warn);
+}
+.work-items {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+.work-items li {
+  margin: 1px 0;
+}
+.work-add {
+  width: 100%;
+  margin-top: 4px;
+  border-style: dashed;
+  background: transparent;
+  font-size: 13px;
+}
+.work-add:focus {
+  border-style: solid;
+}
+
+/* ---------- weekly timesheet ---------- */
+
+.week-page {
+  max-width: 1100px;
+}
+.week-grid-panel {
+  overflow-x: auto;
+}
+.week-grid th,
+.week-grid td {
+  white-space: nowrap;
+}
+.week-grid .weekend {
+  background: color-mix(in srgb, var(--code-bg) 60%, transparent);
+}
+.week-grid th.today {
+  color: var(--accent);
+}
+.week-grid td.missing {
+  background: color-mix(in srgb, var(--warn) 15%, transparent);
+}
+.week-grid .week-label {
+  font-weight: 600;
+}
+.week-grid .week-total {
+  font-weight: 700;
+}
+.week-grid tfoot td {
+  font-weight: 700;
+  border-bottom: 0;
+}
+.cell-copy {
+  border: 0;
+  background: none;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+  border-radius: 4px;
+}
+.cell-copy:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.week-day {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.week-day-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.week-day ul {
+  margin: 4px 0 0;
+  padding-left: 22px;
+}

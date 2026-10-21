@@ -20,6 +20,13 @@ interface Props {
 const SAVE_DELAY = 500;
 
 /** Markdown editor for one file. Autosaves; reloads when the file changes on disk. */
+const flushers = new Set<() => Promise<void>>();
+
+/** Save any unsaved typing in open editors. Await this before writing to a file an editor may have open. */
+export async function flushEditors(): Promise<void> {
+  await Promise.all([...flushers].map((f) => f()));
+}
+
 export function Editor({ path, line, onOpenLink }: Props) {
   const { hold, version, bump, reportError } = useHold();
   const host = useRef<HTMLDivElement>(null);
@@ -136,9 +143,11 @@ export function Editor({ path, line, onOpenLink }: Props) {
     const h = () => void flush();
     window.addEventListener("blur", h);
     window.addEventListener("keel-flush", h);
+    flushers.add(flush);
     return () => {
       window.removeEventListener("blur", h);
       window.removeEventListener("keel-flush", h);
+      flushers.delete(flush);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);

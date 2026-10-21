@@ -111,13 +111,23 @@ function Shell() {
     try {
       if (c.kind === "flag") {
         await hold.hoistFlag(c.line, "yellow", focus);
+      } else if (c.work) {
+        await hold.logWork(today(), c.work.key, c.work);
       } else {
         const path = await hold.ensureLog(today());
         await hold.appendTo(path, c.heading, c.line);
       }
       bump();
       toast(
-        { hours: "Hours logged", log: "Added to today's log", reminder: "Reminder set", task: "Task added", flag: "Flag hoisted", waiting: "Added to waiting on" }[c.kind],
+        {
+          hours: "Hours logged",
+          work: "Added to today's work",
+          log: "Added to today's log",
+          reminder: "Reminder set",
+          task: "Task added",
+          flag: "Flag hoisted",
+          waiting: "Added to waiting on",
+        }[c.kind],
       );
       const hide = capture?.hideAfter;
       setCapture(null);

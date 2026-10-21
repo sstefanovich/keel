@@ -11,7 +11,8 @@ function useEscape(onClose: () => void) {
 }
 
 const KIND_LABEL = {
-  hours: "Hours → today's log",
+  hours: "Hours → today's work",
+  work: "Done item → today's work",
   task: "Task → today's log",
   reminder: "Reminder → today's log",
   log: "Log entry → today's log",

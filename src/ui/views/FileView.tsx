@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { addDays, formatLong, today } from "../../core/dates";
 import { confirmDialog } from "../../lib/platform";
 import { FlagBoard } from "../FlagBoard";
+import { WorkPanel } from "../WorkPanel";
 import { useHold } from "../HoldContext";
 import { Editor } from "../editor/Editor";
 import { useNav } from "../nav";
@@ -85,6 +86,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
       </header>
       <div className="file-body">
         {isLog && file.date === today() && <FlagBoard compact />}
+        {isLog && <WorkPanel file={file} />}
         {mode === "chart" && hasChart ? (
           <ChartView path={path} />
         ) : (

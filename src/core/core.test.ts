@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { azureContext, azurePortalUrl } from "./azure";
 import { parseCapture } from "./capture";
 import { buildReport, reportHtml, reportMarkdown } from "./report";
+import { buildWeek, rowReport, rowTsv, weekTsv } from "./week";
 import { parseTime, today } from "./dates";
 import { MemoryFs } from "./fs";
 import { Hold } from "./hold";
@@ -289,8 +290,6 @@ describe("setTaskChar", () => {
 describe("parseCapture", () => {
   const now = new Date(2026, 9, 19, 10, 5); // Mon 2026-10-19 10:05
   it.each([
-    ["2h @acme fixed login", "Hours", "- 2h @acme fixed login"],
-    ["45m @acme standup", "Hours", "- 45m @acme standup"],
     ["todo buy ink", "Tasks", "- [ ] buy ink"],
     ["[] buy ink", "Tasks", "- [ ] buy ink"],
     ["remind me 3pm call the bank", "Tasks", "- [ ] call the bank @remind(15:00)"],
@@ -309,11 +308,28 @@ describe("parseCapture", () => {
   });
 });
 
+describe("parseCapture work entries", () => {
+  const now = new Date(2026, 9, 19, 10, 5);
+  it.each([
+    ["6h @portal", undefined, { key: "portal", hours: 6, item: undefined }],
+    ["2h @acme fixed login", undefined, { key: "acme", hours: 2, item: "fixed login" }],
+    ["1h30m @Acme/Portal pairing", undefined, { key: "acme/portal", hours: 1.5, item: "pairing" }],
+    ["45m @acme standup", undefined, { key: "acme", hours: 0.75, item: "standup" }],
+    ["@portal reviewed the auth PR", undefined, { key: "portal", hours: undefined, item: "reviewed the auth PR" }],
+    ["2h fixed login", "acme", { key: "acme", hours: 2, item: "fixed login" }],
+    ["2h @globex other client", "acme", { key: "globex", hours: 2, item: "other client" }],
+  ])("%s", (input, focus, work) => {
+    expect(parseCapture(input, now, focus)?.work).toEqual(work);
+  });
+  it("leaves a bare @mention and plain durations alone", () => {
+    expect(parseCapture("@jordan", now)?.kind).toBe("log");
+    expect(parseCapture("2h meeting with no project", now)?.kind).toBe("log");
+  });
+});
+
 describe("parseCapture with a focused client", () => {
   const now = new Date(2026, 9, 19, 10, 5);
   it.each([
-    ["2h fixed login", "- 2h @acme fixed login"],
-    ["2h @globex other client", "- 2h @globex other client"],
     ["todo review PR", "- [ ] review PR #acme"],
     ["todo review PR #acme/portal", "- [ ] review PR #acme/portal"],
     ["wait Jordan: rules", "- [ ] rules #acme @waiting(Jordan)"],
@@ -469,6 +485,86 @@ describe("Hold", () => {
     // mid-week: waiting time counts to today, not to the end of the week
     expect(reportMarkdown(buildReport(hold, "acme", "2026-10-19", "2026-10-25", "2026-10-20"))).toContain("firewall rules (6 days)");
     expect(reportHtml(r)).toContain("<li><b>Jordan</b>: firewall rules (11 days)</li>");
+  });
+
+  it("parses work blocks: hours line plus indented done items", () => {
+    const f = parseFile(
+      "logs/2026/2026-10-21.md",
+      `---
+date: 2026-10-21
+---
+## Work
+- 6h @portal-rebuild
+  - Designed the API gateway
+  - [x] Reviewed the auth PR
+  - [ ] still to do, not counted
+
+  - after a blank line, still in the block
+- @contoso
+  - Fixed SSO bug
+- 1h @globex quick call
+## Log
+- 10:00 not part of any block
+`,
+    );
+    expect(f.hours.map((h) => [h.client, h.hours, h.items])).toEqual([
+      ["portal-rebuild", 6, ["Designed the API gateway", "Reviewed the auth PR", "after a blank line, still in the block"]],
+      ["contoso", 0, ["Fixed SSO bug"]],
+      ["globex", 1, ["quick call"]],
+    ]);
+    expect(f.hours[0].end).toBe(9);
+    expect(f.tasks.map((t) => t.text)).toEqual(["Reviewed the auth PR", "still to do, not counted"]);
+  });
+
+  it("logs work into today's blocks: adds hours and items, creates blocks", async () => {
+    const hold = await makeHold({
+      "logs/2026/2026-10-21.md": "---\ndate: 2026-10-21\n---\n## Tasks\n\n## Work\n- 2h @portal\n  - morning item\n\n## Log\n",
+    });
+    await hold.logWork("2026-10-21", "portal", { hours: 3, item: "afternoon item" });
+    await hold.logWork("2026-10-21", "@Contoso", { item: "fixed SSO" });
+    await hold.logWork("2026-10-21", "contoso", { hours: 1.5 });
+    expect(await hold.fs.read("logs/2026/2026-10-21.md")).toBe(
+      "---\ndate: 2026-10-21\n---\n## Tasks\n\n## Work\n- 5h @portal\n  - morning item\n  - afternoon item\n- 1.5h @contoso\n  - fixed SSO\n\n## Log\n",
+    );
+    await hold.setWorkHours(hold.get("logs/2026/2026-10-21.md")!.hours[1], 0);
+    expect(hold.get("logs/2026/2026-10-21.md")!.content).toContain("\n- @contoso\n  - fixed SSO\n");
+  });
+
+  it("writes into an older log's Hours section, or adds Work", async () => {
+    const hold = await makeHold({
+      "logs/2026/2026-10-19.md": "---\ndate: 2026-10-19\n---\n## Hours\n\n## Log\n",
+      "logs/2026/2026-10-20.md": "---\ndate: 2026-10-20\n---\n# Tue\n",
+    });
+    await hold.logWork("2026-10-19", "acme", { hours: 1 });
+    await hold.logWork("2026-10-20", "acme", { hours: 1 });
+    expect(hold.get("logs/2026/2026-10-19.md")!.content).toContain("## Hours\n- 1h @acme\n");
+    expect(hold.get("logs/2026/2026-10-20.md")!.content).toContain("## Work\n- 1h @acme\n");
+  });
+
+  it("builds a week grid with per-day items per project", async () => {
+    const hold = await makeHold({
+      "clients/contoso.md": "---\nname: Contoso\n---\n",
+      "projects/Portal rebuild.md": "---\nclient: contoso\n---\n# Portal rebuild\n",
+      "logs/2026/2026-10-19.md": "---\ndate: 2026-10-19\n---\n- 6h @portal-rebuild\n  - API gateway design\n- 2h @contoso\n  - Steering call\n",
+      "logs/2026/2026-10-20.md":
+        "---\ndate: 2026-10-20\n---\n- [x] Cost model #portal-rebuild @done(2026-10-20)\n- 7.5h @contoso/portal-rebuild\n  - Auth PR review\n- @globex\n  - unbilled item\n",
+      "logs/2026/2026-10-26.md": "---\ndate: 2026-10-26\n---\n- 4h @portal-rebuild\n",
+    });
+    const w = buildWeek(hold, "2026-10-19");
+    expect(w.rows.map((r) => [r.label, r.hours.slice(0, 2), r.total])).toEqual([
+      ["Contoso", [2, 0], 2],
+      ["Portal rebuild", [6, 7.5], 13.5],
+      ["globex", [0, 0], 0],
+    ]);
+    const portal = w.rows[1];
+    expect(portal.items[0]).toEqual(["API gateway design"]);
+    expect(portal.items[1]).toEqual(["Auth PR review", "Cost model"]);
+    expect(w.dayTotals.slice(0, 2)).toEqual([8, 7.5]);
+    expect(w.total).toBe(15.5);
+    expect(rowReport(w, portal)).toBe("Mon, Oct 19 (6h)\n- API gateway design\n\nTue, Oct 20 (7.5h)\n- Auth PR review\n- Cost model");
+    expect(rowTsv(portal)).toBe("6\t7.5\t\t\t\t\t");
+    expect(weekTsv(w).split("\r\n")[2]).toBe("Portal rebuild (Contoso)\t6\t7.5\t\t\t\t\t\t13.5");
+    expect(buildWeek(hold, "2026-10-19", "globex").rows.map((r) => r.label)).toEqual(["globex"]);
   });
 
   it("keeps a waiting item's original date when it rolls over", async () => {

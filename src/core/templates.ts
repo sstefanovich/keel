@@ -8,7 +8,7 @@ date: {{date}}
 
 ## Tasks
 
-## Hours
+## Work
 
 ## Log
 
@@ -104,7 +104,7 @@ Everything in your **Hold** is a plain markdown file, so you can open it in any 
 ## Syntax
 - Tasks: \`- [ ] Call the bank @due(2026-10-21) #finance\`
 - Reminder on a task: \`- [ ] Call dentist @remind(14:00)\` (the time is on that log's day)
-- Hours: \`- 2.5h @acme API refactor\` or \`- 45m @acme standup\`
+- Work: \`- 6h @portal-rebuild\` with what you did indented under it (see below)
 - Links: \`[[Some note]]\`. Ctrl+click to follow (creates the note if needed).
 - Tags: \`#anything\`
 
@@ -131,9 +131,25 @@ Code blocks on a Chart get a copy button, and the line above becomes the title:
 Chart, and every \`- Resource group: rg-…\` (or full \`/subscriptions/…\` resource ID) gets a **Portal ↗**
 button. Projects use their client's tenant and subscription unless they list their own.
 
-## Hours per project
-\`- 2h @acme/portal-rebuild API work\` (or just \`@portal-rebuild\`) counts toward the project
-*and* rolls up to the client in the Timesheet and in Dispatch.
+## Daily work and the weekly timesheet
+Under **Work** in each day's log, give every project you worked on one line with the day's total,
+and list what you did underneath:
+
+    - 6h @portal-rebuild
+      - Designed the API gateway
+      - Reviewed the auth PR
+    - 1.5h @contoso
+      - Fixed the SSO redirect bug
+
+Start a project with just \`- @portal-rebuild\` and fill in the hours later. The **Work** panel above
+the log does the same with a form. Ticked tasks tagged \`#portal-rebuild\` also count as that day's work.
+
+The **Timesheet** shows the week as projects × days for entering into your time system (copy a cell,
+a row, or the whole grid), with a daily report per project underneath (**Copy report** / **Copy day**).
+\`@client/project\` and \`@project\` both count toward the project *and* roll up to its client.
+
+Quick capture: \`6h @portal-rebuild\` adds hours to today's block; \`@portal-rebuild reviewed the PR\`
+adds an item to it.
 
 ## Waiting on
 \`- [ ] firewall rules @waiting(Jordan)\` puts the item on the **Waiting on** list, grouped by person,
@@ -143,7 +159,7 @@ with how long it's been. Quick capture: \`wait Jordan: firewall rules\`.
 Anything in a client or project file, or in a meeting or note with \`client: acme\` in its frontmatter,
 or tagged \`#acme\` (or \`#portal-rebuild\`). **Focus** (top of the sidebar) narrows the Agenda, Flags,
 Charts, Waiting on, Timesheet and Search to one client. While focused, quick capture adds the
-client for you (\`2h fixed bug\` → \`- 2h @acme fixed bug\`).
+client for you (\`2h fixed bug\` adds 2h and the item to today's \`@acme\` block).
 
 ## Dispatch (status reports)
 **Dispatch** builds a client status update for a week: hours by project, what you completed,
@@ -159,7 +175,9 @@ Hoist one from the Flags board, or with quick capture: \`flag renew the TLS cert
 
 ## Quick capture
 Press **Ctrl+Alt+K** anywhere in Windows:
-- \`2h @acme fixed the login bug\` logs hours
+- \`6h @portal-rebuild\` adds hours to today's work for that project
+- \`@portal-rebuild fixed the login bug\` adds what you did to it
+- \`wait Jordan: firewall rules\` adds to Waiting on
 - \`todo buy printer ink\` or \`[] buy printer ink\` adds a task
 - \`remind me 3pm call the bank\` (also \`tomorrow 9am …\`) adds a reminder
 - \`flag call Sam about the cutover\` hoists a Flag

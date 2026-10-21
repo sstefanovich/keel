@@ -1,14 +1,31 @@
 import { addDays, hhmm, isISODate, parseTime, toISO, weekdayOf } from "./dates";
 
 export interface Capture {
-  kind: "hours" | "task" | "reminder" | "waiting" | "log" | "flag";
-  /** Section of today's log the line goes under ("" for a flag, which gets its own file) */
-  heading: "Hours" | "Tasks" | "Log" | "";
+  kind: "hours" | "work" | "task" | "reminder" | "waiting" | "log" | "flag";
+  /** Section of today's log the line goes under ("" when it isn't a plain append) */
+  heading: "Tasks" | "Log" | "";
+  /** What will be written (a preview, for work entries) */
   line: string;
+  /** Hours/items for a project's block in today's log */
+  work?: { key: string; hours?: number; item?: string };
 }
 
-const DURATION = /^(\d+(?:\.\d+)?h|\d+m|\d+h\d+m)\s+/i;
-const HOURS_START = /^(\d+(?:\.\d+)?h|\d+m|\d+h\d+m)\s+@[\w.-]+/i;
+const DURATION = /^(?:(\d+(?:\.\d+)?)h)?(?:(\d+)m)?\s+/i;
+const KEY = /^@([\w.-]+(?:\/[\w.-]+)?)(?:\s+(.*))?$/;
+
+function hoursOf(m: RegExpMatchArray): number {
+  return (m[1] ? Number(m[1]) : 0) + (m[2] ? Number(m[2]) / 60 : 0);
+}
+
+function work(key: string, hours?: number, item?: string): Capture {
+  const head = `- ${hours ? `${Math.round(hours * 100) / 100}h ` : ""}@${key.toLowerCase()}`;
+  return {
+    kind: hours ? "hours" : "work",
+    heading: "",
+    line: item ? `${head}  ↳ ${item}` : head,
+    work: { key: key.toLowerCase(), hours: hours || undefined, item: item || undefined },
+  };
+}
 const TASK_START = /^(?:todo:?|task:?|t:|\[\s?\]|-\s?\[ \])\s+/i;
 const TIME_IN_TEXT = /(?:^|\s)(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}:\d{2})(?=\s|$)/i;
 const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -25,9 +42,17 @@ export function parseCapture(input: string, now: Date = new Date(), focus?: stri
   const flag = text.match(/^(?:flag:?|!)\s+(.+)$/i);
   if (flag) return { kind: "flag", heading: "", line: flag[1].trim() };
 
-  if (HOURS_START.test(text)) return { kind: "hours", heading: "Hours", line: `- ${text}` };
+  // "6h @portal [what]" adds hours (and an item) to today's block for that project
   const dur = text.match(DURATION);
-  if (dur && focus) return { kind: "hours", heading: "Hours", line: `- ${dur[1]} @${focus} ${text.slice(dur[0].length)}` };
+  if (dur && (dur[1] || dur[2])) {
+    const rest = text.slice(dur[0].length).trim();
+    const k = rest.match(KEY);
+    if (k) return work(k[1], hoursOf(dur), k[2]?.trim());
+    if (focus) return work(focus, hoursOf(dur), rest);
+  }
+  // "@portal reviewed the PR" adds a done item to today's block for that project
+  const item = text.match(KEY);
+  if (item && item[2]?.trim()) return work(item[1], undefined, item[2].trim());
 
   const wait = text.match(/^wait(?:ing)?(?:\s+on)?\s+([^:]{1,40}?):\s*(.+)$/i);
   if (wait) return { kind: "waiting", heading: "Tasks", line: `- [ ] ${tag(wait[2].trim())} @waiting(${wait[1].trim()})` };
