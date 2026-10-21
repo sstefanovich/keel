@@ -1589,7 +1589,7 @@ mark {
 .log-side {
   position: sticky;
   top: 12px;
-  padding: 14px 16px 14px 0;
+  padding: 14px 20px 14px 0;
 }
 .log-side .work-panel {
   width: 100%;
@@ -1640,4 +1640,21 @@ mark {
   background: var(--accent-soft);
   border-color: transparent;
   color: var(--accent);
+}
+
+/* work panel must never be wider than its column */
+.work-panel,
+.work-panel * {
+  min-width: 0;
+  max-width: 100%;
+}
+.work-add-project {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+.work-name {
+  overflow-wrap: anywhere;
 }

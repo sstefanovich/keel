@@ -103,20 +103,7 @@ export function WorkPanel({ file }: { file: ParsedFile }) {
     <section className="work-panel">
       <header>
         <h3>Work</h3>
-        {total > 0 && <span className="chip">{round2(total)}h today</span>}
-        <span className="spacer" />
-        <select
-          value=""
-          aria-label="Add a project to today"
-          onChange={(e) => e.target.value && run(() => hold.logWork(file.date!, e.target.value, {}))}
-        >
-          <option value="">+ Add project…</option>
-          {options.map((o) => (
-            <option key={o.key} value={o.key}>
-              {o.text}
-            </option>
-          ))}
-        </select>
+        {total > 0 && <span className="chip">{round2(total)}h</span>}
       </header>
       {!blocks.length && (
         <p className="muted small">
@@ -146,6 +133,20 @@ export function WorkPanel({ file }: { file: ParsedFile }) {
           </div>
         );
       })}
+      {/* own full-width row: long project names would otherwise push the panel off-screen */}
+      <select
+        className="work-add-project"
+        value=""
+        aria-label="Add a project to this day"
+        onChange={(e) => e.target.value && run(() => hold.logWork(file.date!, e.target.value, {}))}
+      >
+        <option value="">+ Add project…</option>
+        {options.map((o) => (
+          <option key={o.key} value={o.key}>
+            {o.text}
+          </option>
+        ))}
+      </select>
     </section>
   );
 }
