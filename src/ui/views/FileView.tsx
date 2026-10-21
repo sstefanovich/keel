@@ -15,6 +15,9 @@ export function FileView({ path, line }: { path: string; line?: number }) {
   const backlinks = hold.backlinks(path);
   const isLog = file?.kind === "log" && !!file.date;
   const hasChart = file?.kind === "client" || file?.kind === "project";
+  // notes and meetings tied to a project show it in the header
+  const ownerKey = file && file.kind !== "project" ? hold.fileProject(file) : undefined;
+  const ownerProject = ownerKey ? { name: hold.projectName(ownerKey), path: hold.projectByKey(ownerKey)?.path } : undefined;
   // charts open on the Chart tab unless we're jumping to a specific line
   const [mode, setMode] = useState<"chart" | "edit">(hasChart && line == null ? "chart" : "edit");
   useEffect(() => setMode(hasChart && line == null ? "chart" : "edit"), [path, hasChart, line]);
@@ -85,6 +88,15 @@ export function FileView({ path, line }: { path: string; line?: number }) {
           </div>
         ) : (
           <span className="file-title">{file.title}</span>
+        )}
+        {ownerProject && (
+          <button
+            className="project-chip small"
+            onClick={() => ownerProject.path && nav.openFile(ownerProject.path)}
+            title={`Part of project ${ownerProject.name}. Set by "project:" in the frontmatter`}
+          >
+            ↳ {ownerProject.name}
+          </button>
         )}
         {hasChart && (
           <div className="seg" role="tablist">

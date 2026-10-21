@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { azureContext, azurePortalUrl } from "../../core/azure";
+import { formatShort } from "../../core/dates";
 import { ChartItem, basename, headingsOf } from "../../core/parse";
 import { slugify } from "../../core/templates";
 import { ChartRow } from "../ChartRow";
@@ -30,6 +31,7 @@ export function ChartView({ path }: { path: string }) {
   const { hold, bump, reportError } = useHold();
   const nav = useNav();
   const [filter, setFilter] = useState("");
+  const [showAllNotes, setShowAllNotes] = useState(false);
   const file = hold.get(path)!;
 
   const q = filter.trim().toLowerCase();
@@ -47,6 +49,15 @@ export function ChartView({ path }: { path: string }) {
   };
 
   const key = basename(path).toLowerCase();
+  const projectKey = slugify(basename(path));
+  // a project's notes; for a client, notes tied to it directly or through one of its projects
+  const notes =
+    file.kind === "project"
+      ? hold.notesOf(projectKey)
+      : hold
+          .all()
+          .filter((f) => (f.kind === "note" || f.kind === "meeting") && hold.fileClient(f) === key)
+          .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || b.mtime - a.mtime);
   const client = file.kind === "client" ? hold.clients().get(key) : undefined;
   const projects = file.kind === "client" ? hold.projectsOf(key) : [];
   const parentKey = file.kind === "project" ? String(file.frontmatter.client ?? "").toLowerCase() : "";
@@ -98,6 +109,47 @@ export function ChartView({ path }: { path: string }) {
               + New project
             </button>
           </div>
+        </section>
+      )}
+
+      {!q && (
+        <section className="panel">
+          <div className="row-between">
+            <h2>
+              Notes <span className="count">{notes.length}</span>
+            </h2>
+            <button className="ghost small" onClick={() => nav.newItem("note", undefined, file.kind === "project" ? projectKey : undefined)}>
+              + New note
+            </button>
+          </div>
+          {notes.length ? (
+            <ul className="chart-notes">
+              {notes.slice(0, showAllNotes ? undefined : 8).map((n) => {
+                const p = file.kind === "client" ? hold.fileProject(n) : undefined;
+                return (
+                  <li key={n.path}>
+                    <button className="link" onClick={() => nav.openFile(n.path)}>
+                      {n.title}
+                    </button>
+                    {n.kind === "meeting" && <span className="chip">meeting</span>}
+                    {p && <span className="muted small"> · {hold.projectName(p)}</span>}
+                    {n.date && <span className="muted small chart-note-date">{formatShort(n.date)}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="empty small">
+              {file.kind === "project"
+                ? "No notes yet. New notes from here are tied to this project; or add project: " + projectKey + " to a note's frontmatter."
+                : "No notes yet. Notes tied to this client or any of its projects show up here."}
+            </p>
+          )}
+          {notes.length > 8 && (
+            <button className="link small" onClick={() => setShowAllNotes(!showAllNotes)}>
+              {showAllNotes ? "Show fewer" : `Show all ${notes.length}`}
+            </button>
+          )}
         </section>
       )}
 

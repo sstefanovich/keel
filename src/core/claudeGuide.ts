@@ -73,8 +73,11 @@ In \`clients/\` and \`projects/\` files, every bullet under a \`##\` heading is 
 Azure portal links for \`- Resource group: rg-…\` rows. Never store passwords or secrets in these files.
 
 ## Meetings and notes
-Meeting files have frontmatter \`title\`, \`date\`, \`client\`, \`attendees\`. A note can set \`client: <key>\`
-to belong to a client. Diagrams: \`\`\`mermaid code blocks render in Keel.
+Meeting files have frontmatter \`title\`, \`date\`, \`client\`, \`attendees\`. A note or meeting can set
+\`project: <project-key>\` to belong to a project (its client follows from the project), or \`client: <key>\`
+to belong to a client only. Notes tied to a project are listed on its Chart, and ticked tasks inside them
+count as that day's work on the project. When creating a note about a project, set \`project:\`.
+Diagrams: \`\`\`mermaid code blocks render in Keel.
 
 ## When asked to…
 - **"Log N hours on X today"** → today's log, \`## Work\`: add or update \`- Nh @key\` and list the work under it.

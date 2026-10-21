@@ -118,6 +118,10 @@ copy button, grouped by its \`##\` heading:
 
 A project names its client in frontmatter (\`client: acme\`) and appears on that client's Chart.
 
+A note or meeting belongs to a project with \`project: portal-rebuild\` in its frontmatter (or pick the
+project when creating it). It's listed under **Notes** on the project's Chart, its client follows from
+the project, and tasks ticked in it count toward that project's day on the Timesheet.
+
 Code blocks on a Chart get a copy button, and the line above becomes the title:
 
     Log in to the tenant:

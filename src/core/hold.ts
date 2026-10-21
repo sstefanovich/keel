@@ -220,10 +220,13 @@ export class Hold {
     return path;
   }
 
-  async createNote(title: string, folder = "notes", client?: string): Promise<string> {
+  /** A new note; with a project it's tied to that project (and so to its client). */
+  async createNote(title: string, folder = "notes", client?: string, project?: string): Promise<string> {
     const path = await this.freePath(folder, title);
-    const content = fillTemplate(await this.template("note"), { date: todayISO(), title, client });
-    await this.save(path, client ? setFrontmatterField(content, "client", client) : content);
+    let content = fillTemplate(await this.template("note"), { date: todayISO(), title, client });
+    if (project) content = setFrontmatterField(content, "project", project);
+    else if (client) content = setFrontmatterField(content, "client", client);
+    await this.save(path, content);
     return path;
   }
 
@@ -288,9 +291,11 @@ export class Hold {
   /** The client and (if any) project a task's work counts toward. */
   taskProject(t: Task): { client: string; project?: string } | undefined {
     const f = this.files.get(t.file);
-    if (f?.kind === "project") {
+    // in a project file, or a note/meeting with `project:` in its frontmatter
+    const fileProj = f && this.fileProject(f);
+    if (f && fileProj) {
       const client = this.fileClient(f);
-      return client ? { client, project: slugify(basename(f.path)) } : undefined;
+      return client ? { client, project: fileProj } : undefined;
     }
     const clients = this.clients();
     for (const tag of t.tags) {
@@ -394,7 +399,25 @@ export class Hold {
   fileClient(f: ParsedFile): string | undefined {
     if (f.kind === "client") return basename(f.path).toLowerCase();
     const c = typeof f.frontmatter.client === "string" ? f.frontmatter.client.trim().toLowerCase() : "";
-    return c || undefined;
+    if (c) return c;
+    // a note or meeting tied to a project belongs to that project's client
+    const p = f.kind !== "project" ? this.fileProject(f) : undefined;
+    const proj = p ? this.projectByKey(p) : undefined;
+    return proj ? this.fileClient(proj) : undefined;
+  }
+
+  /** The project a file belongs to: the project file itself, or a `project:` key in frontmatter. */
+  fileProject(f: ParsedFile): string | undefined {
+    if (f.kind === "project") return slugify(basename(f.path));
+    const p = typeof f.frontmatter.project === "string" ? f.frontmatter.project.trim().toLowerCase().replace(/^@/, "") : "";
+    return p || undefined;
+  }
+
+  /** Notes and meetings tied to a project with `project:` in their frontmatter, newest first. */
+  notesOf(projectKey: string): ParsedFile[] {
+    return this.all()
+      .filter((f) => (f.kind === "note" || f.kind === "meeting") && this.fileProject(f) === projectKey)
+      .sort((a, b) => (b.date ?? String(b.frontmatter.created ?? "")).localeCompare(a.date ?? String(a.frontmatter.created ?? "")) || b.mtime - a.mtime);
   }
 
   /** A task's client: from its file, else a #tag naming a client or project. */

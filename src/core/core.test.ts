@@ -701,6 +701,30 @@ date: 2026-10-21
     expect(hold.get(proj)!.frontmatter.client).toBeUndefined();
   });
 
+  it("ties notes to a project with project: frontmatter", async () => {
+    const hold = await makeHold({
+      "clients/hogan-lovells.md": "---\nname: Hogan Lovells\n---\n",
+      "projects/FLIS Retain PA.md": "---\nclient: hogan-lovells\n---\n# FLIS Retain / PA\n",
+      "notes/Retention design.md":
+        "---\nproject: flis-retain-pa\ncreated: 2026-10-20\n---\n# Retention design\n- [x] Agree schema @done(2026-10-21)\n- [ ] Draft ADR\n",
+      "meetings/2026-10-21 FLIS sync.md": "---\ndate: 2026-10-21\nproject: \"@FLIS-Retain-PA\"\n---\n# FLIS sync\n",
+      "notes/Unrelated.md": "# Unrelated\n",
+    });
+    const note = hold.get("notes/Retention design.md")!;
+    expect(hold.fileProject(note)).toBe("flis-retain-pa");
+    expect(hold.fileClient(note)).toBe("hogan-lovells"); // client comes from the project
+    expect(hold.notesOf("flis-retain-pa").map((f) => f.title)).toEqual(["FLIS sync", "Retention design"]);
+    // its tasks belong to the project and client; ticked ones count as that day's work
+    expect(hold.taskProject(note.tasks[1])).toEqual({ client: "hogan-lovells", project: "flis-retain-pa" });
+    expect(hold.agenda("2026-10-21", 14, "hogan-lovells").open.map((t) => t.text)).toEqual(["Draft ADR"]);
+    const w = buildWeek(hold, "2026-10-17");
+    expect(w.rows.find((r) => r.project === "flis-retain-pa")?.items[4]).toEqual(["Agree schema"]);
+
+    const p = await hold.createNote("Cutover plan", "notes", undefined, "flis-retain-pa");
+    expect(hold.get(p)!.frontmatter.project).toBe("flis-retain-pa");
+    expect(hold.notesOf("flis-retain-pa").map((f) => f.title)).toContain("Cutover plan");
+  });
+
   it("links projects to clients and searches charts", async () => {
     const hold = await makeHold({ "clients/acme.md": "# Acme\n## Azure\n- Resource group: rg-acme-prod\n" });
     const p = await hold.createProject("Portal rebuild", "acme");

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseCapture } from "./core/capture";
 import { today } from "./core/dates";
 import { Hold } from "./core/hold";
+import { basename } from "./core/parse";
+import { slugify } from "./core/templates";
 import { hideWindow, loadSettings, onQuickCapture, openFs, saveSettings } from "./lib/platform";
 import { HoldProvider, useHold } from "./ui/HoldContext";
 import { PromptModal, PromptSpec, QuickCapture } from "./ui/Modals";
@@ -139,7 +141,7 @@ function Shell() {
   };
 
   const newItem = useCallback(
-    (kind: NewKind, client?: string) => {
+    (kind: NewKind, client?: string, project?: string) => {
       const make = async (fn: () => Promise<string>) => {
         try {
           const path = await fn();
@@ -151,7 +153,27 @@ function Shell() {
         }
       };
       const specs: Record<typeof kind, PromptSpec> = {
-        note: { title: "New note", label: "Title", submitLabel: "Create", onSubmit: (v) => make(() => hold.createNote(v, "notes", focus)) },
+        note: {
+          title: "New note",
+          label: "Title",
+          submitLabel: "Create",
+          choice: {
+            label: "Project (optional)",
+            initial: project ?? "",
+            options: [
+              { value: "", label: focus ? `(none, just ${hold.clients().get(focus)?.name ?? focus})` : "(none)" },
+              ...hold
+                .all()
+                .filter((f) => f.kind === "project" && f.frontmatter.status !== "done" && (!focus || hold.fileClient(f) === focus))
+                .map((p) => {
+                  const c = hold.fileClient(p);
+                  return { value: slugify(basename(p.path)), label: `${p.title}${c ? ` · ${hold.clients().get(c)?.name ?? c}` : ""}` };
+                })
+                .sort((a, b) => a.label.localeCompare(b.label)),
+            ],
+          },
+          onSubmit: (v, _d, proj) => make(() => hold.createNote(v, "notes", proj ? undefined : focus, proj || undefined)),
+        },
         meeting: {
           title: "New meeting",
           label: "Meeting title",

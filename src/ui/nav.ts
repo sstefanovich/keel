@@ -22,8 +22,8 @@ export interface Nav {
   openLog: (date: string) => void;
   openLink: (target: string) => void;
   capture: () => void;
-  /** For "project", `client` preselects the client. */
-  newItem: (kind: NewKind, client?: string) => void;
+  /** For "project", `client` preselects the client; for "note", `project` preselects the project. */
+  newItem: (kind: NewKind, client?: string, project?: string) => void;
   /** The Claude terminal panel */
   claudeOpen: boolean;
   toggleClaude: () => void;
