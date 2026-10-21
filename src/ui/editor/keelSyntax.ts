@@ -343,7 +343,7 @@ function propertiesDecorations(state: EditorState): DecorationSet {
   const fm = frontmatterRange(state);
   if (!fm) return Decoration.none;
   // while the cursor is inside the block, show it raw for editing
-  const inside = state.selection.ranges.some((r) => r.to >= fm.from && r.from <= fm.to + 1);
+  const inside = state.selection.ranges.some((r) => r.to >= fm.from && r.from <= fm.to);
   if (inside) return Decoration.none;
   return Decoration.set([Decoration.replace({ widget: new PropertiesWidget(fm.lines), block: true }).range(fm.from, fm.to)]);
 }

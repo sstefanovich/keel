@@ -328,7 +328,8 @@ function Shell() {
       }
       // inside the Claude terminal, its own keys (Ctrl+T, Ctrl+J, …) win
       if ((e.target as Element | null)?.closest?.(".claude-panel")) return;
-      const k = e.key.toLowerCase();
+      // physical keys for punctuation, since e.key varies with layout and Ctrl
+      const k = e.code === "BracketLeft" ? "[" : e.code === "BracketRight" ? "]" : e.key.toLowerCase();
       const act: Record<string, () => void> = e.shiftKey
         ? {
             f: () => show({ kind: "search" }),
@@ -347,7 +348,8 @@ function Shell() {
             tab: () => setTabs((s) => cycleTab(s, 1)),
             "[": () => setTabs((s) => go(s, -1)),
             "]": () => setTabs((s) => go(s, 1)),
-            "\\": toggleSidebar,
+            // Ctrl+B like VS Code/Obsidian (Ctrl+\ is 1Password's global shortcut)
+            b: toggleSidebar,
           };
       if (act[k]) {
         e.preventDefault();

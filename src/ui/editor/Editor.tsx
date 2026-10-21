@@ -174,6 +174,16 @@ export function Editor({ path, line, onOpenLink, onStatus }: Props) {
 
 function jumpTo(v: EditorView, line?: number) {
   if (line == null) {
+    // start just below the frontmatter, so it shows as the properties bar rather than raw
+    const doc = v.state.doc;
+    if (doc.lines > 2 && doc.line(1).text.trim() === "---") {
+      for (let n = 2; n <= Math.min(doc.lines, 200); n++) {
+        if (doc.line(n).text.trim() === "---") {
+          v.dispatch({ selection: { anchor: n < doc.lines ? doc.line(n + 1).from : doc.length } });
+          break;
+        }
+      }
+    }
     v.focus();
     return;
   }

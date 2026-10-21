@@ -198,7 +198,7 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
     <aside className={`sidebar${collapsed ? " collapsed" : ""}`} aria-label="Navigation">
       <div className="brand">
         {collapsed ? (
-          <button className="brand-mark" onClick={nav.toggleSidebar} title="Expand sidebar (Ctrl+\)" aria-label="Expand sidebar">
+          <button className="brand-mark" onClick={nav.toggleSidebar} title="Expand sidebar (Ctrl+B)" aria-label="Expand sidebar">
             <KeelLogo />
           </button>
         ) : (
@@ -207,7 +207,7 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
               <KeelLogo />
             </span>
             <span className="brand-name">Keel</span>
-            <button className="side-icon-btn" onClick={nav.toggleSidebar} title="Collapse sidebar (Ctrl+\)" aria-label="Collapse sidebar">
+            <button className="side-icon-btn" onClick={nav.toggleSidebar} title="Collapse sidebar (Ctrl+B)" aria-label="Collapse sidebar">
               <PanelLeftClose size={16} />
             </button>
           </>
@@ -296,7 +296,7 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
           </button>
           <ThemeToggle />
           {collapsed && (
-            <button className="side-icon-btn" onClick={nav.toggleSidebar} title="Expand sidebar (Ctrl+\)" aria-label="Expand sidebar">
+            <button className="side-icon-btn" onClick={nav.toggleSidebar} title="Expand sidebar (Ctrl+B)" aria-label="Expand sidebar">
               <PanelLeftOpen size={16} />
             </button>
           )}
