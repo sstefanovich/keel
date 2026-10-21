@@ -1406,14 +1406,6 @@ mark {
   min-width: 0;
   padding: 3px 6px;
 }
-.manage-table input.rate {
-  width: 90px;
-  text-align: right;
-}
-.manage-table input.currency {
-  width: 70px;
-  text-transform: uppercase;
-}
 .manage-table .client-row td {
   padding-top: 10px;
 }
@@ -1575,4 +1567,8 @@ mark {
 .week-day ul {
   margin: 4px 0 0;
   padding-left: 22px;
+}
+.table .sub-row td:first-child {
+  padding-left: 24px;
+  color: var(--muted);
 }

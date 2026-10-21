@@ -28,14 +28,6 @@ function rangeFor(p: Preset, d: ISODate): [ISODate, ISODate] {
 
 const fmtHours = (h: number) => `${round2(h)}h`;
 
-function money(n: number, currency: string) {
-  try {
-    return n.toLocaleString(undefined, { style: "currency", currency });
-  } catch {
-    return `${round2(n)} ${currency}`;
-  }
-}
-
 function TotalsView({ toggle }: { toggle: ReactNode }) {
   const { hold, bump, reportError, toast, focus } = useHold();
   const nav = useNav();
@@ -44,8 +36,7 @@ function TotalsView({ toggle }: { toggle: ReactNode }) {
   const [from, to] = preset === "custom" ? custom : rangeFor(preset, today());
   const ts = hold.timesheet(from, to, focus);
 
-  const currencies = new Set(ts.byClient.filter((c) => c.client.rate).map((c) => c.client.currency));
-  const billable = ts.byClient.reduce((s, c) => s + c.amount, 0);
+  const projectCount = ts.byClient.reduce((n, c) => n + c.byProject.filter((p) => p.key).length, 0);
 
   const doExport = async () => {
     try {
@@ -104,10 +95,8 @@ function TotalsView({ toggle }: { toggle: ReactNode }) {
           <span className="stat-value">{fmtHours(ts.totalHours)}</span>
         </div>
         <div className="stat">
-          <span className="stat-label">Billable</span>
-          <span className="stat-value">
-            {currencies.size === 1 ? money(billable, [...currencies][0]) : currencies.size ? "mixed currencies" : "—"}
-          </span>
+          <span className="stat-label">Projects</span>
+          <span className="stat-value">{projectCount}</span>
         </div>
         <div className="stat">
           <span className="stat-label">Days worked</span>
@@ -121,44 +110,50 @@ function TotalsView({ toggle }: { toggle: ReactNode }) {
 
       {ts.entries.length === 0 ? (
         <p className="empty panel">
-          No hours in this period. Log them in a daily log as <code>- 2.5h @client what you did</code>, or press Ctrl+K.
+          No hours in this period. Add projects under <b>Work</b> in a day's log, or quick capture <code>6h @project</code> with Ctrl+K.
         </p>
       ) : (
         <>
           <section className="panel">
-            <h2>By client</h2>
+            <h2>By client & project</h2>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Client</th>
+                  <th>Client / project</th>
                   <th className="num">Hours</th>
-                  <th className="num">Rate</th>
-                  <th className="num">Amount</th>
                 </tr>
               </thead>
-              <tbody>
-                {ts.byClient.map(({ client, hours, amount }) => (
-                  <tr key={client.key}>
+              {ts.byClient.map(({ client, hours, byProject }) => (
+                <tbody key={client.key}>
+                  <tr>
                     <td>
                       {client.path ? (
                         <button className="link" onClick={() => nav.openFile(client.path!)}>
-                          {client.name}
+                          <b>{client.name}</b>
                         </button>
                       ) : (
                         <>
-                          @{client.key}{" "}
-                          <button className="link small" onClick={() => createClient(client.key)}>
-                            set rate
+                          <b>@{client.key}</b>{" "}
+                          <button className="link small" onClick={() => createClient(client.key)} title="Not a known client yet">
+                            create client
                           </button>
                         </>
                       )}
                     </td>
-                    <td className="num">{fmtHours(hours)}</td>
-                    <td className="num">{client.rate ? money(client.rate, client.currency) : "—"}</td>
-                    <td className="num">{client.rate ? money(amount, client.currency) : "—"}</td>
+                    <td className="num">
+                      <b>{fmtHours(hours)}</b>
+                    </td>
                   </tr>
-                ))}
-              </tbody>
+                  {byProject.length > 1 || byProject[0]?.key
+                    ? byProject.map((p) => (
+                        <tr key={p.key || "_general"} className="sub-row">
+                          <td>{p.name || "General"}</td>
+                          <td className="num">{fmtHours(p.hours)}</td>
+                        </tr>
+                      ))
+                    : null}
+                </tbody>
+              ))}
             </table>
           </section>
 

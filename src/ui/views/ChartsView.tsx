@@ -67,7 +67,7 @@ export function ChartsView() {
                   </button>
                 </h3>
                 <p className="muted small">
-                  {n} item{n === 1 ? "" : "s"} · {c.rate ? `${c.rate} ${c.currency}/h` : "no rate"}
+                  {n} item{n === 1 ? "" : "s"} · @{c.key}
                 </p>
                 <div className="chips-row">
                   {projects.map((p) => (

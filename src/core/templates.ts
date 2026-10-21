@@ -38,12 +38,10 @@ tags: []
 `,
   "templates/client.md": `---
 name: {{title}}
-rate: 0
-currency: USD
 ---
 # {{title}}
 
-Log hours with \`- 1.5h @{{slug}} what you did\`. Each bullet below shows on the Chart
+Log hours with \`- 6h @{{slug}}\` in a day's log. Each bullet below shows on the Chart
 with a copy button: \`- Label: value\`. Keep secrets in a password manager, not here.
 
 ## Links
@@ -97,7 +95,7 @@ Everything in your **Hold** is a plain markdown file, so you can open it in any 
 - \`logs/2026/2026-10-19.md\`: one log per day. Open it with **Today** (Ctrl+T).
 - \`meetings/\`: meeting notes, named by date.
 - \`notes/\`: anything else.
-- \`clients/\`: one file per client with an hourly \`rate\` in the frontmatter.
+- \`clients/\` and \`projects/\`: one file per client and per project.
 - \`reminders.md\`: recurring reminders.
 - \`templates/\`: edit these to change how new files start.
 

@@ -60,10 +60,9 @@ export function ChartView({ path }: { path: string }) {
     <div className="page chart-page">
       <div className="chart-meta">
         {client && (
-          <>
-            <span className="chip">{client.rate ? `${client.rate} ${client.currency}/h` : "no rate set"}</span>
-            <span className="chip">@{client.key}</span>
-          </>
+          <span className="chip" title="Log hours to this client with this tag">
+            @{client.key}
+          </span>
         )}
         {file.kind === "project" &&
           (parent ? (

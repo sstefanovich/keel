@@ -18,7 +18,7 @@ export interface StatusReport {
 }
 
 export function buildReport(hold: Hold, clientKey: string, from: ISODate, to: ISODate, asOf: ISODate = today()): StatusReport {
-  const client = hold.clients().get(clientKey) ?? { key: clientKey, name: clientKey, rate: 0, currency: "USD" };
+  const client = hold.clients().get(clientKey) ?? { key: clientKey, name: clientKey };
   const mine = hold.tasks().filter((t) => hold.taskClient(t) === clientKey);
   const fileDate = (t: Task) => hold.get(t.file)?.date;
   const inRange = (d?: ISODate) => !!d && d >= from && d <= to;

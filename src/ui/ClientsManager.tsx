@@ -8,7 +8,7 @@ import { useNav } from "./nav";
 const STATUSES = ["active", "paused", "done"];
 
 /** Text/number input that saves on Enter or blur, not on every keystroke. */
-function Field({ value, onCommit, placeholder, type = "text", className, label }: { value: string; onCommit: (v: string) => void; placeholder?: string; type?: string; className?: string; label: string }) {
+function Field({ value, onCommit, placeholder, className, label }: { value: string; onCommit: (v: string) => void; placeholder?: string; className?: string; label: string }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   const commit = () => {
@@ -17,7 +17,7 @@ function Field({ value, onCommit, placeholder, type = "text", className, label }
   return (
     <input
       className={className}
-      type={type}
+      type="text"
       value={v}
       placeholder={placeholder}
       aria-label={label}
@@ -89,7 +89,7 @@ export function ClientsManager() {
         <td>
           <code className="key">@{owner ? `${owner}/` : ""}{slugify(basename(p.path))}</code>
         </td>
-        <td colSpan={2}>
+        <td>
           <select value={owner} aria-label={`Client of ${p.title}`} onChange={(e) => run(() => hold.updateFrontmatter(p.path, { client: e.target.value }))}>
             {clients.map((c) => (
               <option key={c.key} value={c.key}>
@@ -125,8 +125,7 @@ export function ClientsManager() {
             <tr>
               <th>Name</th>
               <th>Hours tag</th>
-              <th className="num">Rate /h</th>
-              <th>Currency</th>
+              <th>Client</th>
               <th>Status</th>
               <th />
             </tr>
@@ -143,19 +142,7 @@ export function ClientsManager() {
                   <td>
                     <code className="key" title="Used in hours lines and #tags. Fixed, so existing hours stay linked.">@{c.key}</code>
                   </td>
-                  <td className="num">
-                    <Field
-                      className="rate"
-                      type="number"
-                      value={c.rate ? String(c.rate) : ""}
-                      placeholder="0"
-                      label={`Hourly rate for ${c.name}`}
-                      onCommit={(v) => run(() => hold.updateFrontmatter(c.path!, { rate: v === "" ? 0 : Number(v) }))}
-                    />
-                  </td>
-                  <td>
-                    <Field className="currency" value={c.currency} label={`Currency for ${c.name}`} onCommit={(v) => run(() => hold.updateFrontmatter(c.path!, { currency: (v || "USD").toUpperCase() }))} />
-                  </td>
+                  <td />
                   <td />
                   <td className="actions">
                     <button className="ghost small" onClick={() => nav.openFile(c.path!)}>
@@ -178,7 +165,7 @@ export function ClientsManager() {
           {orphans.length > 0 && (
             <tbody>
               <tr>
-                <td colSpan={6} className="muted small">
+                <td colSpan={5} className="muted small">
                   Projects without a client
                 </td>
               </tr>

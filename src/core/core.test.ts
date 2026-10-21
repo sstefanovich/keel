@@ -408,29 +408,31 @@ describe("Hold", () => {
     expect(await hold.fs.read("notes/a.md")).toBe("# A\n- [ ] one\n");
   });
 
-  it("totals a timesheet with client rates", async () => {
+  it("totals a timesheet by client, hours only", async () => {
     const hold = await makeHold({
       "logs/2026/2026-10-19.md": LOG,
-      "clients/acme.md": "---\nname: Acme Corp\nrate: 100\n---\n# Acme\n",
+      "clients/acme.md": "---\nname: Acme Corp\n---\n# Acme\n",
     });
     const ts = hold.timesheet("2026-10-01", "2026-10-31");
     expect(ts.totalHours).toBe(4.75);
-    expect(ts.byClient.map((c) => [c.client.name, c.hours, c.amount])).toEqual([
-      ["Acme Corp", 4, 400],
-      ["globex", 0.75, 0],
+    expect(ts.byClient.map((c) => [c.client.name, c.hours])).toEqual([
+      ["Acme Corp", 4],
+      ["globex", 0.75],
     ]);
-    expect(hold.timesheetCsv(ts).split("\r\n")[1]).toBe("2026-10-19,acme,,2.5,100,250,API refactor,logs/2026/2026-10-19.md");
+    const csv = hold.timesheetCsv(ts).split("\r\n");
+    expect(csv[0]).toBe("date,client,project,hours,work done,file");
+    expect(csv[1]).toBe("2026-10-19,acme,,2.5,API refactor,logs/2026/2026-10-19.md");
   });
 
   it("rolls project hours up to their client", async () => {
     const hold = await makeHold({
-      "clients/acme.md": "---\nrate: 100\n---\n# Acme\n",
+      "clients/acme.md": "---\nname: Acme\n---\n# Acme\n",
       "projects/Portal rebuild.md": "---\nclient: acme\n---\n# Portal rebuild\n",
       "logs/2026/2026-10-19.md": "---\ndate: 2026-10-19\n---\n- 2h @acme/portal-rebuild api\n- 1h @portal-rebuild review\n- 1h @acme admin\n- 3h @globex other\n",
     });
     const ts = hold.timesheet("2026-10-19", "2026-10-19", "acme");
     expect(ts.totalHours).toBe(4);
-    expect(ts.byClient[0].amount).toBe(400);
+    expect(ts.byClient[0].hours).toBe(4);
     expect(ts.byClient[0].byProject).toEqual([
       { key: "portal-rebuild", name: "Portal rebuild", hours: 3 },
       { key: "", name: "", hours: 1 },
@@ -608,8 +610,8 @@ date: 2026-10-21
   it("updates and clears frontmatter fields", async () => {
     const hold = await makeHold();
     const p = await hold.createClient("Acme Corp");
-    await hold.updateFrontmatter(p, { name: "Acme: EMEA", rate: 165, currency: "EUR" });
-    expect(hold.clients().get("acme-corp")).toMatchObject({ name: "Acme: EMEA", rate: 165, currency: "EUR" });
+    await hold.updateFrontmatter(p, { name: "Acme: EMEA" });
+    expect(hold.clients().get("acme-corp")).toMatchObject({ name: "Acme: EMEA" });
     const proj = await hold.createProject("Portal", "acme-corp");
     await hold.updateFrontmatter(proj, { client: "", status: "done" });
     expect(hold.get(proj)!.frontmatter).toMatchObject({ status: "done" });

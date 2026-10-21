@@ -25,8 +25,6 @@ export type FlagColor = (typeof FLAG_COLORS)[number];
 export interface Client {
   key: string;
   name: string;
-  rate: number;
-  currency: string;
   path?: string;
 }
 
@@ -41,7 +39,6 @@ export interface Agenda {
 export interface ClientTotal {
   client: Client;
   hours: number;
-  amount: number;
   /** Hours per project key ("" = not tied to a project) */
   byProject: { key: string; name: string; hours: number }[];
 }
@@ -458,8 +455,6 @@ export class Hold {
       out.set(key, {
         key,
         name: typeof fm.name === "string" && fm.name ? fm.name : f.title,
-        rate: Number(fm.rate) || 0,
-        currency: typeof fm.currency === "string" ? fm.currency : "USD",
         path: f.path,
       });
     }
@@ -507,10 +502,9 @@ export class Hold {
     const totals = new Map<string, ClientTotal>();
     const byDay = new Map<ISODate, number>();
     for (const e of entries) {
-      const client = clients.get(e.client) ?? { key: e.client, name: e.client, rate: 0, currency: "USD" };
-      const t = totals.get(e.client) ?? { client, hours: 0, amount: 0, byProject: [] };
+      const client = clients.get(e.client) ?? { key: e.client, name: e.client };
+      const t = totals.get(e.client) ?? { client, hours: 0, byProject: [] };
       t.hours += e.hours;
-      t.amount += e.hours * client.rate;
       const pk = e.project ?? "";
       let p = t.byProject.find((x) => x.key === pk);
       if (!p) {
@@ -531,14 +525,10 @@ export class Hold {
   }
 
   timesheetCsv(ts: Timesheet): string {
-    const clients = this.clients();
     const q = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
-    const rows = [["date", "client", "project", "hours", "rate", "amount", "description", "file"].join(",")];
+    const rows = [["date", "client", "project", "hours", "work done", "file"].join(",")];
     for (const e of ts.entries) {
-      const rate = clients.get(e.client)?.rate ?? 0;
-      rows.push(
-        [e.date, q(e.client), q(e.project ? this.projectName(e.project) : ""), round2(e.hours), rate, round2(e.hours * rate), q(e.description), q(e.file)].join(","),
-      );
+      rows.push([e.date, q(e.client), q(e.project ? this.projectName(e.project) : ""), round2(e.hours), q(e.items.join("; ")), q(e.file)].join(","));
     }
     return rows.join("\r\n") + "\r\n";
   }
