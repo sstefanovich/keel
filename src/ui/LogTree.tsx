@@ -2,7 +2,7 @@ import { ReactNode, useState } from "react";
 import { addDays, formatShort, parseISO, startOfWeek, today } from "../core/dates";
 import { round2 } from "../core/hold";
 import { ParsedFile } from "../core/parse";
-import { useNav } from "./nav";
+import { openOpts, useNav } from "./nav";
 import { useWeekStart } from "./weekStart";
 
 const OPEN_KEY = "keel.logTreeOpen";
@@ -59,7 +59,8 @@ export function LogTree({ logs, current }: { logs: ParsedFile[]; current?: strin
       key={f.path}
       className={`file-item tree-day${current === f.path ? " active" : ""}`}
       style={{ paddingLeft: 10 + indent * 12 }}
-      onClick={() => nav.openFile(f.path)}
+      onClick={(e) => nav.openFile(f.path, undefined, openOpts(e))}
+      onAuxClick={(e) => e.button === 1 && nav.openFile(f.path, undefined, { newTab: true })}
       title={f.path}
     >
       <span>{formatShort(f.date!)}</span>

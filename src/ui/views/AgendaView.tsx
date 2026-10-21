@@ -5,7 +5,7 @@ import { Task } from "../../core/parse";
 import { FlagBoard } from "../FlagBoard";
 import { useHold } from "../HoldContext";
 import { TaskRow } from "../TaskRow";
-import { useNav } from "../nav";
+import { openOpts, useNav } from "../nav";
 
 function Section({ title, count, tone, children }: { title: string; count: number; tone?: string; children: ReactNode }) {
   return (
@@ -52,7 +52,7 @@ export function AgendaView() {
             <ul className="tasks">{a.today.map((t) => <TaskRow key={t.file + t.line} task={t} />)}</ul>
           ) : (
             <p className="empty">
-              Nothing for today. <button className="link" onClick={nav.openToday}>Open today's log</button>
+              Nothing for today. <button className="link" onClick={(e) => nav.openToday(openOpts(e))}>Open today's log</button>
             </p>
           )}
         </Section>

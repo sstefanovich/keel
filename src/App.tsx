@@ -8,7 +8,10 @@ import { hideWindow, loadSettings, onQuickCapture, openFs, saveSettings } from "
 import { HoldProvider, useHold } from "./ui/HoldContext";
 import { PromptModal, PromptSpec, QuickCapture } from "./ui/Modals";
 import { Sidebar } from "./ui/Sidebar";
-import { Nav, NavCtx, NewKind, View } from "./ui/nav";
+import { Nav, NavCtx, NewKind, OpenOpts, View, isView } from "./ui/nav";
+import { TabBar } from "./ui/TabBar";
+import { QuickSwitcher } from "./ui/QuickSwitcher";
+import { TabsState, canBack, canForward, closeTab, currentView, cycleTab, go, initTabs, moveTab, navigate, reopenClosed, restoreTabs, selectTab, serializeTabs } from "./ui/tabs";
 import { ChartsView } from "./ui/views/ChartsView";
 import { DispatchView } from "./ui/views/DispatchView";
 import { FlagsView } from "./ui/views/FlagsView";
@@ -67,36 +70,72 @@ export default function App() {
 function Shell() {
   const { hold, bump, reportError, toast, focus } = useHold();
   useReminders(hold);
-  const [view, setView] = useState<View>({ kind: "agenda" });
+  // tabs, each with its own history; restored from the last session
+  const [tabs, setTabs] = useState<TabsState<View>>(() => {
+    try {
+      return restoreTabs(localStorage.getItem(TABS_KEY), isView) ?? initTabs<View>({ kind: "agenda" });
+    } catch {
+      return initTabs<View>({ kind: "agenda" });
+    }
+  });
+  const [hadSavedTabs] = useState(() => {
+    try {
+      return !!localStorage.getItem(TABS_KEY);
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(TABS_KEY, serializeTabs(tabs));
+    } catch {
+      // tabs just won't be restored
+    }
+  }, [tabs]);
+  const view = currentView(tabs);
+  const show = useCallback((v: View, o?: OpenOpts) => setTabs((s) => navigate(s, v, o?.newTab)), []);
+
   const [capture, setCapture] = useState<{ hideAfter: boolean } | null>(null);
   const [prompt, setPrompt] = useState<PromptSpec | null>(null);
+  const [switcher, setSwitcher] = useState(false);
 
-  const openFile = useCallback((path: string, line?: number) => setView({ kind: "file", path, line }), []);
+  // sidebar: collapsible to an icon rail, and resizable
+  const [sidebar, setSidebar] = useState(loadSidebar);
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_KEY, JSON.stringify(sidebar));
+    } catch {
+      // ignore
+    }
+  }, [sidebar]);
+  const toggleSidebar = useCallback(() => setSidebar((s) => ({ ...s, collapsed: !s.collapsed })), []);
+
+  const openFile = useCallback((path: string, line?: number, o?: OpenOpts) => show({ kind: "file", path, line }, o), [show]);
 
   const openLog = useCallback(
-    async (date: string) => {
+    async (date: string, o?: OpenOpts) => {
       try {
         const path = await hold.ensureLog(date);
         bump();
-        openFile(path);
+        openFile(path, undefined, o);
       } catch (e) {
         reportError(e);
       }
     },
     [hold, bump, openFile, reportError],
   );
-  const openToday = useCallback(() => openLog(today()), [openLog]);
+  const openToday = useCallback((o?: OpenOpts) => openLog(today(), o), [openLog]);
 
   const openLink = useCallback(
-    async (target: string) => {
+    async (target: string, o?: OpenOpts) => {
       const found = hold.resolveLink(target);
-      if (found) return openFile(found);
+      if (found) return openFile(found, undefined, o);
       try {
         const name = target.split("/").pop()!;
         const folder = target.includes("/") ? target.split("/").slice(0, -1).join("/") : "notes";
         const path = await hold.createNote(name, folder);
         bump();
-        openFile(path);
+        openFile(path, undefined, o);
       } catch (e) {
         reportError(e);
       }
@@ -220,15 +259,60 @@ function Shell() {
     setClaudeOpen((o) => !o);
   }, []);
 
+  const newTab = useCallback(() => openToday({ newTab: true }), [openToday]);
+  const closeTabById = useCallback((id: string) => setTabs((s) => closeTab(s, id, { kind: "agenda" })), []);
+
   const nav: Nav = useMemo(
-    () => ({ view, go: setView, openFile, openToday, openLog, openLink, capture: () => startCapture(), newItem, claudeOpen, toggleClaude }),
-    [view, openFile, openToday, openLog, openLink, startCapture, newItem, claudeOpen, toggleClaude],
+    () => ({
+      view,
+      go: show,
+      openFile,
+      openToday,
+      openLog,
+      openLink,
+      capture: () => startCapture(),
+      newItem,
+      openSwitcher: () => setSwitcher(true),
+      claudeOpen,
+      toggleClaude,
+      tabs: tabs.tabs.map((t) => ({ id: t.id, view: t.history[t.index] })),
+      activeTab: tabs.active,
+      selectTab: (id) => setTabs((s) => selectTab(s, id)),
+      closeTab: closeTabById,
+      newTab,
+      moveTab: (id, to) => setTabs((s) => moveTab(s, id, to)),
+      back: () => setTabs((s) => go(s, -1)),
+      forward: () => setTabs((s) => go(s, 1)),
+      canBack: canBack(tabs),
+      canForward: canForward(tabs),
+      sidebarCollapsed: sidebar.collapsed,
+      toggleSidebar,
+    }),
+    [view, show, openFile, openToday, openLog, openLink, startCapture, newItem, claudeOpen, toggleClaude, tabs, closeTabById, newTab, sidebar.collapsed, toggleSidebar],
   );
 
-  // start on today's log
+  // start on today's log, unless tabs were restored (then just make sure today's log exists and has its carry-over)
   useEffect(() => {
-    openToday();
-  }, [openToday]);
+    if (hadSavedTabs) {
+      hold
+        .ensureLog(today())
+        .then(bump)
+        .catch(reportError);
+    } else openToday();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // mouse back/forward buttons
+  useEffect(() => {
+    const onUp = (e: MouseEvent) => {
+      if (e.button === 3 || e.button === 4) {
+        e.preventDefault();
+        setTabs((s) => go(s, e.button === 3 ? -1 : 1));
+      }
+    };
+    window.addEventListener("mouseup", onUp);
+    return () => window.removeEventListener("mouseup", onUp);
+  }, []);
 
   // global hotkey / tray → capture
   useEffect(() => onQuickCapture((wasHidden) => startCapture(wasHidden)), [startCapture]);
@@ -246,8 +330,25 @@ function Shell() {
       if ((e.target as Element | null)?.closest?.(".claude-panel")) return;
       const k = e.key.toLowerCase();
       const act: Record<string, () => void> = e.shiftKey
-        ? { f: () => setView({ kind: "search" }), m: () => newItem("meeting") }
-        : { k: () => startCapture(), t: openToday, j: () => setView({ kind: "agenda" }), n: () => newItem("note") };
+        ? {
+            f: () => show({ kind: "search" }),
+            m: () => newItem("meeting"),
+            t: () => setTabs((s) => reopenClosed(s)),
+            tab: () => setTabs((s) => cycleTab(s, -1)),
+          }
+        : {
+            k: () => startCapture(),
+            t: () => openToday(),
+            j: () => show({ kind: "agenda" }),
+            n: () => newItem("note"),
+            p: () => setSwitcher(true),
+            o: () => setSwitcher(true),
+            w: () => setTabs((s) => closeTab(s, s.active, { kind: "agenda" })),
+            tab: () => setTabs((s) => cycleTab(s, 1)),
+            "[": () => setTabs((s) => go(s, -1)),
+            "]": () => setTabs((s) => go(s, 1)),
+            "\\": toggleSidebar,
+          };
       if (act[k]) {
         e.preventDefault();
         act[k]();
@@ -255,13 +356,14 @@ function Shell() {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [startCapture, openToday, newItem, toggleClaude]);
+  }, [startCapture, openToday, newItem, toggleClaude, show, toggleSidebar]);
 
   return (
     <NavCtx.Provider value={nav}>
-      <div className="app">
-        <Sidebar />
+      <div className={`app${sidebar.collapsed ? " sidebar-collapsed" : ""}`} style={{ gridTemplateColumns: `${sidebar.collapsed ? 56 : sidebar.width}px 1fr` }}>
+        <Sidebar onResize={(width) => setSidebar((s) => ({ ...s, width }))} />
         <main className="main">
+          <TabBar />
           <div className="main-content">
             {view.kind === "file" && <FileView path={view.path} line={view.line} />}
             {view.kind === "agenda" && <AgendaView />}
@@ -279,6 +381,19 @@ function Shell() {
       </div>
       {capture && <QuickCapture onSubmit={submitCapture} onClose={() => setCapture(null)} focus={focus} />}
       {prompt && <PromptModal spec={prompt} onClose={() => setPrompt(null)} />}
+      {switcher && <QuickSwitcher onClose={() => setSwitcher(false)} />}
     </NavCtx.Provider>
   );
+}
+
+const TABS_KEY = "keel.tabs";
+const SIDEBAR_KEY = "keel.sidebar";
+
+function loadSidebar(): { collapsed: boolean; width: number } {
+  try {
+    const s = JSON.parse(localStorage.getItem(SIDEBAR_KEY) ?? "{}");
+    return { collapsed: !!s.collapsed, width: Math.min(420, Math.max(200, Number(s.width) || 248)) };
+  } catch {
+    return { collapsed: false, width: 248 };
+  }
 }
