@@ -315,6 +315,10 @@ describe("parseCapture work entries", () => {
     ["2h @acme fixed login", undefined, { key: "acme", hours: 2, item: "fixed login" }],
     ["1h30m @Acme/Portal pairing", undefined, { key: "acme/portal", hours: 1.5, item: "pairing" }],
     ["45m @acme standup", undefined, { key: "acme", hours: 0.75, item: "standup" }],
+    ["6 hours @portal", undefined, { key: "portal", hours: 6, item: undefined }],
+    ["2.5 hrs @portal design review", undefined, { key: "portal", hours: 2.5, item: "design review" }],
+    ["Work .25 Hours @flis-retain-pa", undefined, { key: "flis-retain-pa", hours: 0.25, item: undefined }],
+    ["worked 3h on @portal API spec", undefined, { key: "portal", hours: 3, item: "API spec" }],
     ["@portal reviewed the auth PR", undefined, { key: "portal", hours: undefined, item: "reviewed the auth PR" }],
     ["2h fixed login", "acme", { key: "acme", hours: 2, item: "fixed login" }],
     ["2h @globex other client", "acme", { key: "globex", hours: 2, item: "other client" }],
@@ -516,6 +520,26 @@ date: 2026-10-21
     ]);
     expect(f.hours[0].end).toBe(9);
     expect(f.tasks.map((t) => t.text)).toEqual(["Reviewed the auth PR", "still to do, not counted"]);
+  });
+
+  it("understands natural durations on work lines", () => {
+    const f = parseFile(
+      "logs/2026/2026-10-21.md",
+      "---\ndate: 2026-10-21\n---\n- 6 hours @a\n- 1.5 hrs @b\n- 6h 30m @c\n- 90 min @d\n- 2 hr @e/proj\n- 1hour @f\n- 3 hours of meetings\n" +
+        "- Work .25 Hours @flis-retain-pa\n- Worked 2h on @g\n- work: 1 hour @h\n- Work @i\n- worked on the deck\n",
+    );
+    expect(f.hours.map((h) => [h.client, h.hours])).toEqual([
+      ["a", 6],
+      ["b", 1.5],
+      ["c", 6.5],
+      ["d", 1.5],
+      ["e/proj", 2],
+      ["f", 1],
+      ["flis-retain-pa", 0.25],
+      ["g", 2],
+      ["h", 1],
+      ["i", 0],
+    ]);
   });
 
   it("logs work into today's blocks: adds hours and items, creates blocks", async () => {

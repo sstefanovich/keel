@@ -8,7 +8,8 @@ import { mountMermaid } from "../mermaid";
 import { currentTheme } from "../theme";
 
 const TASK = /^(\s*[-*+] \[)([ xX>\-])(\])/;
-const HOURS = /^(\s*[-*+]\s+)((?:\d+(?:\.\d+)?h)?(?:\d+m)?)(\s+)(@[\w.-]+(?:\/[\w.-]+)?)/;
+const HOURS =
+  /^(\s*[-*+]\s+(?:work(?:ed)?:?\s+)?)((?:\d*\.?\d+\s?(?:h|hrs?|hours?)(?![a-z]))?\s?(?:\d+\s?(?:m|mins?|minutes?)(?![a-z]))?)(\s+(?:on\s+)?)(@[\w.-]+(?:\/[\w.-]+)?)/i;
 const TOKENS =
   /@due\((\d{4}-\d{2}-\d{2})\)|@remind\([^)]*\)|@waiting(?:\([^)]*\))?|@since\([^)]*\)|@done\([^)]*\)|\[\[[^\]]+\]\]|(?<=^|\s)#[A-Za-z][\w/-]*/g;
 
@@ -48,7 +49,7 @@ function build(view: EditorView): DecorationSet {
         ranges.push([start, start + 3, mark(`cm-k-box${st === " " ? "" : " cm-k-box-checked"}`)]);
       } else {
         const h = text.match(HOURS);
-        if (h && h[2]) {
+        if (h && h[2].trim()) {
           const s = line.from + h[1].length;
           ranges.push([s, s + h[2].length, mark("cm-k-dur")]);
           const c = s + h[2].length + h[3].length;
@@ -132,8 +133,20 @@ export function keelClicks(onOpenLink: (target: string) => void) {
   });
 }
 
-/** Autocomplete for [[links]], @client on hours lines, and @due/@remind on tasks. */
-export function keelCompletions(getNames: () => string[], getClients: () => string[]) {
+/** Something hours can be logged against, for @ suggestions. */
+export interface WorkTarget {
+  /** What gets inserted after @ */
+  key: string;
+  /** Shown beside it, e.g. "Project · Contoso" */
+  detail: string;
+  /** Client key, for narrowing "@contoso/…" */
+  client?: string;
+  /** Project key (when this is a project) */
+  project?: string;
+}
+
+/** Autocomplete for [[links]], @project/@client on work lines, and @due/@remind/@waiting on tasks. */
+export function keelCompletions(getNames: () => string[], getTargets: () => WorkTarget[]) {
   return (ctx: CompletionContext): CompletionResult | null => {
     const link = ctx.matchBefore(/\[\[[^\]]*/);
     if (link) {
@@ -143,13 +156,28 @@ export function keelCompletions(getNames: () => string[], getClients: () => stri
         validFor: /^[^\]]*$/,
       };
     }
-    const at = ctx.matchBefore(/@[\w.-]*/);
+    const at = ctx.matchBefore(/@[\w.-]*(?:\/[\w.-]*)?/);
     if (!at) return null;
-    const lineText = ctx.state.doc.lineAt(ctx.pos).text;
-    if (/^\s*[-*+]\s+(?:\d+(?:\.\d+)?h)?(?:\d+m)?\s+@[\w.-]*$/.test(lineText.slice(0, ctx.pos - ctx.state.doc.lineAt(ctx.pos).from))) {
+    const line = ctx.state.doc.lineAt(ctx.pos);
+    const lineText = line.text;
+
+    // a bullet that isn't a task: "- @", "- 6h @", "- 6 hours @", "- @contoso/" → projects and clients
+    if (!TASK.test(lineText) && /^\s*[-*+]\s+(?:\S+\s+){0,3}@[\w.-]*(?:\/[\w.-]*)?$/.test(lineText.slice(0, ctx.pos - line.from))) {
+      const typed = at.text.slice(1);
+      const slash = typed.indexOf("/");
+      if (slash >= 0) {
+        const client = typed.slice(0, slash).toLowerCase();
+        return {
+          from: at.from + 1 + slash + 1,
+          options: getTargets()
+            .filter((t) => t.project && t.client === client)
+            .map((t) => ({ label: t.project!, detail: t.detail, type: "class" })),
+          validFor: /^[\w.-]*$/,
+        };
+      }
       return {
         from: at.from + 1,
-        options: getClients().map((c) => ({ label: c, type: "variable", detail: "client" })),
+        options: getTargets().map((t, i) => ({ label: t.key, detail: t.detail, type: t.project ? "class" : "variable", boost: -i / 1000 })),
         validFor: /^[\w.-]*$/,
       };
     }

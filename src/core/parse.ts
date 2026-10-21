@@ -98,8 +98,20 @@ const STATUS_CHARS: Record<string, TaskStatus> = { " ": "open", x: "done", X: "d
 export const STATUS_CHAR: Record<TaskStatus, string> = { open: " ", done: "x", migrated: ">", cancelled: "-" };
 
 export const TASK_RE = /^(\s*)[-*+] \[([ xX>\-])\] (.*)$/;
-/** "- 6h @key description" / "- 1h30m @client/project" / "- @key" — groups: indent, hours, minutes, key, description */
-export const HOURS_RE = /^(\s*)[-*+]\s+(?:(?:(\d+(?:\.\d+)?)h)?(?:(\d+)m)?\s+)?@([\w.-]+(?:\/[\w.-]+)?)\s*(?:[-–:]\s*)?(.*)$/i;
+/**
+ * A duration: "6h", "6 hours", "1.5 hrs", "6h30m", "6h 30m", "90 min". Two groups: hours, minutes.
+ * Shared by the parser, quick capture and editor highlighting.
+ */
+export const DURATION_SRC = String.raw`(?:(\d*\.?\d+)\s?(?:h|hrs?|hours?)(?![a-z]))?\s?(?:(\d+)\s?(?:m|mins?|minutes?)(?![a-z]))?`;
+
+/**
+ * "- 6h @key description" / "- Work .25 hours @client/project" / "- Worked 2h on @key" / "- @key"
+ * Groups: indent, hours, minutes, key, description.
+ */
+export const HOURS_RE = new RegExp(
+  String.raw`^(\s*)[-*+]\s+(?:work(?:ed)?:?\s+)?(?:${DURATION_SRC}\s+)?(?:on\s+)?@([\w.-]+(?:\/[\w.-]+)?)\s*(?:[-–:]\s*)?(.*)$`,
+  "i",
+);
 
 const indentOf = (s: string) => s.replace(/\t/g, "    ").match(/^\s*/)![0].length;
 const BULLET_RE = /^\s*[-*+]\s+(.*)$/;

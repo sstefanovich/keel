@@ -1,4 +1,5 @@
 import { addDays, hhmm, isISODate, parseTime, toISO, weekdayOf } from "./dates";
+import { DURATION_SRC } from "./parse";
 
 export interface Capture {
   kind: "hours" | "work" | "task" | "reminder" | "waiting" | "log" | "flag";
@@ -10,7 +11,7 @@ export interface Capture {
   work?: { key: string; hours?: number; item?: string };
 }
 
-const DURATION = /^(?:(\d+(?:\.\d+)?)h)?(?:(\d+)m)?\s+/i;
+const DURATION = new RegExp(String.raw`^${DURATION_SRC}\s+`, "i");
 const KEY = /^@([\w.-]+(?:\/[\w.-]+)?)(?:\s+(.*))?$/;
 
 function hoursOf(m: RegExpMatchArray): number {
@@ -42,10 +43,11 @@ export function parseCapture(input: string, now: Date = new Date(), focus?: stri
   const flag = text.match(/^(?:flag:?|!)\s+(.+)$/i);
   if (flag) return { kind: "flag", heading: "", line: flag[1].trim() };
 
-  // "6h @portal [what]" adds hours (and an item) to today's block for that project
-  const dur = text.match(DURATION);
+  // "6h @portal [what]" (or "worked .5 hours on @portal") adds hours (and an item) to today's block
+  const workText = text.replace(/^work(?:ed)?:?\s+/i, "");
+  const dur = workText.match(DURATION);
   if (dur && (dur[1] || dur[2])) {
-    const rest = text.slice(dur[0].length).trim();
+    const rest = workText.slice(dur[0].length).trim().replace(/^on\s+/i, "");
     const k = rest.match(KEY);
     if (k) return work(k[1], hoursOf(dur), k[2]?.trim());
     if (focus) return work(focus, hoursOf(dur), rest);
