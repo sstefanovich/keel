@@ -3,6 +3,7 @@ import { addDays, formatLong, today } from "../../core/dates";
 import { confirmDialog } from "../../lib/platform";
 import { FlagBoard } from "../FlagBoard";
 import { WorkPanel } from "../WorkPanel";
+import { Glance } from "../Glance";
 import { useHold } from "../HoldContext";
 import { Editor, SaveStatus } from "../editor/Editor";
 import { Check, FileX, Trash2 } from "lucide-react";
@@ -136,6 +137,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
           // work lines, so it must never sit above the text and shift it under the cursor
           <div className="log-layout">
             <div className="log-main">
+              <Glance file={file} />
               {file.date === today() && <FlagBoard compact />}
               <Editor key={path} path={path} line={line} onOpenLink={(t, newTab) => nav.openLink(t, { newTab })} onStatus={setSaveStatus} />
               {backlinkList}

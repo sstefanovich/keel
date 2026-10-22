@@ -881,3 +881,59 @@ button.icon-text {
   color: var(--text-2);
   font-weight: 600;
 }
+
+/* ---------- day at a glance ---------- */
+
+.glance {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 820px;
+  height: 34px;
+  margin: 14px auto 0;
+  padding: 0 28px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.glance-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12.5px;
+  min-width: 0;
+  flex: none;
+}
+.glance-item b {
+  color: var(--text);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.glance-item svg {
+  color: var(--accent);
+  flex: none;
+}
+.glance-item.static {
+  cursor: default;
+}
+.glance-item:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.glance-text {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.glance-alert {
+  color: var(--danger);
+  font-weight: 600;
+}
+.glance-item:last-child {
+  flex: 0 1 auto;
+}
