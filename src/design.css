@@ -1203,3 +1203,51 @@ button.icon-text {
   background: var(--border);
   margin: 4px 6px;
 }
+
+/* ---------- text column: left-aligned, readable width (or full width) ---------- */
+
+.editor {
+  max-width: 900px;
+  margin: 0;
+  padding: 20px 40px 48px;
+}
+.backlinks {
+  max-width: 900px;
+  margin: 0 0 40px;
+  padding: 12px 40px;
+}
+.glance {
+  max-width: 900px;
+  margin: 14px 0 0;
+  padding: 0 40px;
+}
+.log-main > .flag-board {
+  max-width: 900px;
+  margin: 16px 0 0;
+  padding: 0 40px;
+}
+.log-layout {
+  max-width: none;
+  margin: 0;
+  grid-template-columns: minmax(0, 900px) 320px;
+  justify-content: start;
+}
+:root[data-editor-width="full"] .editor,
+:root[data-editor-width="full"] .backlinks,
+:root[data-editor-width="full"] .glance,
+:root[data-editor-width="full"] .log-main > .flag-board {
+  max-width: none;
+}
+:root[data-editor-width="full"] .log-layout {
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+@media (max-width: 1100px) {
+  .log-layout,
+  :root[data-editor-width="full"] .log-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .log-side {
+    padding: 0 40px 24px;
+    margin: 0;
+  }
+}

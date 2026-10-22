@@ -7,6 +7,7 @@ import { ClientsManager } from "../ClientsManager";
 import { WEEKDAY_NAMES } from "../../core/dates";
 import { setWeekStart, useWeekStart } from "../weekStart";
 import { livePreviewEnabled, setLivePreview } from "../editor/livePreview";
+import { setEditorWidth, useEditorWidth } from "../editorWidth";
 
 export function SettingsView({ section }: { section?: string }) {
   const { dir, reportError } = useHold();
@@ -15,6 +16,7 @@ export function SettingsView({ section }: { section?: string }) {
   const { pref, theme, setPref } = useTheme();
   const weekStart = useWeekStart();
   const [preview, setPreview] = useState(livePreviewEnabled);
+  const width = useEditorWidth();
 
   useEffect(() => {
     getAutostart().then(setAuto).catch(() => {});
@@ -90,6 +92,17 @@ export function SettingsView({ section }: { section?: string }) {
             ))}
           </div>
           {pref === "system" && <span className="muted small">Following Windows: currently {theme}</span>}
+        </div>
+        <div className="setting-row">
+          <span>Text width</span>
+          <div className="seg" role="radiogroup" aria-label="Text width">
+            {(["readable", "full"] as const).map((w) => (
+              <button key={w} role="radio" aria-checked={width === w} className={width === w ? "on" : ""} onClick={() => setEditorWidth(w)}>
+                {w === "readable" ? "Readable" : "Full width"}
+              </button>
+            ))}
+          </div>
+          <span className="muted small">{width === "readable" ? "Lines stop at a comfortable length" : "Text uses the whole window"}</span>
         </div>
         <label className="setting-row check">
           <input
