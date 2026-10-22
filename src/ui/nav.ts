@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { PromptSpec } from "./Modals";
 
 export type View =
   | { kind: "file"; path: string; line?: number }
@@ -52,6 +53,8 @@ export interface Nav {
   openSwitcher: () => void;
   /** The first-run tour */
   openTour: () => void;
+  /** Ask for a value (rename, new folder, …); closes itself when onSubmit succeeds */
+  prompt: (spec: PromptSpec) => void;
   /** The Claude terminal panel */
   claudeOpen: boolean;
   toggleClaude: () => void;

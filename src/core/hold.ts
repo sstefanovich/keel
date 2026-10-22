@@ -87,6 +87,7 @@ export class Hold {
       if (!(await this.fs.exists(path))) await this.fs.write(path, content);
     }
     await this.reindex();
+    await this.loadPins();
   }
 
   /** Re-read files whose mtime changed; drop deleted ones. Returns true if anything changed. */
@@ -471,6 +472,157 @@ export class Hold {
       .sort((a, b) => (a.since ?? "").localeCompare(b.since ?? ""));
   }
 
+  // ---------- organizing: pins, folders, move/rename, archive ----------
+
+  /** Pinned file paths, kept in .keel/pins.json inside the hold so they travel with it. */
+  pins: string[] = [];
+  private renameListeners = new Set<(from: string, to: string) => void>();
+
+  /** Called with each file's old and new path when files are renamed or moved. */
+  onRename(cb: (from: string, to: string) => void): () => void {
+    this.renameListeners.add(cb);
+    return () => this.renameListeners.delete(cb);
+  }
+
+  private moved(pairs: [string, string][]) {
+    if (!pairs.length) return;
+    const map = new Map(pairs);
+    this.pins = this.pins.map((p) => map.get(p) ?? p);
+    for (const [from, to] of pairs) this.renameListeners.forEach((l) => l(from, to));
+  }
+
+  async loadPins(): Promise<void> {
+    try {
+      const raw = JSON.parse(await this.fs.read(PINS_PATH));
+      this.pins = Array.isArray(raw) ? raw.filter((p): p is string => typeof p === "string") : [];
+    } catch {
+      this.pins = [];
+    }
+  }
+
+  private async savePins() {
+    await this.fs.write(PINS_PATH, JSON.stringify(this.pins, null, 2) + "\n");
+  }
+
+  isPinned(path: string): boolean {
+    return this.pins.includes(path);
+  }
+
+  async setPinned(path: string, on: boolean): Promise<void> {
+    this.pins = on ? [...this.pins.filter((p) => p !== path), path] : this.pins.filter((p) => p !== path);
+    await this.savePins();
+  }
+
+  /** Every folder under notes/ (e.g. "notes/Clients/Hogan"), including empty ones. */
+  async noteFolders(): Promise<string[]> {
+    return (await this.fs.dirs()).filter((d) => d.startsWith("notes/")).sort((a, b) => a.localeCompare(b));
+  }
+
+  async createFolder(parent: string, name: string): Promise<string> {
+    const clean = safeFileName(name);
+    if (!clean) throw new Error("A folder needs a name.");
+    const path = `${parent}/${clean}`;
+    if (await this.fs.exists(path)) throw new Error(`“${clean}” already exists here.`);
+    await this.fs.mkdir(path);
+    return path;
+  }
+
+  async renameFolder(path: string, name: string): Promise<string> {
+    const clean = safeFileName(name);
+    if (!clean) throw new Error("A folder needs a name.");
+    const to = `${path.split("/").slice(0, -1).join("/")}/${clean}`;
+    if (to === path) return path;
+    if (await this.fs.exists(to)) throw new Error(`“${clean}” already exists here.`);
+    const inside = this.all().filter((f) => f.path.startsWith(`${path}/`)).map((f) => f.path);
+    await this.fs.rename(path, to);
+    await this.reindex();
+    this.moved(inside.map((p) => [p, `${to}${p.slice(path.length)}`]));
+    await this.savePins();
+    return to;
+  }
+
+  /** Removes an empty folder (Keel never deletes notes this way). */
+  async deleteFolder(path: string): Promise<void> {
+    await this.fs.rmdir(path);
+  }
+
+  /** Move a file into a folder, keeping its name (links keep working: they match by name). */
+  async moveFile(path: string, folder: string): Promise<string> {
+    const from = path.split("/").slice(0, -1).join("/");
+    if (from === folder) return path;
+    const to = await this.freePath(folder, basename(path));
+    await this.fs.rename(path, to);
+    await this.refresh(path);
+    await this.refresh(to);
+    this.moved([[path, to]]);
+    if (this.pins.includes(to)) await this.savePins();
+    return to;
+  }
+
+  /**
+   * Rename a note or meeting: the file, its # title (or frontmatter title) when it matched,
+   * and every [[link]] to it elsewhere. Clients and projects can't be renamed: their file name
+   * is their @tag, and logged hours point at it.
+   */
+  async renameFile(path: string, title: string): Promise<string> {
+    const f = this.files.get(path);
+    if (!f) throw new Error("That file no longer exists.");
+    if (f.kind === "client" || f.kind === "project" || f.kind === "log") throw new Error(`A ${f.kind} can't be renamed.`);
+    const newTitle = title.trim();
+    if (!newTitle) throw new Error("A name can't be empty.");
+    const dir = path.split("/").slice(0, -1).join("/");
+    const oldBase = basename(path);
+    // meetings keep their date prefix
+    const datePrefix = f.kind === "meeting" ? oldBase.match(/^\d{4}-\d{2}-\d{2} /)?.[0] ?? "" : "";
+    const newBase = safeFileName(datePrefix && !newTitle.startsWith(datePrefix.trim()) ? `${datePrefix}${newTitle}` : newTitle);
+    const sameName = newBase === oldBase;
+    const to = sameName ? path : await this.freePath(dir, newBase);
+    const displayOld = f.title;
+    const displayNew = newTitle.replace(/^\d{4}-\d{2}-\d{2}\s+/, "");
+
+    // the file's own title
+    let content = await this.fs.read(path);
+    if (typeof f.frontmatter.title === "string" && f.frontmatter.title === displayOld) {
+      content = setFrontmatterField(content, "title", yamlScalar(displayNew));
+    }
+    content = content.replace(/^#\s+(.+)$/m, (line, h: string) => (h.trim() === displayOld ? `# ${displayNew}` : line));
+    await this.save(path, content);
+    if (!sameName) {
+      await this.fs.rename(path, to);
+      await this.refresh(path);
+      await this.refresh(to);
+    }
+
+    // links elsewhere: [[Old name]], [[Old title|label]], [[Old#heading]]
+    const linkName = basename(to);
+    const names = [...new Set([oldBase, displayOld])].filter((n) => n && n !== linkName);
+    if (names.length) {
+      const re = new RegExp(String.raw`\[\[\s*(?:${names.map(escapeRe).join("|")})\s*((?:#[^\]|]*)?)((?:\|[^\]]*)?)\]\]`, "gi");
+      for (const other of this.all()) {
+        if (other.kind === "template" || !other.content.includes("[[")) continue;
+        const next = other.content.replace(re, (_m, hash: string, label: string) => `[[${linkName}${hash}${label}]]`);
+        if (next !== other.content) await this.save(other.path, next);
+      }
+    }
+    if (!sameName) {
+      this.moved([[path, to]]);
+      if (this.pins.includes(to)) await this.savePins();
+    }
+    return to;
+  }
+
+  /** Archive a note or meeting (archived: date in frontmatter), or mark a project done. */
+  async setArchived(path: string, on: boolean): Promise<void> {
+    const f = this.files.get(path);
+    if (!f) return;
+    if (f.kind === "project") return this.updateFrontmatter(path, { status: on ? "done" : "active" });
+    await this.updateFrontmatter(path, { archived: on ? todayISO() : undefined });
+  }
+
+  isArchived(f: ParsedFile): boolean {
+    return f.kind === "project" ? f.frontmatter.status === "done" : !!f.frontmatter.archived;
+  }
+
   // ---------- links ----------
 
   /** Resolve a [[link]] target to a file path (by basename or title, case-insensitive). */
@@ -627,4 +779,11 @@ export function workHeading(content: string): string {
 /** A client/project key from frontmatter: "@Hogan-Lovells" → "hogan-lovells". */
 function keyValue(v: unknown): string {
   return typeof v === "string" ? v.trim().replace(/^@/, "").toLowerCase() : "";
+}
+
+/** Where pins are stored, inside the hold (dot-folders aren't listed as notes). */
+export const PINS_PATH = ".keel/pins.json";
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

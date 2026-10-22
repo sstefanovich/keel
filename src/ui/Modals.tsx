@@ -183,6 +183,10 @@ export function QuickCapture({ onSubmit, onClose, focus }: { onSubmit: (c: Captu
 export interface PromptSpec {
   title: string;
   label: string;
+  /** Pre-filled value (selected, ready to overwrite) */
+  initial?: string;
+  /** Only the dropdown, no text box (e.g. "Move to folder") */
+  noText?: boolean;
   placeholder?: string;
   withDate?: boolean;
   /** Optional dropdown (e.g. which client a project belongs to) */
@@ -192,16 +196,19 @@ export interface PromptSpec {
 }
 
 export function PromptModal({ spec, onClose }: { spec: PromptSpec; onClose: () => void }) {
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(spec.initial ?? "");
   const [date, setDate] = useState(today());
   const [choice, setChoice] = useState(spec.choice?.initial ?? spec.choice?.options[0]?.value ?? "");
   const input = useRef<HTMLInputElement>(null);
   useEscape(onClose);
-  useEffect(() => input.current?.focus(), []);
+  useEffect(() => {
+    input.current?.focus();
+    input.current?.select();
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!value.trim()) return;
+    if (!spec.noText && !value.trim()) return;
     await spec.onSubmit(value.trim(), date, choice);
   };
 
@@ -209,14 +216,16 @@ export function PromptModal({ spec, onClose }: { spec: PromptSpec; onClose: () =
     <div className="modal-backdrop" onMouseDown={onClose}>
       <form className="modal" role="dialog" aria-label={spec.title} onMouseDown={(e) => e.stopPropagation()} onSubmit={submit}>
         <h2>{spec.title}</h2>
-        <label>
-          {spec.label}
-          <input ref={input} value={value} placeholder={spec.placeholder} onChange={(e) => setValue(e.target.value)} />
-        </label>
+        {!spec.noText && (
+          <label>
+            {spec.label}
+            <input ref={input} value={value} placeholder={spec.placeholder} onChange={(e) => setValue(e.target.value)} />
+          </label>
+        )}
         {spec.choice && (
           <label>
             {spec.choice.label}
-            <select value={choice} onChange={(e) => setChoice(e.target.value)}>
+            <select value={choice} onChange={(e) => setChoice(e.target.value)} autoFocus={spec.noText}>
               {spec.choice.options.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
@@ -235,7 +244,7 @@ export function PromptModal({ spec, onClose }: { spec: PromptSpec; onClose: () =
           <button type="button" className="ghost" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="primary" disabled={!value.trim()}>
+          <button type="submit" className="primary" disabled={!spec.noText && !value.trim()}>
             {spec.submitLabel}
           </button>
         </div>

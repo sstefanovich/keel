@@ -18,7 +18,7 @@ won't show up anywhere. Prefer small, targeted edits over rewriting whole files.
 |---|---|
 | \`logs/YYYY/YYYY-MM-DD.md\` | One log per day (e.g. \`logs/2026/2026-10-21.md\`). Sections: \`## Tasks\`, \`## Work\` (older logs: \`## Hours\`), \`## Log\` |
 | \`meetings/YYYY-MM-DD Title.md\` | Meeting notes; frontmatter has \`date\` and \`client\` |
-| \`notes/…\` | Free-form notes (subfolders allowed) |
+| \`notes/…\` | Free-form notes, organised in subfolders (\`notes/Clients/Hogan/…\`). \`archived: <date>\` in frontmatter files a note in the Archive |
 | \`clients/<key>.md\` | One per client; file name is the client key (e.g. \`clients/hogan-lovells.md\`); frontmatter \`name\` |
 | \`projects/<Name>.md\` | One per project; frontmatter \`client: <client-key>\` and \`status: active / paused / done\` |
 | \`flags/…md\` | Sticky notes ("Flags"); frontmatter \`color\`, \`created\`, and \`lowered: <date>\` once done |

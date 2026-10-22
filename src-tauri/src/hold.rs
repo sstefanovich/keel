@@ -110,6 +110,43 @@ pub fn hold_rename(root: String, from: String, to: String) -> Result<(), String>
     fs::rename(src, dst).map_err(|e| e.to_string())
 }
 
+fn walk_dirs(root: &Path, dir: &Path, out: &mut Vec<String>) -> std::io::Result<()> {
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if name.to_string_lossy().starts_with('.') || !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let path = entry.path();
+        let rel = path.strip_prefix(root).unwrap_or(&path);
+        out.push(rel.components().map(|c| c.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/"));
+        walk_dirs(root, &path, out)?;
+    }
+    Ok(())
+}
+
+/// Every folder in the hold (relative, "/"-separated), including empty ones.
+#[tauri::command]
+pub fn hold_dirs(root: String) -> Result<Vec<String>, String> {
+    let root_path = Path::new(&root);
+    let mut out = Vec::new();
+    if root_path.exists() {
+        walk_dirs(root_path, root_path, &mut out).map_err(|e| e.to_string())?;
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn hold_mkdir(root: String, path: String) -> Result<(), String> {
+    fs::create_dir_all(resolve(&root, &path)?).map_err(|e| e.to_string())
+}
+
+/// Removes a folder only if it's empty (never deletes notes).
+#[tauri::command]
+pub fn hold_rmdir(root: String, path: String) -> Result<(), String> {
+    fs::remove_dir(resolve(&root, &path)?).map_err(|_| format!("{path} isn't empty"))
+}
+
 /// Saves an export (e.g. timesheet CSV) to a path the user picked in a save dialog.
 #[tauri::command]
 pub fn save_export(path: String, content: String) -> Result<(), String> {

@@ -1009,3 +1009,197 @@ button.icon-text {
   display: flex;
   gap: 18px;
 }
+
+/* ---------- sidebar sections ---------- */
+
+.side-section {
+  margin-bottom: 4px;
+}
+.side-section-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px 0 0;
+  border-radius: var(--radius-sm);
+}
+.side-section-head.drop {
+  background: var(--accent-soft);
+  outline: 1px dashed var(--accent);
+}
+.side-section-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 6px;
+  border: 0;
+  background: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+}
+.side-section-toggle:hover:not(:disabled) {
+  background: none;
+  color: var(--text);
+}
+.side-chevron {
+  flex: none;
+  transition: transform 0.12s;
+}
+.side-section.open .side-chevron {
+  transform: rotate(90deg);
+}
+.side-count {
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--muted);
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+.side-section-actions {
+  display: flex;
+  gap: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.side-section-head:hover .side-section-actions,
+.side-section-head:focus-within .side-section-actions {
+  opacity: 1;
+}
+.side-section-actions .icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 6px;
+  opacity: 1;
+}
+.side-section-actions .icon-btn:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+.side-section-body {
+  padding-bottom: 4px;
+}
+
+/* rows */
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.file-row-icon {
+  flex: none;
+  color: var(--muted);
+  opacity: 0.8;
+}
+.file-item.active .file-row-icon {
+  color: var(--accent);
+  opacity: 1;
+}
+.file-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-row-pin {
+  flex: none;
+  color: var(--muted);
+  opacity: 0.7;
+}
+.file-row[draggable="true"] {
+  cursor: pointer;
+}
+.tree-branch.drop {
+  background: var(--accent-soft);
+  outline: 1px dashed var(--accent);
+}
+.tree-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.tree-label .tree-caret {
+  width: auto;
+  flex: none;
+}
+.tree-folder {
+  flex: none;
+  color: var(--muted);
+}
+.tree-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- context menu ---------- */
+
+.context-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 200px;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  outline: none;
+  animation: keel-pop-in 0.1s ease-out;
+}
+.context-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  text-align: left;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+.context-item svg {
+  color: var(--muted);
+  flex: none;
+}
+.context-item.on:not(:disabled),
+.context-item:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.context-item.on:not(:disabled) svg,
+.context-item:hover:not(:disabled) svg {
+  color: var(--accent);
+}
+.context-item.danger,
+.context-item.danger svg {
+  color: var(--danger);
+}
+.context-item.danger:hover:not(:disabled),
+.context-item.danger.on:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.context-item:disabled {
+  opacity: 0.45;
+}
+.context-icon-gap {
+  width: 14px;
+  flex: none;
+}
+.context-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 6px;
+}

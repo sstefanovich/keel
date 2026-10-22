@@ -11,7 +11,6 @@ import {
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
-  Plus,
   Search,
   Send,
   Settings,
@@ -19,12 +18,12 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { MouseEvent, useState } from "react";
+import { MouseEvent } from "react";
 import { today } from "../core/dates";
 import { ParsedFile, basename } from "../core/parse";
 import { ClaudeIcon } from "./ClaudePanel";
+import { ArchiveSection, ChartsSection, LogsSection, MeetingsSection, NotesSection, PinnedSection, RecentSection } from "./SidebarSections";
 import { useHold } from "./HoldContext";
-import { LogTree } from "./LogTree";
 import { OpenOpts, View, openOpts, useNav } from "./nav";
 import { ThemePref, useTheme } from "./theme";
 
@@ -59,58 +58,6 @@ function NavItem({
       {!collapsed && <span className="nav-label">{label}</span>}
       {badge ? <span className={`badge${collapsed ? " badge-dot" : ""}`}>{collapsed ? "" : badge}</span> : null}
     </button>
-  );
-}
-
-function FileGroup({
-  title,
-  files,
-  label,
-  current,
-  onAdd,
-  addLabel,
-  limit = 8,
-}: {
-  title: string;
-  files: ParsedFile[];
-  label: (f: ParsedFile) => string;
-  current?: string;
-  onAdd?: () => void;
-  addLabel?: string;
-  limit?: number;
-}) {
-  const nav = useNav();
-  const [all, setAll] = useState(false);
-  const shown = all ? files : files.slice(0, limit);
-  const open = (f: ParsedFile, e: MouseEvent) => nav.openFile(f.path, undefined, openOpts(e));
-  return (
-    <div className="side-group">
-      <div className="side-group-head">
-        <span>{title}</span>
-        {onAdd && (
-          <button className="icon-btn" onClick={onAdd} aria-label={addLabel ?? `New ${title.toLowerCase()}`} title={addLabel ?? `New ${title.toLowerCase()}`}>
-            <Plus size={14} />
-          </button>
-        )}
-      </div>
-      {shown.map((f) => (
-        <button
-          key={f.path}
-          className={`file-item${current === f.path ? " active" : ""}${f.kind === "project" ? " sub" : ""}`}
-          onClick={(e) => open(f, e)}
-          onAuxClick={(e) => e.button === 1 && open(f, e)}
-          title={f.path}
-        >
-          {label(f)}
-        </button>
-      ))}
-      {files.length > limit && (
-        <button className="file-item more" onClick={() => setAll(!all)}>
-          {all ? "Show fewer" : `Show all ${files.length}`}
-        </button>
-      )}
-      {!files.length && <span className="file-item muted">None yet</span>}
-    </div>
   );
 }
 
@@ -162,8 +109,12 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
 
   const mine = (f: ParsedFile) => !focus || hold.fileClient(f) === focus;
   const logs = files.filter((f) => f.kind === "log").sort(byDateDesc);
-  const meetings = files.filter((f) => f.kind === "meeting" && mine(f)).sort(byDateDesc);
-  const notes = files.filter((f) => f.kind === "note" && (!focus || !hold.fileClient(f) || mine(f))).sort((a, b) => a.title.localeCompare(b.title));
+  const live = (f: ParsedFile) => !hold.isArchived(f);
+  const meetings = files.filter((f) => f.kind === "meeting" && mine(f) && live(f)).sort(byDateDesc);
+  const notes = files.filter((f) => f.kind === "note" && live(f) && (!focus || !hold.fileClient(f) || mine(f))).sort((a, b) => a.title.localeCompare(b.title));
+  const archived = files
+    .filter((f) => (f.kind === "note" || f.kind === "meeting" || f.kind === "project") && hold.isArchived(f) && mine(f))
+    .sort((a, b) => a.title.localeCompare(b.title));
   const flagCount = hold.flags(focus).length;
   const waitingCount = hold.waitingOn(focus).length;
   const agenda = hold.agenda(t, 14, focus);
@@ -273,10 +224,13 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
 
       {!collapsed ? (
         <div className="side-scroll">
-          <FileGroup title="Meetings" files={meetings} current={current} onAdd={() => nav.newItem("meeting")} label={(f) => f.title.replace(/^\d{4}-\d{2}-\d{2}\s*/, "") || f.title} />
-          <FileGroup title="Notes" files={notes} current={current} onAdd={() => nav.newItem("note")} label={(f) => (f.path.split("/").length > 2 ? `${f.path.split("/").slice(1, -1).join("/")}/` : "") + f.title} limit={12} />
-          <LogTree logs={logs} current={current} />
-          <FileGroup title="Charts" files={charts} current={current} onAdd={() => nav.newItem("client")} addLabel="New client" label={(f) => f.title} limit={14} />
+          <PinnedSection current={current} />
+          <RecentSection current={current} />
+          <MeetingsSection meetings={meetings} current={current} />
+          <NotesSection notes={notes} current={current} />
+          <LogsSection logs={logs} current={current} />
+          <ChartsSection charts={charts} current={current} />
+          <ArchiveSection items={archived} current={current} />
         </div>
       ) : (
         <div className="side-scroll" />

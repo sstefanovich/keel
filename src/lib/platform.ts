@@ -26,6 +26,15 @@ export class TauriFs implements HoldFs {
   rename(from: string, to: string) {
     return invoke<void>("hold_rename", { root: this.root, from, to });
   }
+  dirs() {
+    return invoke<string[]>("hold_dirs", { root: this.root });
+  }
+  mkdir(path: string) {
+    return invoke<void>("hold_mkdir", { root: this.root, path });
+  }
+  rmdir(path: string) {
+    return invoke<void>("hold_rmdir", { root: this.root, path });
+  }
 }
 
 /** Browser-only stand-in: keeps the hold in localStorage. */

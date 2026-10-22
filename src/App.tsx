@@ -12,6 +12,8 @@ import { Nav, NavCtx, NewKind, OpenOpts, View, isView } from "./ui/nav";
 import { TabBar } from "./ui/TabBar";
 import { QuickSwitcher } from "./ui/QuickSwitcher";
 import { Tour, tourSeen } from "./ui/Tour";
+import { ContextMenuProvider } from "./ui/ContextMenu";
+import { pushRecent, renameRecent } from "./ui/sidebarStore";
 import { TabsState, canBack, canForward, closeTab, currentView, cycleTab, go, initTabs, moveTab, navigate, reopenClosed, restoreTabs, selectTab, serializeTabs } from "./ui/tabs";
 import { ChartsView } from "./ui/views/ChartsView";
 import { DispatchView } from "./ui/views/DispatchView";
@@ -262,6 +264,44 @@ function Shell() {
   }, []);
 
   const newTab = useCallback(() => openToday({ newTab: true }), [openToday]);
+
+  // generic "ask for a name" dialog for the sidebar (rename, new folder, …)
+  const askFor = useCallback(
+    (spec: PromptSpec) =>
+      setPrompt({
+        ...spec,
+        onSubmit: async (v, d, c) => {
+          try {
+            await spec.onSubmit(v, d, c);
+            setPrompt(null);
+          } catch (e) {
+            reportError(e);
+          }
+        },
+      }),
+    [reportError],
+  );
+
+  // remember recently opened files
+  useEffect(() => {
+    if (view.kind === "file") pushRecent(view.path);
+  }, [view]);
+
+  // tabs and recents follow files that are renamed or moved
+  useEffect(
+    () =>
+      hold.onRename((from, to) => {
+        renameRecent(from, to);
+        setTabs((s) => ({
+          ...s,
+          tabs: s.tabs.map((t) => ({
+            ...t,
+            history: t.history.map((v) => (v.kind === "file" && v.path === from ? { ...v, path: to } : v)),
+          })),
+        }));
+      }),
+    [hold],
+  );
   const closeTabById = useCallback((id: string) => setTabs((s) => closeTab(s, id, { kind: "agenda" })), []);
 
   const nav: Nav = useMemo(
@@ -276,6 +316,7 @@ function Shell() {
       newItem,
       openSwitcher: () => setSwitcher(true),
       openTour: () => setTour(true),
+      prompt: askFor,
       claudeOpen,
       toggleClaude,
       tabs: tabs.tabs.map((t) => ({ id: t.id, view: t.history[t.index] })),
@@ -291,7 +332,7 @@ function Shell() {
       sidebarCollapsed: sidebar.collapsed,
       toggleSidebar,
     }),
-    [view, show, openFile, openToday, openLog, openLink, startCapture, newItem, claudeOpen, toggleClaude, tabs, closeTabById, newTab, sidebar.collapsed, toggleSidebar],
+    [view, show, openFile, openToday, openLog, openLink, startCapture, newItem, claudeOpen, toggleClaude, tabs, closeTabById, newTab, sidebar.collapsed, toggleSidebar, askFor],
   );
 
   // start on today's log, unless tabs were restored (then just make sure today's log exists and has its carry-over)
@@ -365,6 +406,7 @@ function Shell() {
 
   return (
     <NavCtx.Provider value={nav}>
+      <ContextMenuProvider>
       <div className={`app${sidebar.collapsed ? " sidebar-collapsed" : ""}`} style={{ gridTemplateColumns: `${sidebar.collapsed ? 56 : sidebar.width}px 1fr` }}>
         <Sidebar onResize={(width) => setSidebar((s) => ({ ...s, width }))} />
         <main className="main">
@@ -388,6 +430,7 @@ function Shell() {
       {prompt && <PromptModal spec={prompt} onClose={() => setPrompt(null)} />}
       {switcher && <QuickSwitcher onClose={() => setSwitcher(false)} />}
       {tour && <Tour onClose={() => setTour(false)} />}
+      </ContextMenuProvider>
     </NavCtx.Provider>
   );
 }

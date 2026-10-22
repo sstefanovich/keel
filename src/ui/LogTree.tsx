@@ -84,10 +84,7 @@ export function LogTree({ logs, current }: { logs: ParsedFile[]; current?: strin
   };
 
   return (
-    <div className="side-group">
-      <div className="side-group-head">
-        <span>Logs</span>
-      </div>
+    <>
       {recent.length ? (
         recent.map((f) => day(f, 0))
       ) : (
@@ -106,6 +103,6 @@ export function LogTree({ logs, current }: { logs: ParsedFile[]; current?: strin
           ),
         ),
       )}
-    </div>
+    </>
   );
 }
