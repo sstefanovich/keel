@@ -147,9 +147,12 @@ export function SettingsView({ section }: { section?: string }) {
             ))}
           </tbody>
         </table>
-        <p>
+        <p className="settings-links">
           <button className="link" onClick={() => nav.openLink("Welcome to Keel")}>
             Syntax guide
+          </button>
+          <button className="link" onClick={nav.openTour}>
+            Show the tour again
           </button>
         </p>
       </section>

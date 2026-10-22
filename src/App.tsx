@@ -11,6 +11,7 @@ import { Sidebar } from "./ui/Sidebar";
 import { Nav, NavCtx, NewKind, OpenOpts, View, isView } from "./ui/nav";
 import { TabBar } from "./ui/TabBar";
 import { QuickSwitcher } from "./ui/QuickSwitcher";
+import { Tour, tourSeen } from "./ui/Tour";
 import { TabsState, canBack, canForward, closeTab, currentView, cycleTab, go, initTabs, moveTab, navigate, reopenClosed, restoreTabs, selectTab, serializeTabs } from "./ui/tabs";
 import { ChartsView } from "./ui/views/ChartsView";
 import { DispatchView } from "./ui/views/DispatchView";
@@ -98,6 +99,7 @@ function Shell() {
   const [capture, setCapture] = useState<{ hideAfter: boolean } | null>(null);
   const [prompt, setPrompt] = useState<PromptSpec | null>(null);
   const [switcher, setSwitcher] = useState(false);
+  const [tour, setTour] = useState(() => !tourSeen());
 
   // sidebar: collapsible to an icon rail, and resizable
   const [sidebar, setSidebar] = useState(loadSidebar);
@@ -273,6 +275,7 @@ function Shell() {
       capture: () => startCapture(),
       newItem,
       openSwitcher: () => setSwitcher(true),
+      openTour: () => setTour(true),
       claudeOpen,
       toggleClaude,
       tabs: tabs.tabs.map((t) => ({ id: t.id, view: t.history[t.index] })),
@@ -384,6 +387,7 @@ function Shell() {
       {capture && <QuickCapture onSubmit={submitCapture} onClose={() => setCapture(null)} focus={focus} />}
       {prompt && <PromptModal spec={prompt} onClose={() => setPrompt(null)} />}
       {switcher && <QuickSwitcher onClose={() => setSwitcher(false)} />}
+      {tour && <Tour onClose={() => setTour(false)} />}
     </NavCtx.Provider>
   );
 }

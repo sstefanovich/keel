@@ -50,6 +50,8 @@ export interface Nav {
   newItem: (kind: NewKind, client?: string, project?: string) => void;
   /** Quick open (Ctrl+P) */
   openSwitcher: () => void;
+  /** The first-run tour */
+  openTour: () => void;
   /** The Claude terminal panel */
   claudeOpen: boolean;
   toggleClaude: () => void;

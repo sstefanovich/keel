@@ -937,3 +937,75 @@ button.icon-text {
 .glance-item:last-child {
   flex: 0 1 auto;
 }
+
+/* ---------- first-run tour ---------- */
+
+.modal.tour {
+  width: min(560px, calc(100vw - 32px));
+  padding: 28px 30px 20px;
+  gap: 6px;
+  align-items: flex-start;
+}
+.tour-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.modal.tour h2 {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.tour-body {
+  color: var(--text-2);
+  line-height: 1.6;
+  min-height: 150px;
+}
+.tour-body p {
+  margin: 6px 0;
+}
+.tour-body ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+.tour-body li {
+  margin: 4px 0;
+}
+.tour-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.tour-dots {
+  display: flex;
+  gap: 6px;
+}
+.tour-dots button {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  border: 0;
+  background: var(--border-strong);
+}
+.tour-dots button.on {
+  background: var(--accent);
+  width: 20px;
+  border-radius: 4px;
+}
+
+.settings-links {
+  display: flex;
+  gap: 18px;
+}
