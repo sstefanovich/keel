@@ -24,7 +24,23 @@ const KIND_INFO: Record<CaptureKind, { label: string; hint: string }> = {
 };
 
 /** Quick capture: one box that logs, adds tasks/work/flags, appends to notes, or asks Claude. */
-export function QuickCapture({ onSubmit, onClose, focus }: { onSubmit: (c: Capture) => Promise<void>; onClose: () => void; focus?: string }) {
+export function QuickCapture({
+  onSubmit,
+  onClose,
+  focus,
+  standalone,
+  status,
+  boxRef,
+}: {
+  onSubmit: (c: Capture) => Promise<void>;
+  onClose: () => void;
+  focus?: string;
+  /** In its own window: no backdrop */
+  standalone?: boolean;
+  /** Replaces the preview line (a confirmation or an error) */
+  status?: { text: string; error?: boolean };
+  boxRef?: React.Ref<HTMLDivElement>;
+}) {
   const { hold } = useHold();
   const [text, setText] = useState("");
   const [force, setForce] = useState<CaptureKind | undefined>(undefined);
@@ -83,11 +99,11 @@ export function QuickCapture({ onSubmit, onClose, focus }: { onSubmit: (c: Captu
     return c.date ? `${formatShort(c.date)} log` : "today's log";
   };
 
-  return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal capture" role="dialog" aria-label="Quick capture" onMouseDown={(e) => e.stopPropagation()}>
+  const box = (
+      <div ref={boxRef} className={`modal capture${standalone ? " standalone" : ""}`} role="dialog" aria-label="Quick capture" onMouseDown={(e) => e.stopPropagation()}>
         <input
           ref={input}
+          readOnly={busy}
           value={text}
           placeholder="Type anything · Tab changes the type · ? asks Claude · > Note: adds to a note · yesterday …"
           onChange={(e) => {
@@ -159,8 +175,10 @@ export function QuickCapture({ onSubmit, onClose, focus }: { onSubmit: (c: Captu
             </button>
           ))}
         </div>
-        <div className={`capture-preview${parsed?.error ? " error" : ""}`}>
-          {parsed ? (
+        <div className={`capture-preview${parsed?.error || status?.error ? " error" : ""}${status && !status.error ? " done" : ""}`} role="status">
+          {status ? (
+            <span>{status.error ? status.text : `✓ ${status.text}`}</span>
+          ) : parsed ? (
             parsed.error ? (
               <span>{parsed.error}</span>
             ) : (
@@ -176,6 +194,11 @@ export function QuickCapture({ onSubmit, onClose, focus }: { onSubmit: (c: Captu
           )}
         </div>
       </div>
+  );
+  if (standalone) return box;
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      {box}
     </div>
   );
 }

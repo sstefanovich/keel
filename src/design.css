@@ -1633,3 +1633,31 @@ button.icon-text {
     animation: none;
   }
 }
+
+/* ---------- standalone quick-capture window (Ctrl+Alt+K while Keel isn't in front) ---------- */
+
+.capture-mode,
+.capture-mode body {
+  background: var(--surface);
+  overflow: hidden;
+  height: auto;
+  min-height: 0;
+}
+.capture-mode #root {
+  height: auto;
+  min-height: 0;
+}
+.capture-mode .toasts {
+  display: none;
+}
+.modal.capture.standalone {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
+}
+.capture-preview.done {
+  color: var(--ok);
+  font-weight: 600;
+}

@@ -1,13 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
+  "description": "Capability for the main window and the quick-capture window",
+  "windows": ["main", "capture"],
   "permissions": [
     "core:default",
     "core:window:allow-show",
     "core:window:allow-set-focus",
     "core:window:allow-hide",
+    "core:window:allow-unminimize",
+    "core:window:allow-set-size",
     "core:window:allow-set-theme",
     "notification:default",
     "dialog:default",

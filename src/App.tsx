@@ -4,7 +4,9 @@ import { formatShort, today } from "./core/dates";
 import { Hold } from "./core/hold";
 import { basename } from "./core/parse";
 import { slugify } from "./core/templates";
-import { hideWindow, loadSettings, onQuickCapture, openFs, saveSettings } from "./lib/platform";
+import { hideWindow, isCaptureWindow, loadSettings, onQuickCapture, onRemoteCapture, openFs, saveSettings, showMainWindow } from "./lib/platform";
+import { flushEditors } from "./ui/editor/Editor";
+import { CaptureWindow } from "./ui/CaptureWindow";
 import { HoldProvider, useHold } from "./ui/HoldContext";
 import { PromptModal, PromptSpec, QuickCapture } from "./ui/Modals";
 import { Sidebar } from "./ui/Sidebar";
@@ -41,7 +43,8 @@ export default function App() {
     (async () => {
       const { fs, dir } = await openFs();
       const hold = new Hold(fs);
-      await hold.init();
+      // the capture window only reads; the main window seeds and writes
+      await hold.init(!isCaptureWindow);
       setState({ hold, dir });
     })().catch((e) => setState({ error: e instanceof Error ? e.message : String(e) }));
   }, []);
@@ -67,7 +70,7 @@ export default function App() {
   }
   return (
     <HoldProvider hold={state.hold} dir={state.dir}>
-      <Shell />
+      {isCaptureWindow ? <CaptureWindow /> : <Shell />}
     </HoldProvider>
   );
 }
@@ -155,8 +158,9 @@ function Shell() {
     setCapture({ hideAfter });
   }, []);
 
-  const submitCapture = async (c: Capture) => {
-    try {
+  /** Save a capture (from either capture box); returns the confirmation to show. */
+  const saveCapture = useCallback(
+    async (c: Capture): Promise<string> => {
       const day = c.date ?? today();
       const onDay = c.date ? ` (${formatShort(c.date)})` : "";
       let message: string;
@@ -178,6 +182,26 @@ function Shell() {
         message = what[c.kind] + onDay;
       }
       bump();
+      return message;
+    },
+    [hold, bump, focus],
+  );
+
+  // from the standalone capture window: it parses, this window saves (one writer, after editors flush)
+  useEffect(
+    () =>
+      onRemoteCapture<Capture>(async (c) => {
+        await flushEditors();
+        const message = await saveCapture(c);
+        if (c.kind === "ask") await showMainWindow();
+        return message;
+      }),
+    [saveCapture],
+  );
+
+  const submitCapture = async (c: Capture) => {
+    try {
+      const message = await saveCapture(c);
       toast(message);
       // from the global hotkey with Keel hidden: hide again, unless Claude's answer is coming
       const hide = capture?.hideAfter && c.kind !== "ask";

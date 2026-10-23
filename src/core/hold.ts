@@ -73,7 +73,13 @@ export class Hold {
   constructor(public fs: HoldFs) {}
 
   /** Create the folder skeleton on first use. */
-  async init(): Promise<void> {
+  /** Index the hold; with `seed`, first write the default templates and guide files that are missing. */
+  async init(seedFiles = true): Promise<void> {
+    if (!seedFiles) {
+      await this.reindex();
+      await this.loadPins();
+      return;
+    }
     const seed: Record<string, string> = {
       ...DEFAULT_TEMPLATES,
       "reminders.md": DEFAULT_REMINDERS,

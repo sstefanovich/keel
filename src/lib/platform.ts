@@ -221,3 +221,75 @@ export function onQuickCapture(cb: (wasHidden: boolean) => void): () => void {
 export async function hideWindow() {
   if (isTauri) await getCurrentWindow().hide();
 }
+
+export async function showMainWindow() {
+  if (!isTauri) return;
+  const w = getCurrentWindow();
+  await w.unminimize();
+  await w.show();
+  await w.setFocus();
+}
+
+// ---------- the standalone quick-capture window ----------
+
+/** True in the small always-on-top capture window (Ctrl+Alt+K while Keel isn't in front). */
+export const isCaptureWindow = isTauri && getCurrentWindow().label === "capture";
+
+/** The capture window was just shown by the hotkey or tray. */
+export function onCaptureOpen(cb: () => void): () => void {
+  if (!isTauri) return () => {};
+  const un = listen("capture-open", () => cb());
+  return () => {
+    un.then((f) => f());
+  };
+}
+
+export async function setWindowHeight(width: number, height: number) {
+  if (!isTauri) return;
+  const { LogicalSize } = await import("@tauri-apps/api/dpi");
+  await getCurrentWindow().setSize(new LogicalSize(width, Math.ceil(height)));
+}
+
+interface CaptureReply {
+  id: string;
+  message?: string;
+  error?: string;
+}
+
+/** Capture window → main window: save this (the main window owns all writes). Resolves with its confirmation. */
+export async function sendCapture<T>(capture: T): Promise<string> {
+  const { emitTo } = await import("@tauri-apps/api/event");
+  const id = `${Date.now()}${Math.random().toString(36).slice(2)}`;
+  return new Promise<string>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      un.then((f) => f());
+      reject(new Error("Keel didn't answer. Is the main window still running?"));
+    }, 15_000);
+    const un = listen<CaptureReply>("capture-done", (e) => {
+      if (e.payload.id !== id) return;
+      window.clearTimeout(timer);
+      un.then((f) => f());
+      if (e.payload.error) reject(new Error(e.payload.error));
+      else resolve(e.payload.message ?? "Saved");
+    });
+    un.then(() => emitTo("main", "capture-submit", { id, capture })).catch(reject);
+  });
+}
+
+/** Main window: handle captures sent from the capture window. */
+export function onRemoteCapture<T>(handle: (capture: T) => Promise<string>): () => void {
+  if (!isTauri) return () => {};
+  const un = listen<{ id: string; capture: T }>("capture-submit", async (e) => {
+    const { emitTo } = await import("@tauri-apps/api/event");
+    let reply: CaptureReply;
+    try {
+      reply = { id: e.payload.id, message: await handle(e.payload.capture) };
+    } catch (err) {
+      reply = { id: e.payload.id, error: err instanceof Error ? err.message : String(err) };
+    }
+    await emitTo("capture", "capture-done", reply);
+  });
+  return () => {
+    un.then((f) => f());
+  };
+}
