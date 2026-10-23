@@ -1,13 +1,35 @@
 import { formatShort, today } from "../core/dates";
-import { Task } from "../core/parse";
+import { Task, taskLabel } from "../core/parse";
 import { useHold } from "./HoldContext";
 import { useNav } from "./nav";
 
-export function TaskRow({ task, showFile = true }: { task: Task; showFile?: boolean }) {
+/**
+ * A task in a list. `inToday`: it's in a "today" list, so a due date of today and today's log as
+ * its source go without saying.
+ */
+export function TaskRow({
+  task,
+  showFile = true,
+  inToday = false,
+  showDue: showDueChip = true,
+}: {
+  task: Task;
+  showFile?: boolean;
+  inToday?: boolean;
+  /** Off where the list is already grouped by due date */
+  showDue?: boolean;
+}) {
   const { hold, bump, reportError } = useHold();
   const nav = useNav();
   const done = task.status === "done";
   const file = hold.get(task.file);
+  const t = today();
+  const label = taskLabel(task);
+  // a #tag naming a project or client shows as its name
+  const owner = task.tags.length ? hold.taskProject(task) : undefined;
+  const ownerName = owner ? (owner.project && hold.projectByKey(owner.project) ? hold.projectName(owner.project) : hold.clients().get(owner.client)?.name) : undefined;
+  const showDue = showDueChip && task.due && !(inToday && task.due === t);
+  const fromToday = file?.kind === "log" && file.date === t;
 
   const toggle = async () => {
     try {
@@ -20,14 +42,17 @@ export function TaskRow({ task, showFile = true }: { task: Task; showFile?: bool
 
   return (
     <li className={`task${done ? " task-done" : ""}`}>
-      <input type="checkbox" checked={done} onChange={toggle} aria-label={`Mark "${task.text}" ${done ? "open" : "done"}`} />
+      <input type="checkbox" checked={done} onChange={toggle} aria-label={`Mark "${label}" ${done ? "open" : "done"}`} />
       <button className="task-text" onClick={() => nav.openFile(task.file, task.line)}>
-        {task.text}
+        {label}
       </button>
-      {task.due && (
-        <span className={`chip${task.due < today() && !done ? " chip-danger" : ""}`}>{formatShort(task.due)}</span>
+      {ownerName && <span className="chip chip-project">{ownerName}</span>}
+      {showDue && (
+        <span className={`chip${task.due! < t && !done ? " chip-danger" : ""}`}>{task.due === t ? "today" : formatShort(task.due!)}</span>
       )}
-      {showFile && file && <span className="task-file">{file.kind === "log" ? formatShort(file.date!) : file.title}</span>}
+      {showFile && file && !(inToday && fromToday) && (
+        <span className="task-file">{file.kind === "log" ? (fromToday ? "today's log" : formatShort(file.date!)) : file.title}</span>
+      )}
     </li>
   );
 }

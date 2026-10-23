@@ -1,7 +1,7 @@
 import { Coffee, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { addDays, formatShort, parseISO } from "../core/dates";
-import { ParsedFile } from "../core/parse";
+import { ParsedFile, taskLabel } from "../core/parse";
 import { CalItem, eventTime, useCalendarEvents } from "./calendars";
 import { useHold } from "./HoldContext";
 import { openOpts, useNav } from "./nav";
@@ -100,7 +100,7 @@ export function Briefing({ file }: { file: ParsedFile }) {
             {due.slice(0, SHOW).map((t) => (
               <li key={t.file + t.line}>
                 <button className="link" onClick={() => nav.openFile(t.file, t.line)}>
-                  {t.text}
+                  {taskLabel(t)}
                 </button>
                 {t.due && t.due < date && <span className="briefing-late"> · due {formatShort(t.due)}</span>}
               </li>
@@ -128,7 +128,7 @@ export function Briefing({ file }: { file: ParsedFile }) {
                 <button className="link" onClick={() => nav.openFile(t.file, t.line)}>
                   {t.waiting ? <b>{t.waiting}</b> : null}
                   {t.waiting ? " · " : ""}
-                  {t.text.replace(/@waiting(\([^)]*\))?/, "").trim()}
+                  {taskLabel(t)}
                 </button>
                 <span className="muted"> · {daysBetween(t.since!, date)}d</span>
               </li>

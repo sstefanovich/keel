@@ -12,6 +12,17 @@ import { setHistoryEnabled, snapshotNow, useHistory } from "../history";
 import { livePreviewEnabled, setLivePreview } from "../editor/livePreview";
 import { setEditorWidth, useEditorWidth } from "../editorWidth";
 
+const SECTIONS = [
+  ["hold", "Hold"],
+  ["history", "File history"],
+  ["clients", "Clients & projects"],
+  ["calendars", "Calendars"],
+  ["timesheet", "Timesheet"],
+  ["appearance", "Appearance"],
+  ["startup", "Startup & reminders"],
+  ["shortcuts", "Shortcuts"],
+] as const;
+
 export function SettingsView({ section }: { section?: string }) {
   const { dir, reportError, toast } = useHold();
   const nav = useNav();
@@ -52,8 +63,15 @@ export function SettingsView({ section }: { section?: string }) {
       <header className="page-head">
         <h1>Settings</h1>
       </header>
+      <nav className="settings-nav" aria-label="Settings sections">
+        {SECTIONS.map(([id, label]) => (
+          <button key={id} className="link" onClick={() => document.getElementById(`settings-${id}`)?.scrollIntoView({ block: "start", behavior: "smooth" })}>
+            {label}
+          </button>
+        ))}
+      </nav>
 
-      <section className="panel">
+      <section className="panel" id="settings-hold">
         <h2>Hold</h2>
         <p className="muted">The folder where Keel keeps your markdown files.</p>
         <div className="setting-row">
@@ -94,7 +112,7 @@ export function SettingsView({ section }: { section?: string }) {
         <CalendarSettings />
       </section>
 
-      <section className="panel">
+      <section className="panel" id="settings-timesheet">
         <h2>Timesheet</h2>
         <label className="setting-row">
           Weeks start on
@@ -143,7 +161,7 @@ export function SettingsView({ section }: { section?: string }) {
         </div>
       </section>
 
-      <section className="panel">
+      <section className="panel" id="settings-appearance">
         <h2>Appearance</h2>
         <div className="setting-row">
           <div className="seg" role="radiogroup" aria-label="Theme">
@@ -179,7 +197,7 @@ export function SettingsView({ section }: { section?: string }) {
         </label>
       </section>
 
-      <section className="panel">
+      <section className="panel" id="settings-startup">
         <h2>Startup & reminders</h2>
         <label className="setting-row check">
           <input type="checkbox" checked={autostart} onChange={toggleAuto} disabled={!isTauri} />
@@ -189,7 +207,7 @@ export function SettingsView({ section }: { section?: string }) {
         <button onClick={() => notifyReminder("keel-test", "Test reminder", "Keel notifications are working")}>Send a test notification</button>
       </section>
 
-      <section className="panel">
+      <section className="panel" id="settings-shortcuts">
         <h2>Shortcuts</h2>
         <table className="table keys">
           <tbody>

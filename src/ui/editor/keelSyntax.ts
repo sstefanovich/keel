@@ -4,6 +4,7 @@ import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirr
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { addDays, today } from "../../core/dates";
+import { flowItems } from "../../core/parse";
 import { mountMermaid } from "../mermaid";
 import { currentTheme } from "../theme";
 import type { WorkTarget } from "../workTargets";
@@ -242,9 +243,19 @@ class MermaidWidget extends WidgetType {
   eq(other: MermaidWidget) {
     return other.code === this.code && other.theme === this.theme;
   }
-  toDOM() {
+  toDOM(view: EditorView) {
     const el = document.createElement("div");
     mountMermaid(el, this.code);
+    // when the code is hidden, clicking the diagram opens it for editing
+    el.addEventListener("mousedown", (e) => {
+      const pos = view.posAtDOM(el);
+      const line = view.state.doc.lineAt(pos);
+      // only while it stands in for the code (then it sits at the opening ```mermaid line)
+      if (!/^\s*(?:```|~~~)\s*mermaid/i.test(line.text) || line.number >= view.state.doc.lines) return;
+      e.preventDefault();
+      view.dispatch({ selection: { anchor: view.state.doc.line(line.number + 1).from } });
+      view.focus();
+    });
     return el;
   }
   ignoreEvent() {
@@ -255,15 +266,20 @@ class MermaidWidget extends WidgetType {
 function mermaidBlocks(state: EditorState): DecorationSet {
   const b = new RangeSetBuilder<Decoration>();
   const doc = state.doc;
-  let fence: { mermaid: boolean; code: string[] } | null = null;
+  let fence: { mermaid: boolean; code: string[]; from: number } | null = null;
   for (let n = 1; n <= doc.lines; n++) {
     const line = doc.line(n);
     const f = line.text.match(/^\s*(?:```|~~~)\s*([\w-]*)/);
     if (f) {
-      if (!fence) fence = { mermaid: f[1].toLowerCase() === "mermaid", code: [] };
+      if (!fence) fence = { mermaid: f[1].toLowerCase() === "mermaid", code: [], from: line.from };
       else {
         if (fence.mermaid && fence.code.join("").trim()) {
-          b.add(line.to, line.to, Decoration.widget({ widget: new MermaidWidget(fence.code.join("\n")), block: true, side: 1 }));
+          const widget = new MermaidWidget(fence.code.join("\n"));
+          const { from } = fence;
+          const editing = state.selection.ranges.some((r) => r.to >= from && r.from <= line.to);
+          // editing: the code with the diagram under it; otherwise just the diagram
+          if (editing) b.add(line.to, line.to, Decoration.widget({ widget, block: true, side: 1 }));
+          else b.add(from, line.to, Decoration.replace({ widget, block: true }));
         }
         fence = null;
       }
@@ -272,10 +288,10 @@ function mermaidBlocks(state: EditorState): DecorationSet {
   return b.finish();
 }
 
-/** Renders each ```mermaid block as a diagram just below it. */
+/** Renders each ```mermaid block as its diagram; the code shows (above it) while the cursor is in the block. */
 export const mermaidPreview = StateField.define<DecorationSet>({
   create: (state) => mermaidBlocks(state),
-  update: (deco, tr) => (tr.docChanged || tr.effects.some((e) => e.is(refreshMermaid)) ? mermaidBlocks(tr.state) : deco),
+  update: (deco, tr) => (tr.docChanged || tr.selection || tr.effects.some((e) => e.is(refreshMermaid)) ? mermaidBlocks(tr.state) : deco),
   provide: (f) => EditorView.decorations.from(f),
 });
 
@@ -293,8 +309,17 @@ function frontmatterRange(state: EditorState): { from: number; to: number; lines
   return null;
 }
 
+/** What the properties bar can show for a value: a display name, and where clicking it goes. */
+export interface PropertyLookup {
+  /** For `project:` / `client:` values: their name and a way to open them */
+  resolve: (key: string, value: string) => { label: string; open?: () => void } | null;
+}
+
 class PropertiesWidget extends WidgetType {
-  constructor(readonly lines: string[]) {
+  constructor(
+    readonly lines: string[],
+    readonly lookup: PropertyLookup,
+  ) {
     super();
   }
   eq(other: PropertiesWidget) {
@@ -319,10 +344,26 @@ class PropertiesWidget extends WidgetType {
       const k = document.createElement("span");
       k.className = "cm-k-prop-key";
       k.textContent = key;
-      const v = document.createElement("span");
-      v.className = "cm-k-prop-val";
-      v.textContent = raw.trim().replace(/^["']|["']$/g, "").replace(/^\[(.*)\]$/, "$1");
-      chip.append(k, v);
+      chip.append(k);
+      const value = raw.trim();
+      const items = /^\[.*\]$/.test(value) ? flowItems(value) : [value.replace(/^["'](.*)["']$/, "$1")];
+      for (const item of items) {
+        const v = document.createElement("span");
+        v.className = "cm-k-prop-val";
+        const found = this.lookup.resolve(key, item);
+        v.textContent = found?.label ?? item;
+        if (found?.open) {
+          const open = found.open;
+          v.classList.add("link");
+          v.title = `Open ${found.label}`;
+          v.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            open();
+          });
+        }
+        chip.append(v);
+      }
       box.append(chip);
     }
     box.addEventListener("mousedown", (e) => {
@@ -339,18 +380,23 @@ class PropertiesWidget extends WidgetType {
   }
 }
 
-function propertiesDecorations(state: EditorState): DecorationSet {
+function propertiesDecorations(state: EditorState, lookup: PropertyLookup): DecorationSet {
   const fm = frontmatterRange(state);
   if (!fm) return Decoration.none;
   // while the cursor is inside the block, show it raw for editing
   const inside = state.selection.ranges.some((r) => r.to >= fm.from && r.from <= fm.to);
   if (inside) return Decoration.none;
-  return Decoration.set([Decoration.replace({ widget: new PropertiesWidget(fm.lines), block: true }).range(fm.from, fm.to)]);
+  // a log's "date:" only repeats its header: hide the bar (moving the cursor up still reveals it)
+  const keys = fm.lines.map((l) => l.match(/^([\w-]+):\s*\S/)?.[1]).filter(Boolean);
+  if (keys.length && keys.every((k) => k === "date")) return Decoration.set([Decoration.replace({ block: true }).range(fm.from, fm.to)]);
+  return Decoration.set([Decoration.replace({ widget: new PropertiesWidget(fm.lines, lookup), block: true }).range(fm.from, fm.to)]);
 }
 
 /** Shows the frontmatter as a compact row of property chips unless the cursor is in it. */
-export const propertiesView = StateField.define<DecorationSet>({
-  create: (state) => propertiesDecorations(state),
-  update: (deco, tr) => (tr.docChanged || tr.selection ? propertiesDecorations(tr.state) : deco),
-  provide: (f) => EditorView.decorations.from(f),
-});
+export function propertiesView(lookup: PropertyLookup) {
+  return StateField.define<DecorationSet>({
+    create: (state) => propertiesDecorations(state, lookup),
+    update: (deco, tr) => (tr.docChanged || tr.selection ? propertiesDecorations(tr.state, lookup) : deco),
+    provide: (f) => EditorView.decorations.from(f),
+  });
+}

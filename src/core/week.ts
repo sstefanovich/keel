@@ -127,8 +127,10 @@ export type WeekIssue =
 
 export interface WeekCheck {
   issues: WeekIssue[];
-  /** Working days still ahead (after today) */
+  /** Working days still ahead, today included until it reaches the target */
   daysLeft: number;
+  /** Today, while it's a working day under the target: in progress, not a problem yet */
+  today?: { hours: number; target: number };
   /** Nothing missing so far and no working days left: ready to enter into the timesheet system */
   ready: boolean;
 }
@@ -140,6 +142,7 @@ export interface WeekCheck {
 export function checkWeek(w: Week, target: DayTarget, today: ISODate): WeekCheck {
   const issues: WeekIssue[] = [];
   let daysLeft = 0;
+  let inProgress: WeekCheck["today"];
   w.days.forEach((d, i) => {
     const working = target.workdays.includes(new Date(`${d}T12:00:00`).getDay());
     if (d > today) {
@@ -147,11 +150,17 @@ export function checkWeek(w: Week, target: DayTarget, today: ISODate): WeekCheck
       return;
     }
     const total = round2(w.dayTotals[i]);
+    // today isn't finished: under the target it's still in progress, and its gaps can wait
+    if (d === today && working && target.hours > 0 && total < target.hours) {
+      daysLeft++;
+      inProgress = { hours: total, target: target.hours };
+      return;
+    }
     if (target.hours > 0 && working && total < target.hours) issues.push({ kind: "short", day: i, hours: total, target: target.hours });
     for (const r of w.rows) {
       if (r.items[i].length && !r.hours[i]) issues.push({ kind: "no-hours", day: i, row: r });
       if (r.hours[i] && !r.items[i].length) issues.push({ kind: "no-items", day: i, row: r });
     }
   });
-  return { issues, daysLeft, ready: !issues.length && daysLeft === 0 };
+  return { issues, daysLeft, today: inProgress, ready: !issues.length && daysLeft === 0 };
 }

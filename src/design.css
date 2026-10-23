@@ -2270,3 +2270,133 @@ button.briefing-label {
   background: var(--hover);
   color: var(--accent);
 }
+
+/* ---------- polish: calendar cell badges never break inside ---------- */
+
+.cal-tag {
+  white-space: nowrap;
+}
+.calendar-page .cal-top {
+  flex-wrap: wrap;
+  row-gap: 3px;
+}
+.calendar-page .cal-top .cal-marks {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+/* ---------- polish: task tokens as chips (live preview, off the cursor line) ---------- */
+
+.cm-lp-token {
+  display: inline-block;
+  margin: 0 1px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.78em;
+  line-height: 1.55;
+  vertical-align: 1px;
+  white-space: nowrap;
+  background: var(--code-bg);
+  color: var(--text-2);
+  font-family: var(--font);
+}
+.cm-lp-token.due {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.cm-lp-token.due.soon {
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  color: var(--warn);
+}
+.cm-lp-token.due.late {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.cm-lp-token.waiting {
+  background: var(--tag-soft);
+  color: var(--tag);
+}
+.cm-lp-token.remind {
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  color: var(--warn);
+}
+.cm-lp-token.project {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.cm-lp-token.done {
+  background: none;
+  color: var(--muted);
+  padding: 0 2px;
+}
+.chip.chip-project {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ---------- polish: properties bar values ---------- */
+
+.cm-k-prop-val + .cm-k-prop-val {
+  border-left: 1px solid var(--border);
+}
+.cm-k-prop-val.link {
+  color: var(--accent);
+  cursor: pointer;
+}
+.cm-k-prop-val.link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- polish: link rows on charts ---------- */
+
+.chart-value.chart-link {
+  font-family: var(--font);
+  color: var(--accent);
+  display: inline-flex;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.chart-link-host {
+  font-weight: 600;
+  flex: none;
+}
+.chart-link-path {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.chart-value.chart-link:hover .chart-link-path {
+  color: var(--accent);
+}
+
+/* ---------- polish: settings section links ---------- */
+
+.settings-nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: -6px 0 14px;
+  padding: 8px 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.settings-page .panel {
+  scroll-margin-top: 52px;
+}
+
+/* ---------- polish: every page starts at the same left edge as the text column ---------- */
+
+.page {
+  margin: 0;
+  padding-left: 40px;
+  padding-right: 40px;
+}

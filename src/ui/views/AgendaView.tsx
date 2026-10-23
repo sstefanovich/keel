@@ -69,7 +69,7 @@ export function AgendaView() {
       <div className="grid-2">
         <Section title="Today" count={a.today.length}>
           {a.today.length ? (
-            <ul className="tasks">{a.today.map((t) => <TaskRow key={t.file + t.line} task={t} />)}</ul>
+            <ul className="tasks">{a.today.map((t) => <TaskRow key={t.file + t.line} task={t} inToday />)}</ul>
           ) : (
             <EmptyState compact icon={CircleCheck} title="Nothing on for today.">
               <button className="link" onClick={(e) => nav.openToday(openOpts(e))}>
@@ -103,7 +103,7 @@ export function AgendaView() {
           groupBy(a.upcoming, (t: Task) => t.due!).map(([due, tasks]) => (
             <div key={due} className="group">
               <h3>{formatShort(due)}</h3>
-              <ul className="tasks">{tasks.map((t) => <TaskRow key={t.file + t.line} task={t} />)}</ul>
+              <ul className="tasks">{tasks.map((t) => <TaskRow key={t.file + t.line} task={t} showDue={false} />)}</ul>
             </div>
           ))
         ) : (

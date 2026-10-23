@@ -48,6 +48,12 @@ export function Editor({ path, line, onOpenLink, onStatus }: Props) {
   const previewOpts: LivePreviewOptions = {
     open: (target, newTab) => linkRef.current(target, newTab),
     exists: (target) => !!hold.resolveLink(target),
+    label: (key) => {
+      const [c, p] = key.split("/");
+      const proj = hold.projectByKey(p ?? c);
+      if (proj) return proj.title;
+      return hold.clients().get(c)?.name ?? null;
+    },
   };
   linkRef.current = onOpenLink;
 
@@ -90,7 +96,20 @@ export function Editor({ path, line, onOpenLink, onStatus }: Props) {
           syntaxHighlighting(keelHighlight),
           keelDecorations,
           mermaidPreview,
-          propertiesView,
+          propertiesView({
+            resolve: (key, value) => {
+              const v = value.replace(/^@/, "");
+              if (key === "project") {
+                const p = hold.projectByKey(v.includes("/") ? v.split("/")[1] : v);
+                return p ? { label: p.title, open: () => linkRef.current(basename(p.path)) } : null;
+              }
+              if (key === "client") {
+                const c = hold.clients().get(v.split("/")[0].toLowerCase());
+                return c ? { label: c.name, open: c.path ? () => linkRef.current(basename(c.path!)) : undefined } : null;
+              }
+              return null;
+            },
+          }),
           keelClicks((t) => linkRef.current(t)),
           foldGutter({ openText: "▾", closedText: "▸" }),
           pasteAndImages({

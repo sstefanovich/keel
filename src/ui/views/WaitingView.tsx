@@ -1,5 +1,5 @@
 import { formatShort, parseISO, today } from "../../core/dates";
-import { Task } from "../../core/parse";
+import { Task, taskLabel } from "../../core/parse";
 import { copyText } from "../../lib/platform";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
@@ -8,8 +8,8 @@ import { EmptyState } from "../EmptyState";
 
 const days = (since?: string) => (since ? Math.max(0, Math.round((parseISO(today()).getTime() - parseISO(since).getTime()) / 86_400_000)) : 0);
 
-/** "Jordan: firewall rules" → "firewall rules" when Jordan is the person waited on */
-const what = (t: Task) => (t.waiting && t.text.startsWith(`${t.waiting}:`) ? t.text.slice(t.waiting.length + 1).trim() : t.text);
+/** "Jordan: firewall rules" / "firewall rules @Jordan" → "firewall rules" (they're listed under Jordan) */
+const what = (t: Task) => taskLabel(t);
 
 export function WaitingView() {
   const { hold, bump, reportError, toast, focus } = useHold();

@@ -252,10 +252,14 @@ function WeekCheckBar({ check, days, total, onOpen }: { check: WeekCheck; days: 
       </p>
     );
   }
+  const soFar = check.today ? ` · today ${cell(check.today.hours) || 0}h of ${check.today.target}h so far` : "";
+  const left = check.daysLeft - (check.today ? 1 : 0);
+  const ahead = left > 0 ? ` · ${left} more working day${left === 1 ? "" : "s"} to go` : "";
   if (!check.issues.length) {
     return (
       <p className="week-check ok" role="status">
-        <CircleCheck size={15} aria-hidden="true" /> On track so far · {check.daysLeft} working day{check.daysLeft === 1 ? "" : "s"} to go
+        <CircleCheck size={15} aria-hidden="true" /> On track{soFar}
+        {ahead}
       </p>
     );
   }
@@ -274,7 +278,12 @@ function WeekCheckBar({ check, days, total, onOpen }: { check: WeekCheck; days: 
     <section className="week-check issues" aria-label="Gaps in this week">
       <h2>
         <TriangleAlert size={15} aria-hidden="true" /> {check.issues.length} thing{check.issues.length === 1 ? "" : "s"} to fix before submitting
-        {check.daysLeft > 0 && <span className="muted small"> · {check.daysLeft} working day{check.daysLeft === 1 ? "" : "s"} to go</span>}
+        {(soFar || ahead) && (
+          <span className="muted small">
+            {soFar}
+            {ahead}
+          </span>
+        )}
       </h2>
       <ul>
         {shown.map((x, i) => (

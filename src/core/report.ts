@@ -1,6 +1,6 @@
 import { ISODate, addDays, formatShort, parseISO, today } from "./dates";
 import { Client, ClientTotal, Hold, round2 } from "./hold";
-import { ParsedFile, Task } from "./parse";
+import { ParsedFile, Task, taskLabel } from "./parse";
 
 /** A client status update ("Dispatch") for a date range, built from the hold. */
 export interface StatusReport {
@@ -41,16 +41,9 @@ export function buildReport(hold: Hold, clientKey: string, from: ISODate, to: IS
   };
 }
 
-/** Task text without the #tags used only to file it under a client. */
-function clean(t: Task, r: StatusReport): string {
-  const key = r.client.key;
-  return t.text
-    .replace(/(^|\s)#([\w/-]+)/g, (m, sp: string, tag: string) => {
-      const lower = tag.toLowerCase();
-      return lower === key || lower.startsWith(`${key}/`) ? sp : m;
-    })
-    .replace(/\s{2,}/g, " ")
-    .trim();
+/** Task text for the report: no #tags (they only file it) and no @Name of who it waits on. */
+function clean(t: Task, _r: StatusReport): string {
+  return taskLabel(t);
 }
 
 function daysSince(d: ISODate | undefined, to: ISODate): number {
@@ -58,7 +51,7 @@ function daysSince(d: ISODate | undefined, to: ISODate): number {
   return Math.max(0, Math.round((parseISO(to).getTime() - parseISO(d).getTime()) / 86_400_000));
 }
 
-const waitingText = (t: Task) => (t.waiting && t.text.startsWith(`${t.waiting}:`) ? t.text.slice(t.waiting.length + 1).trim() : t.text);
+const waitingText = (t: Task) => taskLabel(t);
 
 interface Section {
   title: string;

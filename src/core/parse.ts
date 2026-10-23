@@ -367,6 +367,53 @@ export function parseChartItem(text: string): { label?: string; value: string; u
 }
 
 /** Level 2+ headings in document order (outside code fences). */
+/**
+ * A task as shown in lists: no #tags (they're shown as chips), and no "Jordan:" prefix or @Jordan
+ * when Jordan is the person it waits on (lists already group or label by person).
+ */
+export function taskLabel(t: Task): string {
+  let s = t.text.replace(/(^|\s)#[\w/-]+/g, "$1");
+  if (t.waiting) {
+    if (s.startsWith(`${t.waiting}:`)) s = s.slice(t.waiting.length + 1);
+    s = s.replace(new RegExp(`(^|\\s)@${t.waiting.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=$|[\\s,;:!?)])`), "$1");
+  }
+  return s.replace(/\s{2,}/g, " ").trim() || t.text;
+}
+
+/** `["Jordan Lee", "Sam Patel"]` / `[a, b]` → the items, quotes removed. */
+export function flowItems(raw: string): string[] {
+  const inner = raw.trim().replace(/^\[(.*)\]$/, "$1");
+  const out: string[] = [];
+  let cur = "";
+  let quote: string | null = null;
+  for (const c of inner) {
+    if (quote) {
+      if (c === quote) quote = null;
+      else cur += c;
+    } else if (c === '"' || c === "'") quote = c;
+    else if (c === ",") {
+      out.push(cur.trim());
+      cur = "";
+    } else cur += c;
+  }
+  out.push(cur.trim());
+  return out.filter(Boolean);
+}
+
+/** One markdown line made readable (search snippets): no list/heading marks, tokens spelled out. */
+export function readableLine(line: string, fmtDate: (iso: string) => string = (d) => d): string {
+  return line
+    .replace(/^\s*(?:[-*+]|\d+\.)\s+\[([ xX>\-])\]\s+/, (_, c: string) => (/[xX]/.test(c) ? "☑ " : c === " " ? "☐ " : ""))
+    .replace(/^\s*(?:[-*+]|\d+\.)\s+/, "")
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/@due\((\d{4}-\d{2}-\d{2})\)/g, (_, d: string) => `· due ${fmtDate(d)}`)
+    .replace(/@remind\(([^)]*)\)/g, "· remind $1")
+    .replace(/@waiting\(([^)]*)\)/g, "· waiting on $1")
+    .replace(/@(?:since|done)\([^)]*\)/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /** Headings (# to ######) with their level and 0-based line, outside code blocks and frontmatter. */
 export function outlineOf(content: string): { level: number; text: string; line: number }[] {
   const out: { level: number; text: string; line: number }[] = [];

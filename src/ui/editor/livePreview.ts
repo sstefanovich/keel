@@ -96,6 +96,75 @@ class WikiLinkWidget extends WidgetType {
   }
 }
 
+/** A task token (@due, @remind, @waiting, #project…) drawn as a small labelled chip. */
+class TokenWidget extends WidgetType {
+  constructor(
+    readonly text: string,
+    readonly kind: string,
+    readonly title: string,
+  ) {
+    super();
+  }
+  eq(o: TokenWidget) {
+    return o.text === this.text && o.kind === this.kind;
+  }
+  toDOM() {
+    const el = document.createElement("span");
+    el.className = `cm-lp-token ${this.kind}`;
+    el.textContent = this.text;
+    el.title = this.title;
+    return el;
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
+const TOKEN = /(?<=^|\s)(?:@(due|remind|waiting|since|done)(?:\(([^)]*)\))?|@([A-Z][\w.'-]*[\w])|#([\w/-]+)|@([a-z0-9][\w.-]*(?:\/[\w.-]+)?))(?=$|[\s,;:!?)])/g;
+const TASK_OR_WORK = /^\s*[-*+] (?:\[[ xX>\-]\] |\d|@)/;
+
+function shortDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function clock(t: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t);
+  if (!m) return t;
+  return new Date(2000, 0, 1, Number(m[1]), Number(m[2])).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/** The chip for one token on a task or work line, or null to leave it as typed. */
+function tokenChip(m: RegExpMatchArray, done: boolean, opts: LivePreviewOptions): Decoration | null {
+  const [raw, kw, arg, person, tag, key] = m;
+  const chip = (text: string, kind: string) => Decoration.replace({ widget: new TokenWidget(text, kind, raw) });
+  const t = today();
+  switch (kw) {
+    case "due":
+      if (!arg || !/^\d{4}-\d{2}-\d{2}$/.test(arg)) return null;
+      if (done) return chip(`due ${shortDate(arg)}`, "due");
+      return arg < t ? chip(`overdue · ${shortDate(arg)}`, "due late") : chip(arg === t ? "due today" : `due ${shortDate(arg)}`, arg === t ? "due soon" : "due");
+    case "remind":
+      return arg ? chip(`🔔 ${arg.replace(/\d{1,2}:\d{2}/, clock)}`, "remind") : null;
+    case "waiting":
+      return chip(`⏳ ${arg?.trim() || "waiting"}`, "waiting");
+    case "since":
+      return Decoration.replace({}); // bookkeeping only
+    case "done":
+      return arg ? chip(`✓ ${shortDate(arg)}`, "done") : null;
+  }
+  if (person) return chip(`⏳ ${person}`, "waiting");
+  if (tag) {
+    const name = opts.label?.(tag.toLowerCase());
+    return name ? chip(name, "project") : null;
+  }
+  if (key) {
+    const name = opts.label?.(key.toLowerCase());
+    return name ? chip(name, "project") : null;
+  }
+  return null;
+}
+
 function frontmatterEnd(state: EditorState): number {
   const doc = state.doc;
   if (doc.lines < 2 || doc.line(1).text.trim() !== "---") return -1;
@@ -147,6 +216,19 @@ function build(view: EditorView, opts: LivePreviewOptions): DecorationSet {
         const target = m[1].trim();
         add(s, s + m[0].length, Decoration.replace({ widget: new WikiLinkWidget(target, (m[2] ?? target).trim(), opts.exists(target), opts.open) }));
       }
+      // tokens on task and work lines as chips (not inside `code`)
+      if (TASK_OR_WORK.test(line.text) || /^\s+[-*+] /.test(line.text)) {
+        const masked = line.text.replace(/`[^`]*`/g, (c) => " ".repeat(c.length));
+        const done = /^\s*[-*+] \[[xX]\]/.test(line.text);
+        for (const m of masked.matchAll(TOKEN)) {
+          const d = tokenChip(m, done, opts);
+          if (!d) continue;
+          const s = line.from + m.index!;
+          // a hidden @since takes its leading space with it
+          const from = m[1] === "since" && line.text[m.index! - 1] === " " ? s - 1 : s;
+          add(from, s + m[0].length, d);
+        }
+      }
     }
 
     // syntax-tree based: heading marks, emphasis, inline code, markdown links
@@ -187,6 +269,8 @@ export interface LivePreviewOptions {
   open: (target: string, newTab: boolean) => void;
   /** Whether a [[link]] target exists (missing ones are styled differently) */
   exists: (target: string) => boolean;
+  /** A project or client key's display name ("flis-retain-pa" → "FLIS Retain PA"), or null */
+  label?: (key: string) => string | null;
 }
 
 export function livePreview(opts: LivePreviewOptions) {

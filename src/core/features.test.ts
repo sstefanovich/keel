@@ -119,8 +119,7 @@ describe("week check", () => {
     });
     const week = buildWeek(hold, "2026-10-17");
     const target = { hours: 8, workdays: [1, 2, 3, 4, 5] };
-    const mid = checkWeek(week, target, "2026-10-22");
-    expect(mid.daysLeft).toBe(1);
+    const mid = checkWeek(week, target, "2026-10-23");
     expect(mid.ready).toBe(false);
     expect(mid.issues.map((x) => `${x.kind}@${week.days[x.day]}`)).toEqual([
       "short@2026-10-20",
@@ -128,6 +127,13 @@ describe("week check", () => {
       "short@2026-10-22",
       "no-hours@2026-10-22",
     ]);
+    // today (Friday, nothing logged yet) is in progress, not a problem
+    expect(mid.today).toEqual({ hours: 0, target: 8 });
+    expect(mid.daysLeft).toBe(1);
+    // seen on Thursday, Thursday's own gaps wait until the day is done
+    const thu = checkWeek(week, target, "2026-10-22");
+    expect(thu.issues.map((x) => `${x.kind}@${week.days[x.day]}`)).toEqual(["short@2026-10-20", "no-items@2026-10-21"]);
+    expect(thu.daysLeft).toBe(2);
     // weekends aren't expected; a target of 0 turns the hours check off
     expect(checkWeek(week, { ...target, hours: 0 }, "2026-10-22").issues.every((x) => x.kind !== "short")).toBe(true);
   });
@@ -234,5 +240,25 @@ describe("outline and attachments", () => {
     const d = new Date(2026, 9, 23, 14, 5, 9);
     expect(attachmentName(d, "png")).toBe("attachments/2026-10-23-140509.png");
     expect(attachmentName(d, "jpg", 2)).toBe("attachments/2026-10-23-140509-2.jpg");
+  });
+});
+
+describe("display text", () => {
+  it("task labels drop tags and the person waited on", async () => {
+    const { taskLabel, readableLine } = await import("./parse");
+    const task = (text: string, waiting?: string) => ({ text, waiting }) as Parameters<typeof taskLabel>[0];
+    expect(taskLabel(task("Update the ADR #flis-retain-pa"))).toBe("Update the ADR");
+    expect(taskLabel(task("Cost model for cool tier @Sam", "Sam"))).toBe("Cost model for cool tier");
+    expect(taskLabel(task("Jordan: firewall rules", "Jordan"))).toBe("firewall rules");
+    expect(taskLabel(task("#only-tags"))).toBe("#only-tags");
+    expect(readableLine("- [ ] Update the ADR @due(2026-10-27) @since(2026-10-20)", () => "Oct 27")).toBe("☐ Update the ADR · due Oct 27");
+    expect(readableLine("  - [x] Shipped @done(2026-10-22)")).toBe("☑ Shipped");
+    expect(readableLine("## Decision")).toBe("Decision");
+  });
+
+  it("splits frontmatter lists", async () => {
+    const { flowItems } = await import("./parse");
+    expect(flowItems('["Lee, Jordan", "Sam Patel"]')).toEqual(["Lee, Jordan", "Sam Patel"]);
+    expect(flowItems("[a, b]")).toEqual(["a", "b"]);
   });
 });

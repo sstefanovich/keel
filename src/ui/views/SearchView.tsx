@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { addDays, today } from "../../core/dates";
+import { addDays, formatLong, formatShort, today } from "../../core/dates";
 import { SearchFilter } from "../../core/hold";
-import { FileKind, basename } from "../../core/parse";
+import { FileKind, basename, readableLine } from "../../core/parse";
 import { slugify } from "../../core/templates";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
@@ -61,6 +61,11 @@ export function SearchView({ initial = "" }: { initial?: string }) {
   const hits = hold.search(q, 200, filter);
   const filtered = type !== "all" || !!owner || when !== "any";
   const clients = [...hold.clients().values()].sort((a, b) => a.name.localeCompare(b.name));
+  // logs by their day ("Friday, October 23, 2026"), everything else by title
+  const titleOf = (path: string, title: string) => {
+    const f = hold.get(path);
+    return f?.kind === "log" && f.date ? formatLong(f.date) : title;
+  };
 
   const groups = new Map<string, typeof hits>();
   for (const h of hits) groups.set(h.path, [...(groups.get(h.path) ?? []), h]);
@@ -144,7 +149,7 @@ export function SearchView({ initial = "" }: { initial?: string }) {
         <section key={path} className="panel search-group">
           <h3>
             <button className="link" onClick={() => nav.openFile(path)}>
-              {hs[0].title}
+              {titleOf(path, hs[0].title)}
             </button>
             <span className="muted small"> {path}</span>
           </h3>
@@ -155,7 +160,7 @@ export function SearchView({ initial = "" }: { initial?: string }) {
               .map((h) => (
                 <li key={h.line}>
                   <button className="snippet" onClick={() => nav.openFile(h.path, h.line)}>
-                    {highlight(h.snippet, q.trim())}
+                    {highlight(readableLine(h.snippet, formatShort), q.trim())}
                   </button>
                 </li>
               ))}
