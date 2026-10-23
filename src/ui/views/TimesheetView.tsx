@@ -2,11 +2,12 @@ import { ReactNode, useState } from "react";
 import { ISODate, addDays, addMonths, endOfMonth, formatShort, startOfMonth, startOfWeek, today, weekdayOf } from "../../core/dates";
 import { round2 } from "../../core/hold";
 import { copyText, exportText } from "../../lib/platform";
-import { TaskListStyle, WeekRow, buildWeek, dayItems, rowReport, rowTsv, weekTsv } from "../../core/week";
+import { TaskListStyle, WeekCheck, WeekIssue, WeekRow, buildWeek, checkWeek, dayItems, rowReport, rowTsv, weekTsv } from "../../core/week";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 import { useWeekStart } from "../weekStart";
-import { Clock } from "lucide-react";
+import { useDayTarget } from "../dayTarget";
+import { CircleCheck, Clock, TriangleAlert } from "lucide-react";
 import { EmptyState } from "../EmptyState";
 
 type Preset = "this-week" | "last-week" | "this-month" | "last-month" | "this-year" | "custom";
@@ -239,6 +240,61 @@ export function TimesheetView() {
 
 const cell = (h: number) => (h ? String(round2(h)) : "");
 
+const MAX_ISSUES = 8;
+
+/** Above the week grid: ready to submit, on track, or the gaps to fill (each opens its day's log). */
+function WeekCheckBar({ check, days, total, onOpen }: { check: WeekCheck; days: ISODate[]; total: number; onOpen: (d: ISODate) => void }) {
+  const [all, setAll] = useState(false);
+  if (check.ready) {
+    return (
+      <p className="week-check ready" role="status">
+        <CircleCheck size={15} aria-hidden="true" /> Week ready to submit · {cell(total)}h, every day has hours and work listed
+      </p>
+    );
+  }
+  if (!check.issues.length) {
+    return (
+      <p className="week-check ok" role="status">
+        <CircleCheck size={15} aria-hidden="true" /> On track so far · {check.daysLeft} working day{check.daysLeft === 1 ? "" : "s"} to go
+      </p>
+    );
+  }
+  const text = (x: WeekIssue) => {
+    switch (x.kind) {
+      case "short":
+        return x.hours ? `${cell(x.hours)}h of ${x.target}h logged` : `no hours logged (${x.target}h expected)`;
+      case "no-hours":
+        return `${x.row.label}: work listed but no hours`;
+      case "no-items":
+        return `${x.row.label}: ${cell(x.row.hours[x.day])}h but nothing listed to report`;
+    }
+  };
+  const shown = all ? check.issues : check.issues.slice(0, MAX_ISSUES);
+  return (
+    <section className="week-check issues" aria-label="Gaps in this week">
+      <h2>
+        <TriangleAlert size={15} aria-hidden="true" /> {check.issues.length} thing{check.issues.length === 1 ? "" : "s"} to fix before submitting
+        {check.daysLeft > 0 && <span className="muted small"> · {check.daysLeft} working day{check.daysLeft === 1 ? "" : "s"} to go</span>}
+      </h2>
+      <ul>
+        {shown.map((x, i) => (
+          <li key={i}>
+            <button className="link" onClick={() => onOpen(days[x.day])}>
+              {formatShort(days[x.day])}
+            </button>{" "}
+            {text(x)}
+          </li>
+        ))}
+      </ul>
+      {check.issues.length > MAX_ISSUES && (
+        <button className="link small" onClick={() => setAll(!all)}>
+          {all ? "Show fewer" : `Show all ${check.issues.length}`}
+        </button>
+      )}
+    </section>
+  );
+}
+
 /** Projects × days grid for entering into a timesheet system, plus per-project daily reports. */
 function WeekSheet({ toggle }: { toggle: ReactNode }) {
   const { hold, toast, focus } = useHold();
@@ -249,6 +305,9 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
   const t = today();
   const week = buildWeek(hold, addDays(startOfWeek(t, weekStart), offset * 7), focus);
   const isWeekend = (d: string) => [0, 6].includes(weekdayOf(d));
+  const target = useDayTarget();
+  const check = checkWeek(week, target, t);
+  const shortDays = new Set(check.issues.filter((x) => x.kind === "short").map((x) => x.day));
 
   const [style, setStyleState] = useState<TaskListStyle>(() => {
     try {
@@ -331,6 +390,7 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
         </EmptyState>
       ) : (
         <>
+          <WeekCheckBar check={check} days={week.days} total={week.total} onOpen={(d) => nav.openLog(d)} />
           <section className="panel week-grid-panel">
             <table className="table week-grid">
               <thead>
@@ -396,8 +456,12 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
                 <tr>
                   <td>Total</td>
                   {week.dayTotals.map((h, i) => (
-                    <td key={i} className={`num${isWeekend(week.days[i]) ? " weekend" : ""}`}>
-                      {cell(h)}
+                    <td
+                      key={i}
+                      className={`num${isWeekend(week.days[i]) ? " weekend" : ""}${shortDays.has(i) ? " short" : ""}`}
+                      title={shortDays.has(i) ? `Under the ${target.hours}h daily target` : undefined}
+                    >
+                      {cell(h) || (shortDays.has(i) ? "0" : "")}
                     </td>
                   ))}
                   <td className="num week-total">{cell(week.total)}</td>

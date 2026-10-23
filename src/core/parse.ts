@@ -118,6 +118,8 @@ const BULLET_RE = /^\s*[-*+]\s+(.*)$/;
 const DUE_RE = /@due\((\d{4}-\d{2}-\d{2})\)/;
 const REMIND_RE = /@remind\(([^)]*)\)/;
 const WAITING_RE = /@waiting(?:\(([^)]*)\))?/;
+/** A capitalised @Name on a task is the person it's waiting on (client and project keys are lowercase) */
+const OWNER_RE = /(?:^|\s)@([A-Z][\w.'-]*[\w])(?=$|[\s,;:!?)])/;
 const SINCE_RE = /@since\((\d{4}-\d{2}-\d{2})\)/;
 const DONE_RE = /@done\((\d{4}-\d{2}-\d{2})\)/;
 const TAG_RE = /(?:^|\s)#([A-Za-z][\w/-]*)/g;
@@ -277,7 +279,8 @@ export function parseFile(path: string, content: string, mtime = 0): ParsedFile 
         due: isISODate(due) ? due : undefined,
         remind,
         tags: tagsIn(tokens),
-        waiting: w ? (w[1]?.trim() || text.match(/^([^:]{1,40}):\s/)?.[1].trim() || "") : undefined,
+        // explicit @waiting(Name), else a person named on the task ("send the deck @Jordan")
+        waiting: w ? (w[1]?.trim() || text.match(/^([^:]{1,40}):\s/)?.[1].trim() || "") : tokens.match(OWNER_RE)?.[1],
         since: isISODate(since) ? since : date,
         doneOn: isISODate(doneOn) ? doneOn : undefined,
       };

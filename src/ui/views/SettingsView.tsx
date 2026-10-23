@@ -7,15 +7,19 @@ import { ClientsManager } from "../ClientsManager";
 import { CalendarSettings } from "../CalendarSettings";
 import { WEEKDAY_NAMES } from "../../core/dates";
 import { setWeekStart, useWeekStart } from "../weekStart";
+import { setDayTarget, useDayTarget } from "../dayTarget";
+import { setHistoryEnabled, snapshotNow, useHistory } from "../history";
 import { livePreviewEnabled, setLivePreview } from "../editor/livePreview";
 import { setEditorWidth, useEditorWidth } from "../editorWidth";
 
 export function SettingsView({ section }: { section?: string }) {
-  const { dir, reportError } = useHold();
+  const { dir, reportError, toast } = useHold();
   const nav = useNav();
   const [autostart, setAuto] = useState(false);
   const { pref, theme, setPref } = useTheme();
   const weekStart = useWeekStart();
+  const target = useDayTarget();
+  const history = useHistory();
   const [preview, setPreview] = useState(livePreviewEnabled);
   const width = useEditorWidth();
 
@@ -60,6 +64,26 @@ export function SettingsView({ section }: { section?: string }) {
         </div>
       </section>
 
+      <section className="panel" id="settings-history">
+        <h2>File history</h2>
+        <label className="setting-row check">
+          <input type="checkbox" checked={history.enabled} onChange={(e) => setHistoryEnabled(e.target.checked)} disabled={!isTauri} />
+          Keep a history of every file: Keel saves a snapshot of whatever changed every 10 minutes
+        </label>
+        <p className="muted">
+          Use <b>History</b> at the top of any file to see earlier versions and restore one. Snapshots are kept in a hidden <code>.git</code> folder inside
+          your Hold, only on this computer; nothing is uploaded. If your Hold is already a git repository, Keel adds its snapshots to it.
+        </p>
+        <div className="setting-row">
+          <button onClick={async () => toast((await snapshotNow("Snapshot from Settings")) ? "Snapshot saved" : "Nothing changed since the last snapshot")} disabled={!isTauri || history.busy}>
+            Save a snapshot now
+          </button>
+          <span className={`small ${history.error ? "error-text" : "muted"}`}>
+            {history.error ?? (history.last ? `Last checked ${new Date(history.last).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}` : "")}
+          </span>
+        </div>
+      </section>
+
       <section className="panel" id="settings-clients">
         <h2>Clients & projects</h2>
         <ClientsManager />
@@ -85,6 +109,38 @@ export function SettingsView({ section }: { section?: string }) {
             {WEEKDAY_NAMES[weekStart]} – {WEEKDAY_NAMES[(weekStart + 6) % 7]}, used by the Timesheet and Dispatch
           </span>
         </label>
+        <div className="setting-row">
+          <label className="check-inline">
+            Expect
+            <input
+              type="number"
+              min="0"
+              max="24"
+              step="0.5"
+              className="num-input"
+              value={target.hours}
+              onChange={(e) => setDayTarget({ ...target, hours: Math.max(0, Math.min(24, Number(e.target.value) || 0)) })}
+              aria-label="Hours expected per working day"
+            />
+            hours on
+          </label>
+          <div className="seg days" role="group" aria-label="Working days">
+            {WEEKDAY_NAMES.map((n, i) => {
+              const on = target.workdays.includes(i);
+              return (
+                <button
+                  key={n}
+                  aria-pressed={on}
+                  className={on ? "on" : ""}
+                  onClick={() => setDayTarget({ ...target, workdays: on ? target.workdays.filter((d) => d !== i) : [...target.workdays, i].sort() })}
+                >
+                  {n.slice(0, 3)}
+                </button>
+              );
+            })}
+          </div>
+          <span className="muted small">{target.hours ? "The Timesheet flags working days under this" : "Daily target check is off"}</span>
+        </div>
       </section>
 
       <section className="panel">

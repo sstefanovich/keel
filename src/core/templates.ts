@@ -1,20 +1,10 @@
 import { ISODate, formatLong, hhmm, parseISO } from "./dates";
 import { yamlScalar } from "./parse";
 
-export const DEFAULT_TEMPLATES: Record<string, string> = {
-  "templates/log.md": `---
-date: {{date}}
----
-# {{dateLong}}
-
-## Tasks
-
-## Work
-
-## Log
-
-`,
-  "templates/meeting.md": `---
+/** Earlier default templates: a hold file still exactly like one of these is upgraded to the current default. */
+export const OLD_TEMPLATES: Record<string, string[]> = {
+  "templates/meeting.md": [
+    `---
 title: {{title}}
 date: {{date}}
 time: "{{time}}"
@@ -29,6 +19,39 @@ attendees: []
 
 ## Action items
 
+`,
+  ],
+};
+
+export const DEFAULT_TEMPLATES: Record<string, string> = {
+  "templates/log.md": `---
+date: {{date}}
+---
+# {{dateLong}}
+
+## Tasks
+
+## Work
+
+## Log
+
+`,
+  // ${""} keeps the space after "- [ ]" (editors strip trailing spaces), so typing starts the first action item
+  "templates/meeting.md": `---
+title: {{title}}
+date: {{date}}
+time: "{{time}}"
+client:
+attendees: []
+---
+# {{title}}
+
+## Agenda
+
+## Notes
+
+## Action items
+- [ ] ${""}
 `,
   "templates/note.md": `---
 created: {{date}}

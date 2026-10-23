@@ -1,4 +1,5 @@
 mod calendar;
+mod history;
 mod hold;
 mod pty;
 
@@ -190,6 +191,9 @@ pub fn run() {
             calendar::calendar_fetch,
             calendar::calendar_cached,
             calendar::calendar_forget,
+            history::history_snapshot,
+            history::history_versions,
+            history::history_read,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Keel");

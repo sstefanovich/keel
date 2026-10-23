@@ -1,4 +1,4 @@
-import { CLAUDE_GUIDE } from "./claudeGuide";
+import { CLAUDE_GUIDE, PREVIOUS_GUIDES } from "./claudeGuide";
 import { ISODate, addDays, hhmm, today as todayISO } from "./dates";
 import { HoldFs } from "./fs";
 import {
@@ -18,7 +18,7 @@ import {
   yamlScalar,
 } from "./parse";
 import { occursOn } from "./schedule";
-import { DEFAULT_REMINDERS, DEFAULT_TEMPLATES, WELCOME_NOTE, fillTemplate, safeFileName, slugify } from "./templates";
+import { DEFAULT_REMINDERS, DEFAULT_TEMPLATES, OLD_TEMPLATES, WELCOME_NOTE, fillTemplate, safeFileName, slugify } from "./templates";
 
 export const FLAG_COLORS = ["yellow", "orange", "pink", "blue", "green", "purple"] as const;
 export type FlagColor = (typeof FLAG_COLORS)[number];
@@ -67,6 +67,9 @@ export interface SearchHit {
  * The Hold: a folder of markdown files plus an in-memory index of them.
  * Files on disk are the only source of truth; the index is rebuilt from them.
  */
+/** Seeded files that are replaced when still identical to an earlier default */
+const UPGRADES: Record<string, string[]> = { ...OLD_TEMPLATES, "CLAUDE.md": PREVIOUS_GUIDES };
+
 export class Hold {
   files = new Map<string, ParsedFile>();
 
@@ -91,6 +94,11 @@ export class Hold {
     for (const [path, content] of Object.entries(seed)) {
       if (path.startsWith("notes/") && !fresh) continue;
       if (!(await this.fs.exists(path))) await this.fs.write(path, content);
+      else if (UPGRADES[path]) {
+        // an untouched copy of an older default gets the new one; edited copies are left alone
+        const cur = (await this.fs.read(path)).replace(/\r\n/g, "\n");
+        if (UPGRADES[path].includes(cur)) await this.fs.write(path, content);
+      }
     }
     await this.reindex();
     await this.loadPins();
@@ -310,6 +318,13 @@ export class Hold {
     const head = add.hours ? `- ${round2(add.hours)}h @${k}` : `- @${k}`;
     const content = await this.fs.read(path);
     await this.appendTo(path, workHeading(content), add.item ? `${head}\n  - ${add.item}` : head);
+  }
+
+  /** Log meetings under a project: optionally add their hours, and list each title as a done item. */
+  async logMeetings(date: ISODate, key: string, titles: string[], hours?: number): Promise<void> {
+    if (!titles.length) return;
+    await this.logWork(date, key, { hours, item: titles[0] });
+    for (const t of titles.slice(1)) await this.logWork(date, key, { item: t });
   }
 
   /** Rewrite a block's hours (0 leaves "- @key" to fill in later). */

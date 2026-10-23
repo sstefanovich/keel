@@ -4,6 +4,7 @@ import { HoursEntry, ParsedFile, basename } from "../core/parse";
 import { slugify } from "../core/templates";
 import { useHold } from "./HoldContext";
 import { flushEditors } from "./editor/Editor";
+import { MeetingHours } from "./MeetingHours";
 
 /** "portal-rebuild" → "Portal rebuild · Contoso" for display. */
 export function useWorkLabel() {
@@ -88,7 +89,7 @@ export function WorkPanel({ file }: { file: ParsedFile }) {
 
   const used = new Set(blocks.map((b) => b.client));
   const clients = [...hold.clients().values()].sort((a, b) => a.name.localeCompare(b.name));
-  const options = clients
+  const allOptions = clients
     .filter((c) => !focus || c.key === focus)
     .flatMap((c) => [
       ...hold
@@ -96,8 +97,8 @@ export function WorkPanel({ file }: { file: ParsedFile }) {
         .filter((p) => p.frontmatter.status !== "done")
         .map((p) => ({ key: slugify(basename(p.path)), text: `${p.title} · ${c.name}` })),
       { key: c.key, text: `${c.name} (general)` },
-    ])
-    .filter((o) => !used.has(o.key));
+    ]);
+  const options = allOptions.filter((o) => !used.has(o.key));
 
   return (
     <section className="work-panel">
@@ -147,6 +148,7 @@ export function WorkPanel({ file }: { file: ParsedFile }) {
           </option>
         ))}
       </select>
+      <MeetingHours file={file} options={allOptions} run={run} />
     </section>
   );
 }

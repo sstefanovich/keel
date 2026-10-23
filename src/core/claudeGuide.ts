@@ -58,7 +58,8 @@ listed underneath, indented two spaces. Hours are per project per day, never per
 - \`- [ ] text\` open · \`- [x] text @done(YYYY-MM-DD)\` done · \`- [>] text\` carried to a later day · \`- [-] text\` cancelled
 - When ticking a task, add \`@done(<today>)\`.
 - Due date: \`@due(YYYY-MM-DD)\`. Reminder: \`@remind(14:00)\`, \`@remind(2026-12-24 18:00)\`, \`@remind(weekdays 09:00)\`.
-- Waiting on someone: \`- [ ] firewall rules @waiting(Jordan Lee)\` (keep any \`@since(…)\` tag).
+- Waiting on someone: \`- [ ] firewall rules @waiting(Jordan Lee)\` (keep any \`@since(…)\` tag). A capitalised
+  \`@Name\` on a task means the same (\`- [ ] send the SOW @Jordan\`); meeting action items use this form.
 - Tag tasks with a client or project with \`#client-key\` or \`#project-key\`. A ticked task tagged to a
   project also counts as that day's work on the timesheet.
 - Each morning Keel moves open top-level tasks from the previous log into today's and marks the old ones \`[>]\`.
@@ -88,3 +89,9 @@ Diagrams: \`\`\`mermaid code blocks render in Keel.
   plus ticked tasks tagged to it.
 - **Summaries or reports** → answer in the chat unless asked to save one; saved reports go in \`notes/\`.
 `;
+
+/** Earlier versions of the guide: a CLAUDE.md still exactly like one of these is replaced with the current one. */
+export const PREVIOUS_GUIDES: string[] = [
+  // before capitalised @Name meant "waiting on"
+  CLAUDE_GUIDE.replace(/ tag\)\. A capitalised\n.*\n/, " tag).\n"),
+];

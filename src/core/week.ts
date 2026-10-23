@@ -109,3 +109,49 @@ export function rowReport(w: Week, r: WeekRow, style: TaskListStyle = "bullets")
 export function dayItems(r: WeekRow, dayIndex: number, style: TaskListStyle = "bullets"): string {
   return r.items[dayIndex].map((x) => listLine(x, style)).join("\n");
 }
+
+/** What a timesheet week is checked against: hours expected on each working day. */
+export interface DayTarget {
+  /** Expected hours per working day; 0 turns the check off */
+  hours: number;
+  /** Working weekdays (0 = Sunday … 6 = Saturday) */
+  workdays: number[];
+}
+
+export const DEFAULT_TARGET: DayTarget = { hours: 8, workdays: [1, 2, 3, 4, 5] };
+
+export type WeekIssue =
+  | { kind: "short"; day: number; hours: number; target: number }
+  | { kind: "no-hours"; day: number; row: WeekRow }
+  | { kind: "no-items"; day: number; row: WeekRow };
+
+export interface WeekCheck {
+  issues: WeekIssue[];
+  /** Working days still ahead (after today) */
+  daysLeft: number;
+  /** Nothing missing so far and no working days left: ready to enter into the timesheet system */
+  ready: boolean;
+}
+
+/**
+ * Gaps to fix before submitting a week: working days (up to today) under the target, projects with
+ * work listed but no hours, and hours with nothing listed to report.
+ */
+export function checkWeek(w: Week, target: DayTarget, today: ISODate): WeekCheck {
+  const issues: WeekIssue[] = [];
+  let daysLeft = 0;
+  w.days.forEach((d, i) => {
+    const working = target.workdays.includes(new Date(`${d}T12:00:00`).getDay());
+    if (d > today) {
+      if (working) daysLeft++;
+      return;
+    }
+    const total = round2(w.dayTotals[i]);
+    if (target.hours > 0 && working && total < target.hours) issues.push({ kind: "short", day: i, hours: total, target: target.hours });
+    for (const r of w.rows) {
+      if (r.items[i].length && !r.hours[i]) issues.push({ kind: "no-hours", day: i, row: r });
+      if (r.hours[i] && !r.items[i].length) issues.push({ kind: "no-items", day: i, row: r });
+    }
+  });
+  return { issues, daysLeft, ready: !issues.length && daysLeft === 0 };
+}

@@ -194,6 +194,33 @@ export async function calendarForget(id: string): Promise<void> {
   if (isTauri) await invoke("calendar_forget", { id });
 }
 
+// ---------- file history (snapshots in a git repository in the hold) ----------
+
+export interface Snapshot {
+  id: string;
+  time: number;
+}
+
+export interface FileVersion {
+  id: string;
+  time: number;
+  message: string;
+  deleted: boolean;
+}
+
+/** Record everything that changed since the last snapshot; null when nothing did. */
+export async function historySnapshot(root: string, message?: string): Promise<Snapshot | null> {
+  return isTauri ? invoke<Snapshot | null>("history_snapshot", { root, message }) : null;
+}
+
+export async function historyVersions(root: string, path: string): Promise<FileVersion[]> {
+  return isTauri ? invoke<FileVersion[]>("history_versions", { root, path }) : [];
+}
+
+export async function historyRead(root: string, id: string, path: string): Promise<string | null> {
+  return isTauri ? invoke<string | null>("history_read", { root, id, path }) : null;
+}
+
 // ---------- autostart ----------
 
 export async function getAutostart(): Promise<boolean> {

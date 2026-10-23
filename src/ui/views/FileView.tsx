@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { addDays, formatLong, today } from "../../core/dates";
-import { confirmDialog } from "../../lib/platform";
+import { confirmDialog, isTauri } from "../../lib/platform";
+import { HistoryPanel } from "../HistoryPanel";
 import { FlagBoard } from "../FlagBoard";
 import { WorkPanel } from "../WorkPanel";
 import { Glance } from "../Glance";
 import { useHold } from "../HoldContext";
 import { Editor, SaveStatus } from "../editor/Editor";
-import { Check, FileX, Trash2 } from "lucide-react";
+import { Check, FileX, History, Trash2 } from "lucide-react";
 import { EmptyState } from "../EmptyState";
 import { useNav } from "../nav";
 import { ChartView } from "./ChartView";
@@ -24,6 +25,8 @@ export function FileView({ path, line }: { path: string; line?: number }) {
   // charts open on the Chart tab unless we're jumping to a specific line
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   useEffect(() => setSaveStatus("saved"), [path]);
+  const [history, setHistory] = useState(false);
+  useEffect(() => setHistory(false), [path]);
   const [mode, setMode] = useState<"chart" | "edit">(hasChart && line == null ? "chart" : "edit");
   useEffect(() => setMode(hasChart && line == null ? "chart" : "edit"), [path, hasChart, line]);
 
@@ -81,6 +84,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
 
   return (
     <div className="file-view">
+      {history && <HistoryPanel path={path} onClose={() => setHistory(false)} />}
       <header className="file-head">
         {isLog ? (
           <div className="day-nav">
@@ -125,6 +129,12 @@ export function FileView({ path, line }: { path: string; line?: number }) {
             {saveStatus === "saved" ? <Check size={13} aria-hidden="true" /> : <span className="save-dot" aria-hidden="true" />}
             {saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Edited"}
           </span>
+        )}
+        {isTauri && (
+          <button className="ghost icon-text" onClick={() => setHistory(true)} title="Earlier versions of this file">
+            <History size={14} aria-hidden="true" />
+            History
+          </button>
         )}
         <button className="ghost danger icon-text" onClick={remove} title="Delete file">
           <Trash2 size={14} aria-hidden="true" />

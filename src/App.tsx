@@ -27,6 +27,7 @@ import { WaitingView } from "./ui/views/WaitingView";
 import { ScratchpadView } from "./ui/views/ScratchpadView";
 import { useReminders } from "./ui/useReminders";
 import { startCalendarSync } from "./ui/calendars";
+import { startHistory } from "./ui/history";
 import { AgendaView } from "./ui/views/AgendaView";
 import { CalendarView } from "./ui/views/CalendarView";
 import { FileView } from "./ui/views/FileView";
@@ -77,9 +78,10 @@ export default function App() {
 }
 
 function Shell() {
-  const { hold, bump, reportError, toast, focus } = useHold();
+  const { hold, dir, bump, reportError, toast, focus } = useHold();
   useReminders(hold);
   useEffect(() => startCalendarSync(), []);
+  useEffect(() => startHistory(dir), [dir]);
   // tabs, each with its own history; restored from the last session
   const [tabs, setTabs] = useState<TabsState<View>>(() => {
     try {
