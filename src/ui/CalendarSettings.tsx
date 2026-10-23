@@ -94,7 +94,9 @@ export function CalendarSettings() {
 
       <form className="cal-add" onSubmit={add}>
         <input
-          type="url"
+          type="text"
+          inputMode="url"
+          className="cal-add-url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Paste a calendar's ICS link (https://… or webcal://…)"
@@ -132,7 +134,9 @@ export function CalendarSettings() {
           <ol>
             <li>Open calendar.google.com → Settings (gear) → Settings → pick your calendar under "Settings for my calendars".</li>
             <li>
-              Under <b>Integrate calendar</b>, copy <b>Secret address in iCal format</b> and paste it above.
+              Under <b>Integrate calendar</b>, copy <b>Secret address in iCal format</b> and paste it above. Not the <i>Public</i> address just above
+              it: that one only works for calendars shared publicly (it opens in your browser because you're signed in to Google there). If
+              there's no secret address, your Google Workspace admin has turned it off.
             </li>
           </ol>
           <p className="muted small">

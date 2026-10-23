@@ -91,7 +91,9 @@ export function refreshCalendars(): Promise<void> {
 
 /** Add a calendar; resolves once its first download succeeds (rejects, and adds nothing, if it fails). */
 export async function addCalendar(url: string, name?: string): Promise<CalendarSource> {
-  const clean = url.trim();
+  // forgive what comes along with a pasted link: spaces, quotes, <angle brackets>
+  const clean = url.trim().replace(/^[<"'\s]+|[>"'\s]+$/g, "");
+  if (!/^(https?|webcal):\/\/\S+$/i.test(clean)) throw new Error("Paste the calendar's full link, starting with https:// or webcal://");
   if (sources.some((s) => s.url === clean)) throw new Error("That calendar is already added");
   const id = `cal${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const text = await calendarFetch(id, clean);

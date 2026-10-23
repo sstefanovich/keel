@@ -1584,7 +1584,7 @@ button.icon-text {
   display: flex;
   gap: 8px;
 }
-.cal-add input[type="url"] {
+.cal-add .cal-add-url {
   flex: 1;
   min-width: 0;
 }
