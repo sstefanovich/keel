@@ -1,3 +1,4 @@
+mod calendar;
 mod hold;
 mod pty;
 
@@ -128,6 +129,9 @@ pub fn run() {
             pty::pty_write,
             pty::pty_resize,
             pty::pty_kill,
+            calendar::calendar_fetch,
+            calendar::calendar_cached,
+            calendar::calendar_forget,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Keel");

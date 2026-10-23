@@ -23,6 +23,7 @@ import { sendToClaude } from "./ui/claudeBridge";
 import { WaitingView } from "./ui/views/WaitingView";
 import { ScratchpadView } from "./ui/views/ScratchpadView";
 import { useReminders } from "./ui/useReminders";
+import { startCalendarSync } from "./ui/calendars";
 import { AgendaView } from "./ui/views/AgendaView";
 import { CalendarView } from "./ui/views/CalendarView";
 import { FileView } from "./ui/views/FileView";
@@ -74,6 +75,7 @@ export default function App() {
 function Shell() {
   const { hold, bump, reportError, toast, focus } = useHold();
   useReminders(hold);
+  useEffect(() => startCalendarSync(), []);
   // tabs, each with its own history; restored from the last session
   const [tabs, setTabs] = useState<TabsState<View>>(() => {
     try {
@@ -422,7 +424,7 @@ function Shell() {
             {view.kind === "dispatch" && <DispatchView />}
             {view.kind === "charts" && <ChartsView />}
             {view.kind === "timesheet" && <TimesheetView />}
-            {view.kind === "calendar" && <CalendarView />}
+            {view.kind === "calendar" && <CalendarView date={view.date} />}
             {view.kind === "search" && <SearchView initial={view.q} />}
             {view.kind === "settings" && <SettingsView section={view.section} />}
           </div>

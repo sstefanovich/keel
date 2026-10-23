@@ -4,6 +4,7 @@ import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 import { useTheme } from "../theme";
 import { ClientsManager } from "../ClientsManager";
+import { CalendarSettings } from "../CalendarSettings";
 import { WEEKDAY_NAMES } from "../../core/dates";
 import { setWeekStart, useWeekStart } from "../weekStart";
 import { livePreviewEnabled, setLivePreview } from "../editor/livePreview";
@@ -62,6 +63,11 @@ export function SettingsView({ section }: { section?: string }) {
       <section className="panel" id="settings-clients">
         <h2>Clients & projects</h2>
         <ClientsManager />
+      </section>
+
+      <section className="panel" id="settings-calendars">
+        <h2>Calendars</h2>
+        <CalendarSettings />
       </section>
 
       <section className="panel">

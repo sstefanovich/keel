@@ -175,6 +175,25 @@ export async function copyRich(html: string, plain: string) {
   }
 }
 
+// ---------- calendar feeds ----------
+
+/** Download an ICS feed (in Rust: no CORS) and cache it under `id`. */
+export async function calendarFetch(id: string, url: string): Promise<string> {
+  if (isTauri) return invoke<string>("calendar_fetch", { id, url });
+  const res = await fetch(url.replace(/^webcal:/i, "https:"));
+  if (!res.ok) throw new Error(`The calendar server answered ${res.status}`);
+  return res.text();
+}
+
+/** The last downloaded copy of a feed. */
+export async function calendarCached(id: string): Promise<string | null> {
+  return isTauri ? invoke<string | null>("calendar_cached", { id }) : null;
+}
+
+export async function calendarForget(id: string): Promise<void> {
+  if (isTauri) await invoke("calendar_forget", { id });
+}
+
 // ---------- autostart ----------
 
 export async function getAutostart(): Promise<boolean> {

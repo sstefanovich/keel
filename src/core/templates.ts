@@ -1,4 +1,5 @@
 import { ISODate, formatLong, hhmm, parseISO } from "./dates";
+import { yamlScalar } from "./parse";
 
 export const DEFAULT_TEMPLATES: Record<string, string> = {
   "templates/log.md": `---
@@ -212,5 +213,12 @@ export function fillTemplate(tpl: string, vars: { date: ISODate; title?: string;
     title,
     slug: slugify(title),
   };
-  return tpl.replace(/\{\{(\w+)\}\}/g, (all, k) => (k in map ? map[k] : all));
+  const fill = (s: string) => s.replace(/\{\{(\w+)\}\}/g, (all, k) => (k in map ? map[k] : all));
+  // a frontmatter value that is just a placeholder ("title: {{title}}") gets quoted when needed,
+  // so titles like "Acme: kickoff" keep the YAML valid
+  const fm = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(tpl)?.[0] ?? "";
+  const head = fm.replace(/^(\s*[\w-]+:[ \t]*)\{\{(\w+)\}\}[ \t]*$/gm, (all, key: string, k: string) =>
+    k in map && map[k] !== "" ? key + yamlScalar(map[k]) : all,
+  );
+  return fill(head) + fill(tpl.slice(fm.length));
 }

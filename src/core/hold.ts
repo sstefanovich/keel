@@ -219,11 +219,50 @@ export class Hold {
     await this.save(prev.path, prevLines.join(prev.content.includes("\r\n") ? "\r\n" : "\n"));
   }
 
-  async createMeeting(title: string, date: ISODate = todayISO(), client?: string): Promise<string> {
+  /** A new meeting note; `extra` fills in what a calendar event knows (start time, attendees, project). */
+  async createMeeting(
+    title: string,
+    date: ISODate = todayISO(),
+    client?: string,
+    extra: { time?: Date; attendees?: string[]; project?: string } = {},
+  ): Promise<string> {
     const path = await this.freePath("meetings", `${date} ${title}`);
-    const content = fillTemplate(await this.template("meeting"), { date, title, client });
-    await this.save(path, client ? setFrontmatterField(content, "client", client) : content);
+    let content = fillTemplate(await this.template("meeting"), { date, title, client, now: extra.time });
+    if (extra.project) content = setFrontmatterField(content, "project", extra.project);
+    else if (client) content = setFrontmatterField(content, "client", client);
+    if (extra.attendees?.length) content = setFrontmatterField(content, "attendees", JSON.stringify(extra.attendees));
+    await this.save(path, content);
     return path;
+  }
+
+  /** The meeting note for a date with this title, if one exists. */
+  meetingNote(date: ISODate, title: string): ParsedFile | undefined {
+    const want = title.trim().toLowerCase();
+    return this.all().find(
+      (f) => f.kind === "meeting" && f.date === date && f.title.replace(/^\d{4}-\d{2}-\d{2}\s+/, "").trim().toLowerCase() === want,
+    );
+  }
+
+  /** The project (else client) a piece of text names, by name or key: "Hogan / FLIS sync" → that project. */
+  guessOwner(text: string): { client?: string; project?: string } {
+    const hay = ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
+    const has = (name: string) => {
+      const n = name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      return n.length >= 3 && hay.includes(` ${n} `) ? n.length : 0;
+    };
+    let best: { score: number; client?: string; project?: string } = { score: 0 };
+    for (const p of this.all()) {
+      if (p.kind !== "project" || String(p.frontmatter.status ?? "active") === "done") continue;
+      const key = slugify(basename(p.path));
+      const score = Math.max(has(p.title), has(key));
+      if (score > best.score) best = { score, project: key, client: this.fileClient(p) };
+    }
+    if (best.project) return { client: best.client, project: best.project };
+    for (const c of this.clients().values()) {
+      const score = Math.max(has(c.name), has(c.key));
+      if (score > best.score) best = { score, client: c.key };
+    }
+    return { client: best.client };
   }
 
   /** A new note; with a project it's tied to that project (and so to its client). */

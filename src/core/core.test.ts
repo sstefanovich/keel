@@ -779,6 +779,28 @@ date: 2026-10-21
     expect(hold.get(a)!.date).toBe("2026-10-19");
   });
 
+  it("starts meeting notes from calendar events and guesses the project", async () => {
+    const hold = await makeHold({
+      "clients/hogan-lovells.md": "---\nname: Hogan Lovells\n---\n# Hogan Lovells\n",
+      "projects/FLIS Retain PA.md": "---\nclient: hogan-lovells\nstatus: active\n---\n# FLIS Retain PA\n",
+    });
+    expect(hold.guessOwner("FLIS Retain PA: weekly sync")).toEqual({ client: "hogan-lovells", project: "flis-retain-pa" });
+    expect(hold.guessOwner("Hogan Lovells quarterly review")).toEqual({ client: "hogan-lovells" });
+    expect(hold.guessOwner("Dentist")).toEqual({ client: undefined });
+    const p = await hold.createMeeting("FLIS Retain PA: weekly sync", "2026-10-23", "hogan-lovells", {
+      time: new Date(2026, 9, 23, 14, 30),
+      attendees: ["Lee, Jordan", "sam@x.com"],
+      project: "flis-retain-pa",
+    });
+    const f = hold.get(p)!;
+    expect(f.frontmatter.time).toBe("14:30");
+    expect(f.frontmatter.attendees).toEqual(["Lee, Jordan", "sam@x.com"]);
+    expect(f.frontmatter.project).toBe("flis-retain-pa");
+    expect(hold.fileClient(f)).toBe("hogan-lovells");
+    expect(hold.meetingNote("2026-10-23", "flis retain pa: weekly sync")?.path).toBe(p);
+    expect(hold.meetingNote("2026-10-24", "FLIS Retain PA: weekly sync")).toBeUndefined();
+  });
+
   it("hoists, edits, recolors and lowers flags", async () => {
     const hold = await makeHold();
     const p = await hold.hoistFlag("Renew the TLS cert\nexpires Friday", "pink");

@@ -1,5 +1,6 @@
-import { Bell, CircleCheck, Clock, Hourglass, ListChecks } from "lucide-react";
-import { formatTime, hhmm, today } from "../core/dates";
+import { Bell, CircleCheck, Clock, Hourglass, ListChecks, Video } from "lucide-react";
+import { addDays, formatTime, hhmm, parseISO, today } from "../core/dates";
+import { eventSpan, eventTime, useCalendarEvents } from "./calendars";
 import { round2 } from "../core/hold";
 import { ParsedFile } from "../core/parse";
 import { useHold } from "./HoldContext";
@@ -24,6 +25,11 @@ export function Glance({ file }: { file: ParsedFile }) {
   const now = hhmm(new Date());
   const next = isToday ? hold.remindersOn(date).find((r) => r.rule.time > now) : undefined;
   const waiting = isToday ? hold.waitingOn(focus).length : 0;
+  const events = useCalendarEvents(parseISO(date).getTime(), parseISO(addDays(date, 1)).getTime());
+  const nowMs = Date.now();
+  const timed = events.filter((e) => !e.allDay && !e.free);
+  const meeting = isToday ? (timed.find((e) => e.start <= nowMs && nowMs < e.end) ?? timed.find((e) => e.start > nowMs)) : undefined;
+  const meetingCount = timed.length;
 
   return (
     <div className="glance" aria-label="Day at a glance">
@@ -53,6 +59,22 @@ export function Glance({ file }: { file: ParsedFile }) {
             </>
           ) : (
             <span>No more reminders today</span>
+          )}
+        </button>
+      )}
+      {meetingCount > 0 && (
+        <button className="glance-item" onClick={(e) => nav.go({ kind: "calendar", date }, openOpts(e))} title={meeting ? `${eventSpan(meeting)} · ${meeting.title}` : "Open the calendar"}>
+          <Video size={14} aria-hidden="true" />
+          {meeting ? (
+            <>
+              <b>{meeting.start <= nowMs ? "Now" : eventTime(meeting.start)}</b>
+              <span className="glance-text">{meeting.title}</span>
+            </>
+          ) : (
+            <>
+              <b>{meetingCount}</b>
+              <span>meeting{meetingCount === 1 ? "" : "s"}</span>
+            </>
           )}
         </button>
       )}

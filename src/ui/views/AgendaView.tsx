@@ -1,9 +1,11 @@
 import { ReactNode } from "react";
 import { describeRule } from "../../core/schedule";
-import { formatLong, formatShort, formatTime, hhmm, today } from "../../core/dates";
+import { addDays, formatLong, formatShort, formatTime, hhmm, parseISO, today } from "../../core/dates";
+import { useCalendarEvents, useCalendars } from "../calendars";
+import { EventRow } from "../EventRow";
 import { Task } from "../../core/parse";
 import { FlagBoard } from "../FlagBoard";
-import { BellOff, CircleCheck } from "lucide-react";
+import { BellOff, CalendarCheck, CircleCheck } from "lucide-react";
 import { EmptyState } from "../EmptyState";
 import { useHold } from "../HoldContext";
 import { TaskRow } from "../TaskRow";
@@ -32,6 +34,8 @@ export function AgendaView() {
   const d = today();
   const a = hold.agenda(d, 14, focus);
   const now = hhmm(new Date());
+  const { sources } = useCalendars();
+  const meetings = useCalendarEvents(parseISO(d).getTime(), parseISO(addDays(d, 1)).getTime());
 
   return (
     <div className="page">
@@ -45,6 +49,20 @@ export function AgendaView() {
       {a.overdue.length > 0 && (
         <Section title="Overdue" count={a.overdue.length} tone="danger">
           <ul className="tasks">{a.overdue.map((t) => <TaskRow key={t.file + t.line} task={t} />)}</ul>
+        </Section>
+      )}
+
+      {sources.some((s) => s.enabled) && (
+        <Section title="Meetings today" count={meetings.length}>
+          {meetings.length ? (
+            <ul className="events">
+              {meetings.map((e) => (
+                <EventRow key={e.id} event={e} />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState compact icon={CalendarCheck} title="No meetings today." />
+          )}
         </Section>
       )}
 
