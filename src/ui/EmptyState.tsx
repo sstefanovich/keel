@@ -1,4 +1,4 @@
-import { LucideIcon } from "lucide-react";
+import { Compass, LucideIcon } from "lucide-react";
 import { ReactNode } from "react";
 
 /**
@@ -31,6 +31,8 @@ export function EmptyState({
   }
   return (
     <div className="empty-state">
+      {/* a faint compass rose behind empty pages: Keel's one nautical flourish */}
+      <Compass className="empty-watermark" size={220} strokeWidth={0.6} aria-hidden="true" />
       <div className="empty-icon">
         <Icon size={26} aria-hidden="true" />
       </div>

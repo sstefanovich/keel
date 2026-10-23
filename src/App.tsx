@@ -450,7 +450,8 @@ function Shell() {
         <Sidebar onResize={(width) => setSidebar((s) => ({ ...s, width }))} />
         <main className="main">
           <TabBar />
-          <div className="main-content">
+          {/* keyed by what is shown, so switching views fades the new one in (and starts it at the top) */}
+          <div className="main-content" key={view.kind === "file" ? `file:${view.path}` : view.kind}>
             {view.kind === "file" && <FileView path={view.path} line={view.line} />}
             {view.kind === "agenda" && <AgendaView />}
             {view.kind === "scratch" && <ScratchpadView />}

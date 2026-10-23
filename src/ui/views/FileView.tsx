@@ -99,7 +99,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
             <button onClick={() => nav.openLog(addDays(file.date!, -1))} aria-label="Previous day" title="Previous day (Alt+←)">
               ‹
             </button>
-            <span className="file-title">
+            <span className="file-title" title={path}>
               {formatLong(file.date!)}
               {file.date === today() && <span className="chip chip-accent">Today</span>}
             </span>
@@ -108,7 +108,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
             </button>
           </div>
         ) : (
-          <span className="file-title">{file.title}</span>
+          <span className="file-title" title={path}>{file.title}</span>
         )}
         {ownerProject && (
           <button
@@ -158,7 +158,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
             <div className="log-main">
               <Glance file={file} />
               {file.date === today() && <FlagBoard compact />}
-              <Editor key={path} path={path} line={line} onOpenLink={(t, newTab) => nav.openLink(t, { newTab })} onStatus={setSaveStatus} />
+              <Editor key={path} path={path} line={line} isLog onOpenLink={(t, newTab) => nav.openLink(t, { newTab })} onStatus={setSaveStatus} />
               {backlinkList}
             </div>
             <aside className="log-side">

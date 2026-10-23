@@ -216,8 +216,8 @@ export function keelCompletions(getNames: () => string[], getTargets: () => Work
 }
 
 export const keelHighlight = HighlightStyle.define([
-  { tag: t.heading1, fontSize: "1.6em", fontWeight: "700" },
-  { tag: t.heading2, fontSize: "1.3em", fontWeight: "650" },
+  { tag: t.heading1, fontSize: "1.75em", fontWeight: "650", fontFamily: "var(--font-title)", letterSpacing: "-0.01em" },
+  { tag: t.heading2, fontSize: "1.32em", fontWeight: "600", fontFamily: "var(--font-title)" },
   { tag: t.heading3, fontSize: "1.12em", fontWeight: "600" },
   { tag: [t.heading4, t.heading5, t.heading6], fontWeight: "600" },
   { tag: t.strong, fontWeight: "700" },
@@ -292,6 +292,25 @@ function mermaidBlocks(state: EditorState): DecorationSet {
 export const mermaidPreview = StateField.define<DecorationSet>({
   create: (state) => mermaidBlocks(state),
   update: (deco, tr) => (tr.docChanged || tr.selection || tr.effects.some((e) => e.is(refreshMermaid)) ? mermaidBlocks(tr.state) : deco),
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+function hiddenTitle(state: EditorState): DecorationSet {
+  const fm = frontmatterRange(state);
+  const doc = state.doc;
+  let n = fm ? doc.lineAt(fm.to).number + 1 : 1;
+  while (n <= doc.lines && !doc.line(n).text.trim()) n++;
+  if (n > doc.lines) return Decoration.none;
+  const line = doc.line(n);
+  if (!/^#\s/.test(line.text)) return Decoration.none;
+  if (state.selection.ranges.some((r) => r.to >= line.from && r.from <= line.to)) return Decoration.none;
+  return Decoration.set([Decoration.replace({ block: true }).range(line.from, line.to)]);
+}
+
+/** Hides a log's "# Friday, 23 October" line (the header already shows the day) unless the cursor is on it. */
+export const hideLogTitle = StateField.define<DecorationSet>({
+  create: (state) => hiddenTitle(state),
+  update: (deco, tr) => (tr.docChanged || tr.selection ? hiddenTitle(tr.state) : deco),
   provide: (f) => EditorView.decorations.from(f),
 });
 

@@ -97,6 +97,16 @@ fn quick_capture(app: &AppHandle) {
 
 pub const CAPTURE_SHORTCUT: &str = "ctrl+alt+k";
 
+/// Whether the window has the Mica backdrop (Windows 11), so the UI can let it show through.
+struct Backdrop {
+    mica: bool,
+}
+
+#[tauri::command]
+fn window_backdrop(state: tauri::State<Backdrop>) -> &'static str {
+    if state.mica { "mica" } else { "none" }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     use tauri_plugin_global_shortcut::ShortcutState;
@@ -111,7 +121,12 @@ pub fn run() {
         // remember window size/position/maximized between launches (restored before show)
         .plugin(
             tauri_plugin_window_state::Builder::new()
-                .with_state_flags(tauri_plugin_window_state::StateFlags::all() & !tauri_plugin_window_state::StateFlags::VISIBLE)
+                // Keel draws its own title bar: never restore decorations from an older saved state
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::all()
+                        & !tauri_plugin_window_state::StateFlags::VISIBLE
+                        & !tauri_plugin_window_state::StateFlags::DECORATIONS,
+                )
                 .with_denylist(&["capture"])
                 .build(),
         )
@@ -160,6 +175,19 @@ pub fn run() {
 
             let _ = build_capture_window(app.handle());
 
+            // Windows 11 Mica behind the window; the UI keeps its own opaque background where it isn't supported
+            #[cfg(windows)]
+            let mica = app
+                .get_webview_window("main")
+                .map(|w| {
+                    let _ = w.set_decorations(false);
+                    window_vibrancy::apply_mica(&w, None).is_ok()
+                })
+                .unwrap_or(false);
+            #[cfg(not(windows))]
+            let mica = false;
+            app.manage(Backdrop { mica });
+
             // Launched at login: stay in the tray so reminders keep running.
             if !std::env::args().any(|a| a == "--hidden") {
                 show_main(app.handle());
@@ -175,6 +203,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             default_hold_dir,
+            window_backdrop,
             hold::hold_list,
             hold::hold_read,
             hold::hold_write,

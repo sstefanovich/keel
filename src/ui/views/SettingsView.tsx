@@ -59,7 +59,7 @@ export function SettingsView({ section }: { section?: string }) {
   };
 
   return (
-    <div className="page settings-page">
+    <div className="page settings-page flat">
       <header className="page-head">
         <h1>Settings</h1>
       </header>
@@ -236,7 +236,7 @@ export function SettingsView({ section }: { section?: string }) {
               ["Ctrl+Shift+[ / ]", "Fold / unfold the section at the cursor (or the ▾ beside a heading)"],
               ["Alt+← / Alt+→", "Previous / next day (in a log)"],
             ].map(([k, d]) => (
-              <tr key={k}>
+              <tr key={k + d}>
                 <td>
                   <kbd>{k}</kbd>
                 </td>

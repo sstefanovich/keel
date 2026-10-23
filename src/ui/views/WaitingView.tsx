@@ -43,7 +43,7 @@ export function WaitingView() {
   };
 
   return (
-    <div className="page">
+    <div className="page flat">
       <header className="page-head">
         <h1>Waiting on</h1>
         <p className="muted">

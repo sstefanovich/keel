@@ -10,7 +10,7 @@ import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemir
 import { useEffect, useRef } from "react";
 import { basename } from "../../core/parse";
 import { useHold } from "../HoldContext";
-import { keelClicks, keelCompletions, keelDecorations, keelHighlight, mermaidPreview, propertiesView, refreshMermaid } from "./keelSyntax";
+import { hideLogTitle, keelClicks, keelCompletions, keelDecorations, keelHighlight, mermaidPreview, propertiesView, refreshMermaid } from "./keelSyntax";
 import { workTargets } from "../workTargets";
 import { onThemeChange } from "../theme";
 import { LivePreviewOptions, livePreview, livePreviewEnabled, onLivePreviewChange } from "./livePreview";
@@ -21,6 +21,8 @@ interface Props {
   onOpenLink: (target: string, newTab?: boolean) => void;
   /** Save state for the header: unsaved typing, a save in flight, or everything saved */
   onStatus?: (s: SaveStatus) => void;
+  /** A day's log: its "# date" title line is hidden (the header shows the day) */
+  isLog?: boolean;
 }
 
 const SAVE_DELAY = 500;
@@ -35,7 +37,7 @@ export async function flushEditors(): Promise<void> {
 export type SaveStatus = "saved" | "pending" | "saving";
 
 /** Markdown editor for one file. Autosaves; reloads when the file changes on disk. */
-export function Editor({ path, line, onOpenLink, onStatus }: Props) {
+export function Editor({ path, line, onOpenLink, onStatus, isLog = false }: Props) {
   const statusRef = useRef(onStatus);
   statusRef.current = onStatus;
   const { hold, dir, version, bump, reportError } = useHold();
@@ -96,6 +98,7 @@ export function Editor({ path, line, onOpenLink, onStatus }: Props) {
           syntaxHighlighting(keelHighlight),
           keelDecorations,
           mermaidPreview,
+          isLog ? hideLogTitle : [],
           propertiesView({
             resolve: (key, value) => {
               const v = value.replace(/^@/, "");
@@ -237,16 +240,20 @@ function toBase64(file: Blob): Promise<string> {
 
 function jumpTo(v: EditorView, line?: number) {
   if (line == null) {
-    // start just below the frontmatter, so it shows as the properties bar rather than raw
+    // start just below the frontmatter and the "# Title" line, so both show finished rather than raw
     const doc = v.state.doc;
+    let n = 1;
     if (doc.lines > 2 && doc.line(1).text.trim() === "---") {
-      for (let n = 2; n <= Math.min(doc.lines, 200); n++) {
-        if (doc.line(n).text.trim() === "---") {
-          v.dispatch({ selection: { anchor: n < doc.lines ? doc.line(n + 1).from : doc.length } });
+      for (let i = 2; i <= Math.min(doc.lines, 200); i++) {
+        if (doc.line(i).text.trim() === "---") {
+          n = i + 1;
           break;
         }
       }
     }
+    while (n <= doc.lines && !doc.line(n).text.trim()) n++;
+    if (n <= doc.lines && /^#\s/.test(doc.line(n).text)) n++;
+    if (n > 1) v.dispatch({ selection: { anchor: n <= doc.lines ? doc.line(n).from : doc.length } });
     v.focus();
     return;
   }

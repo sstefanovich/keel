@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useHold } from "./HoldContext";
 import { useNav } from "./nav";
 import { viewMeta } from "./viewMeta";
+import { WindowControls } from "./WindowControls";
 
 /** Back/forward, the open tabs (drag to reorder, middle-click to close) and a new-tab button. */
 export function TabBar() {
@@ -11,7 +12,8 @@ export function TabBar() {
   const [dragId, setDragId] = useState<string | null>(null);
 
   return (
-    <div className="tabbar" onDoubleClick={(e) => e.target === e.currentTarget && nav.newTab()}>
+    // the tab strip is also the window's title bar: empty space drags it, double-click maximises
+    <div className="tabbar" data-tauri-drag-region>
       <div className="tabbar-nav">
         <button className="tab-icon-btn" onClick={nav.back} disabled={!nav.canBack} title="Back (Ctrl+[)" aria-label="Back">
           <ArrowLeft size={15} />
@@ -20,7 +22,7 @@ export function TabBar() {
           <ArrowRight size={15} />
         </button>
       </div>
-      <div className="tabs" role="tablist" onDoubleClick={(e) => e.target === e.currentTarget && nav.newTab()}>
+      <div className="tabs" role="tablist" data-tauri-drag-region>
         {nav.tabs.map((t, i) => {
           const { title, Icon } = viewMeta(t.view, hold);
           const active = t.id === nav.activeTab;
@@ -73,6 +75,8 @@ export function TabBar() {
           <Plus size={15} />
         </button>
       </div>
+      <div className="tabbar-drag" data-tauri-drag-region />
+      <WindowControls />
     </div>
   );
 }

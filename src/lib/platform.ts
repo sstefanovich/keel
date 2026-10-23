@@ -299,6 +299,20 @@ export async function hideWindow() {
   if (isTauri) await getCurrentWindow().hide();
 }
 
+/**
+ * Marks the page when the main window has Windows 11's Mica backdrop (data-backdrop="mica"), so the
+ * sidebar and title strip let it show through. Elsewhere everything stays opaque.
+ */
+export async function applyBackdrop() {
+  if (!isTauri || getCurrentWindow().label !== "main") return;
+  try {
+    const kind = await invoke<string>("window_backdrop");
+    document.documentElement.dataset.backdrop = kind;
+  } catch {
+    // older build: keep the opaque look
+  }
+}
+
 export async function showMainWindow() {
   if (!isTauri) return;
   const w = getCurrentWindow();

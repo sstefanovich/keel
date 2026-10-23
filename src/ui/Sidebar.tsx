@@ -35,6 +35,7 @@ function NavItem({
   active,
   onOpen,
   badge,
+  alert,
   hint,
   collapsed,
 }: {
@@ -43,6 +44,8 @@ function NavItem({
   active?: boolean;
   onOpen: (o: OpenOpts) => void;
   badge?: number;
+  /** The count needs attention (e.g. something overdue): coloured instead of muted */
+  alert?: boolean;
   hint?: string;
   collapsed: boolean;
 }) {
@@ -57,7 +60,7 @@ function NavItem({
     >
       <Icon size={17} className="nav-icon" aria-hidden="true" />
       {!collapsed && <span className="nav-label">{label}</span>}
-      {badge ? <span className={`badge${collapsed ? " badge-dot" : ""}`}>{collapsed ? "" : badge}</span> : null}
+      {badge ? <span className={`badge${alert ? " badge-alert" : ""}${collapsed ? " badge-dot" : ""}`}>{collapsed ? "" : badge}</span> : null}
     </button>
   );
 }
@@ -129,7 +132,7 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
   const clients = [...hold.clients().values()].sort((a, b) => a.name.localeCompare(b.name));
   const focusName = focus ? clients.find((c) => c.key === focus)?.name ?? focus : undefined;
 
-  const item = (icon: LucideIcon, label: string, active: boolean, onOpen: (o: OpenOpts) => void, extra: { badge?: number; hint?: string } = {}) => (
+  const item = (icon: LucideIcon, label: string, active: boolean, onOpen: (o: OpenOpts) => void, extra: { badge?: number; alert?: boolean; hint?: string } = {}) => (
     <NavItem icon={icon} label={label} active={active} onOpen={onOpen} collapsed={collapsed} {...extra} />
   );
 
@@ -148,7 +151,7 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
 
   return (
     <aside className={`sidebar${collapsed ? " collapsed" : ""}`} aria-label="Navigation">
-      <div className="brand">
+      <div className="brand" data-tauri-drag-region>
         {collapsed ? (
           <button className="brand-mark" onClick={nav.toggleSidebar} title="Expand sidebar (Ctrl+B)" aria-label="Expand sidebar">
             <KeelLogo />
@@ -158,7 +161,7 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
             <span className="brand-mark">
               <KeelLogo />
             </span>
-            <span className="brand-name">Keel</span>
+            <span className="brand-name" data-tauri-drag-region>Keel</span>
             <button className="side-icon-btn" onClick={nav.toggleSidebar} title="Collapse sidebar (Ctrl+B)" aria-label="Collapse sidebar">
               <PanelLeftClose size={16} />
             </button>
@@ -211,7 +214,7 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
       <nav className="nav">
         {item(Sun, "Today", current === todayPath, (o) => nav.openToday(o), { hint: "Ctrl+T" })}
         {item(NotepadText, "Scratchpad", v.kind === "scratch", (o) => nav.go({ kind: "scratch" }, o), { hint: "Ctrl+Shift+S" })}
-        {item(ListChecks, "Agenda", v.kind === "agenda", (o) => nav.go({ kind: "agenda" }, o), { badge: agenda.overdue.length + agenda.today.length, hint: "Ctrl+J" })}
+        {item(ListChecks, "Agenda", v.kind === "agenda", (o) => nav.go({ kind: "agenda" }, o), { badge: agenda.overdue.length + agenda.today.length, alert: agenda.overdue.length > 0, hint: "Ctrl+J" })}
         {item(Flag, "Flags", v.kind === "flags", (o) => nav.go({ kind: "flags" }, o), { badge: flagCount })}
         {item(Hourglass, "Waiting on", v.kind === "waiting", (o) => nav.go({ kind: "waiting" }, o), { badge: waitingCount })}
         <div className="nav-sep" />

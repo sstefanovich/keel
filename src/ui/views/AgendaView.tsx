@@ -38,7 +38,7 @@ export function AgendaView() {
   const meetings = useCalendarEvents(parseISO(d).getTime(), parseISO(addDays(d, 1)).getTime());
 
   return (
-    <div className="page">
+    <div className="page flat">
       <header className="page-head">
         <h1>Agenda</h1>
         <p className="muted">{formatLong(d)}</p>

@@ -1,0 +1,370 @@
+/*
+ * Keel's look: navy and brass, a serif for titles, Windows 11 window chrome (Mica, own title bar),
+ * calmer section styling, dark-mode tuning, motion and focus details.
+ * Loaded after styles.css and design.css; everything here is the final word on appearance.
+ */
+
+/* ---------- 1. palette & type ---------- */
+
+:root {
+  --accent: #1d5687;
+  --accent-hover: #17466f;
+  --accent-soft: #e4eef7;
+  /* brass: the warm second colour, for "now" and "needs you" (today, the current meeting, overdue counts) */
+  --brass: #a8701a;
+  --brass-strong: #c4851f;
+  --brass-soft: #f7ecd6;
+  --font-title: "Source Serif 4 Variable", "Source Serif 4", Georgia, "Times New Roman", serif;
+  --ring: 0 0 0 2px var(--surface), 0 0 0 4px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+:root[data-theme="dark"] {
+  --bg: #0e1218;
+  /* cards lifted further off the background so sections separate */
+  --surface: #19202a;
+  --surface-2: #1d2430;
+  --border: #283140;
+  --border-strong: #364152;
+  --accent: #6bb3e6;
+  --accent-hover: #8cc5ee;
+  --accent-soft: #16314a;
+  --brass: #e3b562;
+  --brass-strong: #efc678;
+  --brass-soft: #3a2f1a;
+  /* flags: deep but still clearly coloured, never muddy */
+  --flag-yellow: #5a4a14;
+  --flag-orange: #5e3812;
+  --flag-pink: #5c2238;
+  --flag-blue: #173f63;
+  --flag-green: #1f4a2b;
+  --flag-purple: #3b2b66;
+  --flag-text: #f6f0de;
+}
+
+/* titles in the serif */
+.page-head h1,
+.scratch-title h1 {
+  font-family: var(--font-title);
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+.file-head .file-title {
+  font-family: var(--font-title);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.day-nav .file-title {
+  font-size: 22px;
+}
+.empty-state h2,
+.modal.tour h2,
+.briefing h3,
+.cal-day-panel .cal-day-head h2 {
+  font-family: var(--font-title);
+  letter-spacing: 0;
+}
+.empty-state h2 {
+  font-size: 20px;
+}
+.briefing h3 {
+  font-size: 16px;
+}
+.cal-day-panel .cal-day-head h2 {
+  font-size: 17px;
+}
+.brand-name {
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+/* brass for "now" */
+.chip-accent {
+  background: var(--brass-soft);
+  color: var(--brass);
+  font-weight: 600;
+}
+.cal-today,
+.calendar-page .cal-day.cal-today {
+  border-color: var(--brass-strong);
+  box-shadow: inset 0 0 0 1px var(--brass-strong);
+}
+.cal-today .cal-num,
+.week-cal-day-head.today .week-cal-num {
+  color: var(--brass);
+}
+.event.live {
+  box-shadow: inset 0 0 0 1.5px var(--brass-strong);
+}
+.briefing {
+  border-color: color-mix(in srgb, var(--brass) 35%, var(--border));
+  background: linear-gradient(160deg, var(--brass-soft), var(--surface) 65%);
+}
+.briefing header {
+  color: var(--brass);
+}
+
+/* a faint compass rose behind empty pages */
+.empty-state {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.empty-watermark {
+  position: absolute;
+  right: -40px;
+  bottom: -60px;
+  color: var(--accent);
+  opacity: 0.06;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ---------- 2. Windows 11 chrome: own title bar, Mica ---------- */
+
+.tabbar {
+  user-select: none;
+}
+.tabbar .tabs {
+  flex: 0 1 auto;
+}
+.tabbar-drag {
+  flex: 1;
+  min-width: 48px;
+}
+.window-controls {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+  margin-left: 4px;
+}
+.wc-btn {
+  width: 46px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.wc-btn svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+.wc-btn:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: transparent;
+}
+.wc-btn.wc-close:hover:not(:disabled) {
+  background: #c42b1c;
+  color: #fff;
+}
+/* With Mica the window itself is the backdrop: the sidebar and title strip let it show through,
+   and the content sits on an opaque, rounded pane like Windows 11's own apps. */
+:root[data-backdrop="mica"],
+:root[data-backdrop="mica"] body,
+:root[data-backdrop="mica"] #root {
+  background: transparent;
+}
+:root[data-backdrop="mica"] .sidebar {
+  background: color-mix(in srgb, var(--sidebar) 35%, transparent);
+  border-right-color: transparent;
+}
+:root[data-backdrop="mica"] .tabbar {
+  background: transparent;
+  border-bottom-color: transparent;
+}
+:root[data-backdrop="mica"] .main {
+  background: transparent;
+}
+:root[data-backdrop="mica"] .main-content {
+  background: var(--bg);
+  border-top-left-radius: 10px;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+}
+:root[data-backdrop="mica"] .tab.active {
+  background: var(--bg);
+}
+
+/* ---------- 3. calmer surfaces ---------- */
+
+/* headings in sentence case, not small caps */
+.panel h2,
+.work-panel h3,
+.meeting-hours h4,
+.backlinks h4 {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text);
+}
+.panel h2 .count,
+.panel h2 .muted {
+  font-weight: 500;
+}
+.briefing-label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+}
+.meeting-hours h4 {
+  font-size: 13px;
+}
+
+/* flat pages: sections separated by a rule instead of each sitting in its own card */
+.page.flat .panel,
+.week-report.panel,
+.search-group.panel {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 18px 2px 10px;
+  margin-bottom: 6px;
+}
+.page.flat .grid-2 {
+  gap: 0 32px;
+}
+.settings-nav {
+  margin-bottom: 4px;
+}
+
+/* sidebar counts: quiet unless something needs attention */
+.badge {
+  background: var(--hover);
+  color: var(--text-2);
+  font-weight: 600;
+}
+.nav-item.active .badge {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+.badge.badge-alert {
+  background: var(--brass-strong);
+  color: #fff;
+}
+:root[data-theme="dark"] .badge.badge-alert {
+  color: #1a1408;
+}
+.badge-dot {
+  background: var(--accent);
+}
+.badge-dot.badge-alert {
+  background: var(--brass-strong);
+}
+
+/* the timesheet's gaps: a slim note, not a big block */
+.week-check.issues {
+  background: transparent;
+  border: 0;
+  border-left: 3px solid var(--warn);
+  border-radius: 0;
+  padding: 4px 0 4px 14px;
+}
+.week-check.issues h2 {
+  font-size: 14px;
+}
+
+/* the file path lives in the title's tooltip; its slot just pushes the actions to the right */
+.file-head .file-path {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+.file-title .chip,
+.page-head h1 .chip {
+  font-family: var(--font);
+  letter-spacing: 0;
+}
+.page-head h1 {
+  font-weight: 600;
+}
+
+/* ---------- 4. dark mode details ---------- */
+
+:root[data-theme="dark"] .flag {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, var(--shadow-sm);
+}
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .work-panel,
+:root[data-theme="dark"] .week-cal {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+}
+
+/* ---------- 5. motion & focus ---------- */
+
+.main-content {
+  animation: keel-view-in 0.16s ease-out;
+}
+@keyframes keel-view-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+.chip,
+.cm-lp-token,
+.cal-tag {
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+/* ticking a checkbox draws the tick */
+.cm-lp-check.done svg path {
+  stroke-dasharray: 16;
+  stroke-dashoffset: 0;
+  animation: keel-tick 0.22s ease-out;
+}
+@keyframes keel-tick {
+  from {
+    stroke-dashoffset: 16;
+  }
+}
+.task input[type="checkbox"],
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+/* one focus ring everywhere, keyboard only */
+button:focus-visible,
+[role="tab"]:focus-visible,
+[role="option"]:focus-visible,
+[role="gridcell"]:focus-visible,
+a:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* hover: a soft fill, not just a border change */
+button:not(.primary):not(.link):not(.wc-btn):not(.chart-value):not(.cal-swatch):not(.on):not(.active):not(.cm-lp-link):hover:not(:disabled) {
+  background-color: var(--hover);
+}
+button.link:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main-content,
+  .cm-lp-check.done svg path {
+    animation: none;
+  }
+}
