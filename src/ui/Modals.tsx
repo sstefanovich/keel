@@ -20,6 +20,7 @@ const KIND_INFO: Record<CaptureKind, { label: string; hint: string }> = {
   reminder: { label: "Remind", hint: "remind me 3pm call the bank" },
   flag: { label: "Flag", hint: "flag renew the TLS cert" },
   note: { label: "Note", hint: "> Note name: what to add" },
+  scratch: { label: "Scratch", hint: "scratch: anything, added to the end of the scratchpad" },
   ask: { label: "Ask", hint: "? what did I do on FLIS this week" },
 };
 
@@ -92,6 +93,7 @@ export function QuickCapture({
   const where = (c: Capture): string => {
     if (c.kind === "ask") return "Claude";
     if (c.kind === "flag") return "the Flags board";
+    if (c.kind === "scratch") return "the scratchpad";
     if (c.kind === "note") {
       const path = c.note ? hold.resolveLink(c.note) : undefined;
       return path ? `note “${hold.get(path)?.title ?? c.note}”` : `new note “${c.note}”`;

@@ -1869,6 +1869,7 @@ mark {
   color: var(--accent);
 }
 .chip-flag,
+.chip-scratch,
 .chip-waiting,
 .chip-log {
   background: var(--code-bg);

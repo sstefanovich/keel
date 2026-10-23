@@ -2,7 +2,7 @@ import { ISODate, addDays, hhmm, isISODate, parseTime, toISO, weekdayOf } from "
 import { DURATION_SRC } from "./parse";
 
 /** What a capture becomes; also the chips shown under the input, in Tab order. */
-export const CAPTURE_KINDS = ["log", "task", "work", "waiting", "reminder", "flag", "note", "ask"] as const;
+export const CAPTURE_KINDS = ["log", "task", "work", "waiting", "reminder", "flag", "note", "scratch", "ask"] as const;
 export type CaptureKind = (typeof CAPTURE_KINDS)[number];
 
 export interface Capture {
@@ -31,6 +31,7 @@ const TASK_START = /^(?:todo:?|task:?|t:|\[\s?\]|-\s?\[ \])\s+/i;
 const FLAG_START = /^(?:flag:?|!)\s+/i;
 const WAIT_START = /^wait(?:ing)?(?:\s+on)?\s+/i;
 const REMIND_START = /^remind\s+me\s+/i;
+const SCRATCH_START = /^(?:scratch|sp):\s*/i;
 const NOTE_TARGET = /^>\s*([^:]+?)\s*:\s*(.*)$/;
 const TIME_IN_TEXT = /(?:^|\s)(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}:\d{2})(?=\s|$)/i;
 const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -106,6 +107,10 @@ const BUILD: Record<CaptureKind, (body: string, c: Ctx) => Built> = {
     if (!m || !m[2].trim()) return { heading: "", line: "", error: "Use > Note name: what to add" };
     return { heading: "", line: `- ${m[2].trim()}`, note: m[1].trim() };
   },
+  scratch: (b) => {
+    const text = b.replace(SCRATCH_START, "").trim();
+    return text ? { heading: "", line: text } : { heading: "", line: "", error: "Type something to jot on the scratchpad" };
+  },
   ask: (b) => {
     const q = b.replace(/^\?\s*/, "").trim();
     return q ? { heading: "", line: q, ask: q } : { heading: "", line: "", error: "Type a question for Claude" };
@@ -116,6 +121,7 @@ const BUILD: Record<CaptureKind, (body: string, c: Ctx) => Built> = {
 function detect(body: string, c: Ctx): CaptureKind {
   if (body.startsWith("?")) return "ask";
   if (body.startsWith(">")) return "note";
+  if (SCRATCH_START.test(body)) return "scratch";
   if (FLAG_START.test(body)) return "flag";
   const w = body.replace(/^work(?:ed)?:?\s+/i, "");
   const dur = w.match(DURATION);
@@ -145,9 +151,11 @@ export function parseCapture(input: string, now: Date = new Date(), focus?: stri
   const auto = detect(rest, ctx);
   const kind = force ?? auto;
   // a task captured via "remind me" without a time drops the "remind me"
-  const body = kind === "task" && REMIND_START.test(rest) ? rest.replace(REMIND_START, "").replace(/^to\s+/i, "") : rest;
+  // the scratchpad takes the text exactly as typed ("yesterday …" included)
+  const body =
+    kind === "scratch" ? text : kind === "task" && REMIND_START.test(rest) ? rest.replace(REMIND_START, "").replace(/^to\s+/i, "") : rest;
   const built = BUILD[kind](body, ctx);
-  const keepsDate = kind !== "flag" && kind !== "note" && kind !== "ask";
+  const keepsDate = kind !== "flag" && kind !== "note" && kind !== "ask" && kind !== "scratch";
   return { ...built, kind, auto, date: keepsDate ? date : undefined };
 }
 

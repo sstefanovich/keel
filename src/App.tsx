@@ -7,6 +7,7 @@ import { slugify } from "./core/templates";
 import { hideWindow, isCaptureWindow, loadSettings, onQuickCapture, onRemoteCapture, openFs, saveSettings, showMainWindow } from "./lib/platform";
 import { flushEditors } from "./ui/editor/Editor";
 import { CaptureWindow } from "./ui/CaptureWindow";
+import { appendToScratch } from "./ui/scratchStore";
 import { HoldProvider, useHold } from "./ui/HoldContext";
 import { PromptModal, PromptSpec, QuickCapture } from "./ui/Modals";
 import { Sidebar } from "./ui/Sidebar";
@@ -175,6 +176,9 @@ function Shell() {
       } else if (c.kind === "note") {
         const path = await hold.appendToNote(c.note!, c.line);
         message = `Added to ${hold.get(path)?.title ?? c.note}`;
+      } else if (c.kind === "scratch") {
+        await appendToScratch(hold, c.line);
+        message = "Added to the scratchpad";
       } else {
         if (c.work) await hold.logWork(day, c.work.key, c.work);
         else await hold.appendTo(await hold.ensureLog(day), c.heading, c.line);

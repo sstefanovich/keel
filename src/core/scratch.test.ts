@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { linesOf, noteFromText, takeText } from "./scratch";
+import { appendLine, linesOf, noteFromText, takeText } from "./scratch";
 
 describe("scratchpad", () => {
   const page = "call Sam re cutover\nidea: cache the token\n\nbuy ink\n";
@@ -31,5 +31,13 @@ describe("scratchpad", () => {
   it("makes a note title from the first line", () => {
     expect(noteFromText("# Token caching\nuse redis\nTTL 5 min")).toEqual({ title: "Token caching", body: "use redis\nTTL 5 min" });
     expect(noteFromText("just one line")).toEqual({ title: "just one line", body: "" });
+  });
+});
+
+describe("appendLine", () => {
+  it("adds a line at the end, tidying trailing space", () => {
+    expect(appendLine("", "first")).toBe("first\n");
+    expect(appendLine("a\nb", "c")).toBe("a\nb\nc\n");
+    expect(appendLine("a\n\n\n", " c ")).toBe("a\nc\n");
   });
 });

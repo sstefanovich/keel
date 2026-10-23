@@ -1,7 +1,8 @@
 import { Check, Eraser, FilePlus, Flag, ListPlus, NotepadText, ScrollText } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { today } from "../../core/dates";
-import { SCRATCH_PATH, linesOf, noteFromText, takeText } from "../../core/scratch";
+import { SCRATCH_PATH, appendLine, linesOf, noteFromText, takeText } from "../../core/scratch";
+import { setLiveScratch } from "../scratchStore";
 import { confirmDialog } from "../../lib/platform";
 import { useHold } from "../HoldContext";
 
@@ -65,6 +66,16 @@ export function ScratchpadView() {
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(save, SAVE_DELAY);
   };
+
+  // quick capture's "Scratch" appends here while the page is open
+  useEffect(
+    () =>
+      setLiveScratch(async (t) => {
+        change(appendLine(latest.current, t));
+        await save();
+      }),
+    [save], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   /** Take the selection (or the cursor's line) out of the page and hand it to `use`. */
   const move = async (what: string, use: (taken: string) => Promise<string>) => {

@@ -2,6 +2,12 @@
 
 export const SCRATCH_PATH = "scratchpad.txt";
 
+/** The page with `text` added as a new line at the end. */
+export function appendLine(page: string, text: string): string {
+  const body = page.replace(/\s+$/, "");
+  return `${body ? `${body}\n` : ""}${text.trim()}\n`;
+}
+
 /**
  * The text an action applies to: the selection, or (with nothing selected) the whole
  * line the cursor is on. Returns what was taken and the page without it, with the gap closed.

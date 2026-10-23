@@ -359,6 +359,14 @@ describe("parseCapture: kinds, overrides, days and notes", () => {
     expect(parseCapture("> no colon here", now)).toMatchObject({ kind: "note", error: expect.any(String) });
   });
 
+  it("jots on the scratchpad, text kept as typed", () => {
+    expect(parseCapture("scratch: call back 0207 555 0101", now)).toMatchObject({ kind: "scratch", line: "call back 0207 555 0101" });
+    expect(parseCapture("sp: ref INC-4411", now)).toMatchObject({ kind: "scratch", line: "ref INC-4411" });
+    // picked with Tab: no day prefix or task syntax is taken out
+    expect(parseCapture("yesterday todo maybe", now, undefined, "scratch")).toMatchObject({ kind: "scratch", line: "yesterday todo maybe", date: undefined });
+    expect(parseCapture("scratch:", now)).toMatchObject({ kind: "scratch", error: expect.any(String) });
+  });
+
   it("targets other days", () => {
     expect(parseDayPrefix("yesterday 6h @flis", "2026-10-21")).toEqual({ date: "2026-10-20", rest: "6h @flis" });
     expect(parseDayPrefix("fri: @vbs timeline", "2026-10-21").date).toBe("2026-10-16"); // last Friday
