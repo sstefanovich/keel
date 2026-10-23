@@ -1258,11 +1258,8 @@ button.icon-text {
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-width: 980px;
+  /* a scratchpad is a working surface: always use the whole window */
   padding: 18px 40px 12px;
-}
-:root[data-editor-width="full"] .scratch-page {
-  max-width: none;
 }
 .scratch-head {
   display: flex;
