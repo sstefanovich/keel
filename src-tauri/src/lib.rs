@@ -229,6 +229,7 @@ pub fn run() {
             attach::hold_write_image,
             attach::hold_image_url,
             attach::link_title,
+            attach::recipe_from_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Keel");

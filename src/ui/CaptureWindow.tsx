@@ -4,6 +4,7 @@ import { Capture } from "../core/capture";
 import { hideWindow, onCaptureOpen, sendCapture, setWindowHeight } from "../lib/platform";
 import { useHold } from "./HoldContext";
 import { QuickCapture } from "./Modals";
+import { refreshSpace } from "./space";
 
 const WIDTH = 680;
 /** How long the confirmation shows before the box hides */
@@ -33,6 +34,7 @@ export function CaptureWindow() {
         window.clearTimeout(closing.current);
         closing.current = undefined;
         setStatus(undefined);
+        refreshSpace(); // the mode may have changed in the main window
         setSession((s) => s + 1);
         void hold.reindex().then((changed) => changed && bump());
       }),

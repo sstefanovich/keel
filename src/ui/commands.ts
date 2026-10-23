@@ -1,5 +1,8 @@
 import {
   Bell,
+  Briefcase,
+  Home,
+  ShoppingCart,
   Building2,
   CalendarDays,
   ClipboardCopy,
@@ -35,6 +38,7 @@ import type { Command } from "./QuickSwitcher";
 import { setThemePref } from "./theme";
 import { VIEW_ICONS, VIEW_TITLES } from "./viewMeta";
 import { SHOW_BRIEFING_EVENT } from "./Briefing";
+import { getSpace, setSpace } from "./space";
 
 /** Asks the open file view to show its History panel. */
 export const OPEN_HISTORY_EVENT = "keel-open-history";
@@ -69,6 +73,17 @@ export function buildCommands({ hold, nav, view, focus, setFocus, weekStart, toa
     { id: "remind", title: "Set a reminder…", sub: "Capture · remind me 3pm …", Icon: Bell, run: () => capture("reminder") },
     { id: "flag", title: "Hoist a flag…", sub: "Capture", Icon: Flag, run: () => capture("flag") },
     { id: "jot", title: "Jot on the scratchpad…", sub: "Capture", Icon: NotepadText, run: () => capture("scratch") },
+    { id: "shopping", title: "Add to the shopping list…", sub: "Capture · + milk, eggs", Icon: ShoppingCart, run: () => capture("list") },
+    {
+      id: "mode",
+      title: getSpace() === "work" ? "Switch to personal mode" : "Switch to work mode",
+      sub: "Mode",
+      Icon: getSpace() === "work" ? Home : Briefcase,
+      run: () => {
+        setSpace(getSpace() === "work" ? "personal" : "work");
+        nav.openToday();
+      },
+    },
     { id: "ask", title: "Ask Claude…", sub: "Capture", Icon: Sparkles, run: () => capture("ask") },
     { id: "new-note", title: "New note…", sub: "Create", Icon: FilePlus, keys: "Ctrl+N", run: () => nav.newItem("note") },
     { id: "new-meeting", title: "New meeting…", sub: "Create", Icon: Users, keys: "Ctrl+Shift+M", run: () => nav.newItem("meeting") },

@@ -1,3 +1,4 @@
+import { getSpace } from "../space";
 import { formatShort, parseISO, today } from "../../core/dates";
 import { Task, taskLabel } from "../../core/parse";
 import { copyText } from "../../lib/platform";
@@ -14,7 +15,7 @@ const what = (t: Task) => taskLabel(t);
 export function WaitingView() {
   const { hold, bump, reportError, toast, focus } = useHold();
   const nav = useNav();
-  const items = hold.waitingOn(focus);
+  const items = hold.waitingOn(focus, getSpace());
   const clients = hold.clients();
 
   const groups = new Map<string, Task[]>();

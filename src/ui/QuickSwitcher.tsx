@@ -67,7 +67,7 @@ export function QuickSwitcher({ onClose, commands, initial = "" }: { onClose: ()
     const label = (f: ParsedFile) => {
       if (f.kind === "log" && f.date) return { title: f.date === today() ? `Today · ${formatShort(f.date)}` : formatLong(f.date), sub: "Log" };
       const client = hold.fileClient(f);
-      const where = { meeting: "Meeting", note: "Note", client: "Client", project: "Project", flag: "Flag", reminders: "Reminders", template: "", log: "Log" }[f.kind];
+      const where = { meeting: "Meeting", note: "Note", client: "Client", project: "Project", flag: "Flag", reminders: "Reminders", template: "", log: "Log", list: "List", recipe: "Recipe" }[f.kind];
       return { title: f.title, sub: [where, client && f.kind !== "client" ? hold.clients().get(client)?.name ?? client : ""].filter(Boolean).join(" · ") };
     };
     const files = hold

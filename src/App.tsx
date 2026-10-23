@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Capture, CaptureKind } from "./core/capture";
 import { buildCommands } from "./ui/commands";
 import { useWeekStart } from "./ui/weekStart";
+import { getSpace, useSpace } from "./ui/space";
+import { ListsView } from "./ui/views/ListsView";
+import { RecipesView } from "./ui/views/RecipesView";
 import { formatShort, today } from "./core/dates";
 import { Hold } from "./core/hold";
 import { basename } from "./core/parse";
@@ -82,6 +85,8 @@ export default function App() {
 function Shell() {
   const { hold, dir, bump, reportError, toast, focus, setFocus } = useHold();
   const weekStart = useWeekStart();
+  // re-render everything on a mode switch (views read the mode as they draw)
+  const space = useSpace();
   useEffect(() => startCalendarSync(), []);
   useEffect(() => startHistory(dir), [dir]);
   // tabs, each with its own history; restored from the last session
@@ -132,7 +137,8 @@ function Shell() {
   const openLog = useCallback(
     async (date: string, o?: OpenOpts) => {
       try {
-        const path = await hold.ensureLog(date);
+        // the log of whichever mode Keel is in: work, or personal
+        const path = await hold.ensureLog(date, today(), getSpace());
         bump();
         openFile(path, undefined, o);
       } catch (e) {
@@ -169,7 +175,9 @@ function Shell() {
   const saveCapture = useCallback(
     async (c: Capture): Promise<string> => {
       const day = c.date ?? today();
-      const onDay = c.date ? ` (${formatShort(c.date)})` : "";
+      // a "p:" / "w:" prefix wins; otherwise the mode Keel is in (hours are always work)
+      const space = c.kind === "work" ? "work" : (c.space ?? getSpace());
+      const onDay = (c.date ? ` (${formatShort(c.date)})` : "") + (space !== getSpace() ? ` · ${space}` : "");
       let message: string;
       if (c.kind === "ask") {
         setClaudeMounted(true);
@@ -177,8 +185,11 @@ function Shell() {
         sendToClaude(c.ask!);
         message = "Sent to Claude";
       } else if (c.kind === "flag") {
-        await hold.hoistFlag(c.line, "yellow", focus);
-        message = "Flag hoisted";
+        await hold.hoistFlag(c.line, "yellow", space === "work" ? focus : undefined, space);
+        message = `Flag hoisted${onDay}`;
+      } else if (c.kind === "list") {
+        const n = await hold.addToList(c.list!.name, c.list!.items);
+        message = n ? `Added ${n} to ${c.list!.name}` : `Already on ${c.list!.name}`;
       } else if (c.kind === "note") {
         const path = await hold.appendToNote(c.note!, c.line);
         message = `Added to ${hold.get(path)?.title ?? c.note}`;
@@ -187,9 +198,9 @@ function Shell() {
         message = "Added to the scratchpad";
       } else {
         if (c.work) await hold.logWork(day, c.work.key, c.work);
-        else await hold.appendTo(await hold.ensureLog(day), c.heading, c.line);
-        const what = { log: "Added to the log", task: "Task added", work: c.work?.hours ? "Hours logged" : "Added to work", waiting: "Added to waiting on", reminder: "Reminder set" };
-        message = what[c.kind] + onDay;
+        else await hold.appendTo(await hold.ensureLog(day, today(), space), c.heading, c.line);
+        const what: Record<string, string> = { log: "Added to the log", task: "Task added", work: c.work?.hours ? "Hours logged" : "Added to work", waiting: "Added to waiting on", reminder: "Reminder set" };
+        message = (what[c.kind] ?? "Saved") + onDay;
       }
       bump();
       return message;
@@ -234,6 +245,16 @@ function Shell() {
           reportError(e);
         }
       };
+      // personal notes live in personal/notes and belong to no client or project
+      if (kind === "note" && getSpace() === "personal") {
+        setPrompt({
+          title: "New personal note",
+          label: "Title",
+          submitLabel: "Create",
+          onSubmit: (v) => make(() => hold.createNote(v, "personal/notes")),
+        });
+        return;
+      }
       const specs: Record<typeof kind, PromptSpec> = {
         note: {
           title: "New note",
@@ -451,7 +472,7 @@ function Shell() {
         <main className="main">
           <TabBar />
           {/* keyed by what is shown, so switching views fades the new one in (and starts it at the top) */}
-          <div className="main-content" key={view.kind === "file" ? `file:${view.path}` : view.kind}>
+          <div className="main-content" key={`${space}:${view.kind === "file" ? view.path : view.kind}`}>
             {view.kind === "file" && <FileView path={view.path} line={view.line} />}
             {view.kind === "agenda" && <AgendaView />}
             {view.kind === "scratch" && <ScratchpadView />}
@@ -463,6 +484,8 @@ function Shell() {
             {view.kind === "calendar" && <CalendarView date={view.date} mode={view.mode} />}
             {view.kind === "search" && <SearchView initial={view.q} />}
             {view.kind === "settings" && <SettingsView section={view.section} />}
+            {view.kind === "lists" && <ListsView />}
+            {view.kind === "recipes" && <RecipesView />}
           </div>
           {claudeMounted && <ClaudePanel open={claudeOpen} onClose={() => setClaudeOpen(false)} />}
         </main>

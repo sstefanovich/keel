@@ -53,6 +53,16 @@ attendees: []
 ## Action items
 - [ ] ${""}
 `,
+  "templates/personal-log.md": `---
+date: {{date}}
+---
+# {{dateLong}}
+
+## Tasks
+
+## Log
+
+`,
   "templates/note.md": `---
 created: {{date}}
 tags: []

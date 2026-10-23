@@ -1,3 +1,4 @@
+import { getSpace } from "./space";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { FLAG_COLORS, FlagColor } from "../core/hold";
 import { ParsedFile } from "../core/parse";
@@ -118,12 +119,12 @@ function FlagCard({ flag }: { flag: ParsedFile }) {
 export function FlagBoard({ compact = false }: { compact?: boolean }) {
   const { hold, bump, reportError, focus } = useHold();
   const [adding, setAdding] = useState(false);
-  const flags = hold.flags(focus);
+  const flags = hold.flags(focus, getSpace());
 
   const hoist = async (text: string) => {
     setAdding(false);
     try {
-      await hold.hoistFlag(text, "yellow", focus);
+      await hold.hoistFlag(text, "yellow", focus, getSpace());
       bump();
     } catch (e) {
       reportError(e);

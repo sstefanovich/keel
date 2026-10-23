@@ -244,6 +244,22 @@ export async function fetchLinkTitle(url: string): Promise<string | null> {
   }
 }
 
+export interface RecipeInfo {
+  title: string;
+  ingredients: string[];
+  steps: string[];
+  servings?: string;
+  /** ISO 8601 duration, e.g. "PT1H30M" */
+  totalTime?: string;
+  image?: string;
+}
+
+/** A recipe read from its page (the structured data recipe sites publish); title only when there's none. */
+export async function recipeFromUrl(url: string): Promise<RecipeInfo> {
+  if (!isTauri) throw new Error("Recipes can only be imported in the desktop app");
+  return invoke<RecipeInfo>("recipe_from_url", { url });
+}
+
 // ---------- file history (snapshots in a git repository in the hold) ----------
 
 export interface Snapshot {

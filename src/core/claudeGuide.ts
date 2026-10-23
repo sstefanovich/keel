@@ -25,6 +25,7 @@ won't show up anywhere. Prefer small, targeted edits over rewriting whole files.
 | \`reminders.md\` | Recurring reminders |
 | \`scratchpad.txt\` | Plain-text scratchpad for transient jottings (no markdown); moved items are removed from it |
 | \`templates/\` | Templates for new files: don't change unless asked |
+| \`personal/\` | The owner's personal space (see "Personal space" below): its own logs, notes, flags, lists and recipes |
 
 Dates are always \`YYYY-MM-DD\`. Every file may start with YAML frontmatter between \`---\` lines: keep it valid.
 
@@ -89,15 +90,35 @@ Diagrams: \`\`\`mermaid code blocks render in Keel.
 - **"What did I do on X this week?"** → read the \`## Work\` blocks for that key in the week's logs (Sat to Fri),
   plus ticked tasks tagged to it.
 - **Summaries or reports** → answer in the chat unless asked to save one; saved reports go in \`notes/\`.
+
+## Personal space
+Everything under \`personal/\` is personal; everything else is work. Keel shows one or the other (Work / Personal mode).
+Never put work in \`personal/\` or personal things at the top level, and never log hours in a personal log.
+
+| Path | What |
+|---|---|
+| \`personal/logs/YYYY/YYYY-MM-DD.md\` | Personal day log: \`## Tasks\` and \`## Log\` (no \`## Work\`) |
+| \`personal/notes/…\` | Personal notes |
+| \`personal/flags/…md\` | Personal flags (same format as \`flags/\`) |
+| \`personal/lists/<Name>.md\` | Checklists: \`# Name\` then \`- [ ] item\` lines (\`Shopping.md\` is the shopping list). Ticked items are \`- [x] item\` with no \`@done\` |
+| \`personal/recipes/<Title>.md\` | Recipes: frontmatter \`title\`, \`source\` (link), \`servings\`, \`time\`; sections \`## Ingredients\` (bullets), \`## Method\` (numbered), \`## Notes\` |
+
+- **"Add X to the shopping list"** → \`personal/lists/Shopping.md\`: append \`- [ ] X\` unless it's already there unticked.
+- **Personal tasks or reminders** → today's \`personal/logs/…\` log, \`## Tasks\`.
 `;
+
+/** The guide before the personal space existed (everything up to that section). */
+const BEFORE_PERSONAL = CLAUDE_GUIDE.replace(/\| `personal\/` \|.*\n/, "").replace(/\n## Personal space\n[\s\S]*$/, "");
 
 /** Earlier versions of the guide: a CLAUDE.md still exactly like one of these is replaced with the current one. */
 export const PREVIOUS_GUIDES: string[] = [
   // before capitalised @Name meant "waiting on"
-  CLAUDE_GUIDE.replace(/ tag\)\. A capitalised\n.*\n.*\n/, " tag).\n"),
+  BEFORE_PERSONAL.replace(/ tag\)\. A capitalised\n.*\n.*\n/, " tag).\n"),
   // before only a trailing @Name counted
-  CLAUDE_GUIDE.replace(
+  BEFORE_PERSONAL.replace(
     /`@Name` at the end of a task means the same \(`- \[ \] send the SOW @Jordan`\); meeting action items use this\n {2}form\. Mid-sentence .*\n/,
     "`@Name` on a task means the same (`- [ ] send the SOW @Jordan`); meeting action items use this form.\n",
   ),
+  // before the personal space
+  BEFORE_PERSONAL,
 ];

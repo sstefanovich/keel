@@ -1,7 +1,7 @@
 import { Coffee, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { addDays, formatShort, parseISO } from "../core/dates";
-import { ParsedFile, taskLabel } from "../core/parse";
+import { ParsedFile, spaceOf, taskLabel } from "../core/parse";
 import { CalItem, eventTime, useCalendarEvents } from "./calendars";
 import { useHold } from "./HoldContext";
 import { openOpts, useNav } from "./nav";
@@ -51,14 +51,14 @@ export function Briefing({ file }: { file: ParsedFile }) {
   };
 
   const meetings: CalItem[] = events.filter((e) => !e.free);
-  const agenda = hold.agenda(date, 14, focus);
+  const agenda = hold.agenda(date, 14, focus, spaceOf(file.path));
   const due = [...agenda.overdue, ...agenda.today];
   const prevLog = hold
     .all()
     .filter((f) => f.kind === "log" && f.date && f.date < date)
     .sort((a, b) => b.date!.localeCompare(a.date!))[0];
   const carried = prevLog ? prevLog.tasks.filter((t) => t.status === "migrated").length : 0;
-  const waiting = hold.waitingOn(focus).filter((t) => t.since && daysBetween(t.since, date) >= WAITING_DAYS);
+  const waiting = hold.waitingOn(focus, spaceOf(file.path)).filter((t) => t.since && daysBetween(t.since, date) >= WAITING_DAYS);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const nothing = !meetings.length && !due.length && !carried && !waiting.length;

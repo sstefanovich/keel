@@ -1,5 +1,9 @@
 import {
   Bell,
+  Briefcase,
+  ChefHat,
+  Home,
+  ShoppingCart,
   CalendarDays,
   Clock,
   Compass,
@@ -21,7 +25,8 @@ import {
 } from "lucide-react";
 import { MouseEvent } from "react";
 import { today } from "../core/dates";
-import { ParsedFile, basename } from "../core/parse";
+import { ParsedFile, Space, basename, spaceOf } from "../core/parse";
+import { setSpace, useSpace } from "./space";
 import { ClaudeIcon } from "./ClaudePanel";
 import { ArchiveSection, ChartsSection, LogsSection, MeetingsSection, NotesSection, PinnedSection, RecentSection } from "./SidebarSections";
 import { useHold } from "./HoldContext";
@@ -102,14 +107,18 @@ export function KeelLogo({ size = 22 }: { size?: number }) {
 const byDateDesc = (a: ParsedFile, b: ParsedFile) => (b.date ?? "").localeCompare(a.date ?? "") || b.mtime - a.mtime;
 
 export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
-  const { hold, focus, setFocus } = useHold();
+  const { hold, focus: workFocus, setFocus } = useHold();
   const nav = useNav();
+  const space = useSpace();
+  const personal = space === "personal";
+  // a client focus only means something at work
+  const focus = personal ? undefined : workFocus;
   const collapsed = nav.sidebarCollapsed;
   const v: View = nav.view;
   const current = v.kind === "file" ? v.path : undefined;
-  const files = hold.all();
+  const files = hold.all().filter((f) => spaceOf(f.path) === space);
   const t = today();
-  const todayPath = hold.logPath(t);
+  const todayPath = hold.logPath(t, space);
 
   const mine = (f: ParsedFile) => !focus || hold.fileClient(f) === focus;
   const logs = files.filter((f) => f.kind === "log").sort(byDateDesc);
@@ -119,9 +128,16 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
   const archived = files
     .filter((f) => (f.kind === "note" || f.kind === "meeting" || f.kind === "project") && hold.isArchived(f) && mine(f))
     .sort((a, b) => a.title.localeCompare(b.title));
-  const flagCount = hold.flags(focus).length;
-  const waitingCount = hold.waitingOn(focus).length;
-  const agenda = hold.agenda(t, 14, focus);
+  const flagCount = hold.flags(focus, space).length;
+  const waitingCount = hold.waitingOn(focus, space).length;
+  const agenda = hold.agenda(t, 14, focus, space);
+  const listCount = personal ? hold.lists().reduce((n, l) => n + l.tasks.filter((x) => x.status === "open").length, 0) : 0;
+
+  const switchTo = (s: Space) => {
+    if (s === space) return;
+    setSpace(s);
+    nav.openToday();
+  };
   // clients, each followed by its projects; projects without a known client at the end
   const clientFiles = files.filter((f) => f.kind === "client").sort((a, b) => a.title.localeCompare(b.title));
   const clientKeys = new Set(clientFiles.map((c) => basename(c.path).toLowerCase()));
@@ -169,7 +185,27 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
         )}
       </div>
 
-      {!collapsed && (
+      {collapsed ? (
+        <button
+          className="rail-space"
+          onClick={() => switchTo(personal ? "work" : "personal")}
+          title={`${personal ? "Personal" : "Work"} mode. Click for ${personal ? "work" : "personal"}`}
+          aria-label={`Switch to ${personal ? "work" : "personal"} mode`}
+        >
+          {personal ? <Home size={16} /> : <Briefcase size={16} />}
+        </button>
+      ) : (
+        <div className="space-switch seg" role="radiogroup" aria-label="Mode">
+          <button role="radio" aria-checked={!personal} className={!personal ? "on" : ""} onClick={() => switchTo("work")}>
+            <Briefcase size={14} aria-hidden="true" /> Work
+          </button>
+          <button role="radio" aria-checked={personal} className={personal ? "on" : ""} onClick={() => switchTo("personal")}>
+            <Home size={14} aria-hidden="true" /> Personal
+          </button>
+        </div>
+      )}
+
+      {!collapsed && !personal && (
         <div className={`focus-picker${focus ? " on" : ""}`}>
           <select
             value={focus ?? ""}
@@ -218,9 +254,18 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
         {item(Flag, "Flags", v.kind === "flags", (o) => nav.go({ kind: "flags" }, o), { badge: flagCount })}
         {item(Hourglass, "Waiting on", v.kind === "waiting", (o) => nav.go({ kind: "waiting" }, o), { badge: waitingCount })}
         <div className="nav-sep" />
-        {item(Clock, "Timesheet", v.kind === "timesheet", (o) => nav.go({ kind: "timesheet" }, o))}
-        {item(Send, "Dispatch", v.kind === "dispatch", (o) => nav.go({ kind: "dispatch" }, o))}
-        {item(Compass, "Charts", v.kind === "charts", (o) => nav.go({ kind: "charts" }, o))}
+        {personal ? (
+          <>
+            {item(ShoppingCart, "Lists", v.kind === "lists", (o) => nav.go({ kind: "lists" }, o), { badge: listCount })}
+            {item(ChefHat, "Recipes", v.kind === "recipes", (o) => nav.go({ kind: "recipes" }, o))}
+          </>
+        ) : (
+          <>
+            {item(Clock, "Timesheet", v.kind === "timesheet", (o) => nav.go({ kind: "timesheet" }, o))}
+            {item(Send, "Dispatch", v.kind === "dispatch", (o) => nav.go({ kind: "dispatch" }, o))}
+            {item(Compass, "Charts", v.kind === "charts", (o) => nav.go({ kind: "charts" }, o))}
+          </>
+        )}
         <div className="nav-sep" />
         {item(CalendarDays, "Calendar", v.kind === "calendar", (o) => nav.go({ kind: "calendar" }, o))}
         {item(Search, "Search", v.kind === "search", (o) => nav.go({ kind: "search" }, o), { hint: "Ctrl+Shift+F" })}
@@ -231,10 +276,10 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
         <div className="side-scroll">
           <PinnedSection current={current} />
           <RecentSection current={current} />
-          <MeetingsSection meetings={meetings} current={current} />
+          {!personal && <MeetingsSection meetings={meetings} current={current} />}
           <NotesSection notes={notes} current={current} />
           <LogsSection logs={logs} current={current} />
-          <ChartsSection charts={charts} current={current} />
+          {!personal && <ChartsSection charts={charts} current={current} />}
           <ArchiveSection items={archived} current={current} />
         </div>
       ) : (

@@ -1,3 +1,4 @@
+import { getSpace } from "../space";
 import { formatShort } from "../../core/dates";
 import { FlagBoard } from "../FlagBoard";
 import { useHold } from "../HoldContext";
@@ -6,7 +7,7 @@ import { useNav } from "../nav";
 export function FlagsView() {
   const { hold, bump, reportError } = useHold();
   const nav = useNav();
-  const lowered = hold.loweredFlags();
+  const lowered = hold.loweredFlags(getSpace());
 
   const rehoist = async (path: string) => {
     try {

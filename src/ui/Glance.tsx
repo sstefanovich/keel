@@ -2,7 +2,7 @@ import { Bell, CircleCheck, Clock, Hourglass, ListChecks, Video } from "lucide-r
 import { addDays, formatTime, hhmm, parseISO, today } from "../core/dates";
 import { eventSpan, eventTime, useCalendarEvents } from "./calendars";
 import { round2 } from "../core/hold";
-import { ParsedFile } from "../core/parse";
+import { ParsedFile, spaceOf } from "../core/parse";
 import { useHold } from "./HoldContext";
 import { openOpts, useNav } from "./nav";
 
@@ -19,12 +19,12 @@ export function Glance({ file }: { file: ParsedFile }) {
   const hours = file.hours.reduce((s, h) => s + h.hours, 0);
   const projects = new Set(file.hours.map((h) => h.client)).size;
   const open = file.tasks.filter((t) => t.status === "open").length;
-  const doneThatDay = hold.tasks().filter((t) => t.status === "done" && (t.doneOn ?? (t.file === file.path ? date : "")) === date).length;
-  const agenda = isToday ? hold.agenda(date, 14, focus) : undefined;
+  const doneThatDay = hold.tasks(spaceOf(file.path)).filter((t) => t.status === "done" && (t.doneOn ?? (t.file === file.path ? date : "")) === date).length;
+  const agenda = isToday ? hold.agenda(date, 14, focus, spaceOf(file.path)) : undefined;
   const overdue = agenda?.overdue.length ?? 0;
   const now = hhmm(new Date());
   const next = isToday ? hold.remindersOn(date).find((r) => r.rule.time > now) : undefined;
-  const waiting = isToday ? hold.waitingOn(focus).length : 0;
+  const waiting = isToday ? hold.waitingOn(focus, spaceOf(file.path)).length : 0;
   const events = useCalendarEvents(parseISO(date).getTime(), parseISO(addDays(date, 1)).getTime());
   const nowMs = Date.now();
   const timed = events.filter((e) => !e.allDay && !e.free);
@@ -33,11 +33,13 @@ export function Glance({ file }: { file: ParsedFile }) {
 
   return (
     <div className="glance" aria-label="Day at a glance">
-      <button className="glance-item" onClick={(e) => nav.go({ kind: "timesheet" }, openOpts(e))} title="Open the timesheet">
-        <Clock size={14} aria-hidden="true" />
-        <b>{hours ? `${round2(hours)}h` : "No hours"}</b>
-        <span>{hours ? `on ${projects} project${projects === 1 ? "" : "s"}` : "logged yet"}</span>
-      </button>
+      {spaceOf(file.path) === "work" && (
+        <button className="glance-item" onClick={(e) => nav.go({ kind: "timesheet" }, openOpts(e))} title="Open the timesheet">
+          <Clock size={14} aria-hidden="true" />
+          <b>{hours ? `${round2(hours)}h` : "No hours"}</b>
+          <span>{hours ? `on ${projects} project${projects === 1 ? "" : "s"}` : "logged yet"}</span>
+        </button>
+      )}
       <button className="glance-item" onClick={(e) => nav.go({ kind: "agenda" }, openOpts(e))} title="Open the agenda">
         <ListChecks size={14} aria-hidden="true" />
         <b>{open}</b>

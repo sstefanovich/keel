@@ -1,3 +1,4 @@
+import { getSpace } from "../space";
 import { ReactNode } from "react";
 import { describeRule } from "../../core/schedule";
 import { addDays, formatLong, formatShort, formatTime, hhmm, parseISO, today } from "../../core/dates";
@@ -32,7 +33,7 @@ export function AgendaView() {
   const { hold, focus } = useHold();
   const nav = useNav();
   const d = today();
-  const a = hold.agenda(d, 14, focus);
+  const a = hold.agenda(d, 14, focus, getSpace());
   const now = hhmm(new Date());
   const { sources } = useCalendars();
   const meetings = useCalendarEvents(parseISO(d).getTime(), parseISO(addDays(d, 1)).getTime());

@@ -1,3 +1,4 @@
+import { getSpace } from "../space";
 import { Check, Eraser, FilePlus, Flag, ListPlus, NotepadText, ScrollText } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { today } from "../../core/dates";
@@ -108,21 +109,21 @@ export function ScratchpadView() {
 
   const toTasks = () =>
     move("Added as tasks", async (t) => {
-      const log = await hold.ensureLog(today());
+      const log = await hold.ensureLog(today(), today(), getSpace());
       await hold.appendTo(log, "Tasks", linesOf(t).map((l) => `- [ ] ${l}`).join("\n"));
       return "today's log";
     });
 
   const toLog = () =>
     move("Added to the log", async (t) => {
-      const log = await hold.ensureLog(today());
+      const log = await hold.ensureLog(today(), today(), getSpace());
       await hold.appendTo(log, "Log", linesOf(t).map((l) => `- ${l}`).join("\n"));
       return "today's log";
     });
 
   const toFlag = () =>
     move("Hoisted a flag", async (t) => {
-      await hold.hoistFlag(t);
+      await hold.hoistFlag(t, "yellow", undefined, getSpace());
       return "the Flags board";
     });
 

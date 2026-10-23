@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { addDays, formatLong, today } from "../../core/dates";
-import { confirmDialog, isTauri } from "../../lib/platform";
+import { confirmDialog, isTauri, openUrl } from "../../lib/platform";
+import { spaceOf } from "../../core/parse";
+import { shopForRecipe } from "../recipes";
 import { HistoryPanel } from "../HistoryPanel";
 import { OPEN_HISTORY_EVENT } from "../commands";
 import { FlagBoard } from "../FlagBoard";
@@ -9,14 +11,14 @@ import { Briefing } from "../Briefing";
 import { Outline } from "../Outline";
 import { Glance } from "../Glance";
 import { useHold } from "../HoldContext";
-import { Editor, SaveStatus } from "../editor/Editor";
-import { Check, FileX, History, Trash2 } from "lucide-react";
+import { Editor, SaveStatus, flushEditors } from "../editor/Editor";
+import { Check, ExternalLink, FileX, History, ShoppingCart, Trash2 } from "lucide-react";
 import { EmptyState } from "../EmptyState";
 import { useNav } from "../nav";
 import { ChartView } from "./ChartView";
 
 export function FileView({ path, line }: { path: string; line?: number }) {
-  const { hold, bump, reportError } = useHold();
+  const { hold, bump, reportError, toast } = useHold();
   const nav = useNav();
   const file = hold.get(path);
   const backlinks = hold.backlinks(path);
@@ -138,6 +140,32 @@ export function FileView({ path, line }: { path: string; line?: number }) {
             {saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Edited"}
           </span>
         )}
+        {file.kind === "recipe" && (
+          <>
+            <button
+              className="ghost icon-text"
+              onClick={async () => {
+                try {
+                  await flushEditors();
+                  toast(await shopForRecipe(hold, hold.get(path) ?? file));
+                  bump();
+                } catch (e) {
+                  reportError(e);
+                }
+              }}
+              title="Put this recipe's ingredients on the Shopping list"
+            >
+              <ShoppingCart size={14} aria-hidden="true" />
+              Shop
+            </button>
+            {typeof file.frontmatter.source === "string" && (
+              <button className="ghost icon-text" onClick={() => void openUrl(String(file.frontmatter.source)).catch(reportError)} title={String(file.frontmatter.source)}>
+                <ExternalLink size={14} aria-hidden="true" />
+                Source
+              </button>
+            )}
+          </>
+        )}
         {(mode === "edit" || !hasChart) && <Outline content={file.content} onJump={(l) => nav.openFile(path, l)} />}
         {isTauri && (
           <button className="ghost icon-text" onClick={() => setHistory(true)} title="Earlier versions of this file">
@@ -163,7 +191,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
             </div>
             <aside className="log-side">
               {file.date === today() && <Briefing file={file} />}
-              <WorkPanel file={file} />
+              {spaceOf(path) === "work" && <WorkPanel file={file} />}
             </aside>
           </div>
         ) : (

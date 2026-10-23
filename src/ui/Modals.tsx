@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CAPTURE_KINDS, Capture, CaptureKind, parseCapture } from "../core/capture";
 import { formatShort, today } from "../core/dates";
 import { useHold } from "./HoldContext";
+import { useSpace } from "./space";
 import { mentionAt, workTargets } from "./workTargets";
 
 function useEscape(onClose: () => void) {
@@ -19,6 +20,7 @@ const KIND_INFO: Record<CaptureKind, { label: string; hint: string }> = {
   waiting: { label: "Waiting", hint: "wait Jordan: firewall rules" },
   reminder: { label: "Remind", hint: "remind me 3pm call the bank" },
   flag: { label: "Flag", hint: "flag renew the TLS cert" },
+  list: { label: "List", hint: "+ milk, eggs  ·  +Hardware: screws" },
   note: { label: "Note", hint: "> Note name: what to add" },
   scratch: { label: "Scratch", hint: "scratch: anything, added to the end of the scratchpad" },
   ask: { label: "Ask", hint: "? what did I do on FLIS this week" },
@@ -46,6 +48,7 @@ export function QuickCapture({
   initialKind?: CaptureKind;
 }) {
   const { hold } = useHold();
+  const mode = useSpace();
   const [text, setText] = useState("");
   const [force, setForce] = useState<CaptureKind | undefined>(initialKind);
   const [busy, setBusy] = useState(false);
@@ -94,14 +97,18 @@ export function QuickCapture({
   };
 
   const where = (c: Capture): string => {
+    const space = c.kind === "work" ? "work" : (c.space ?? mode);
+    // name the space only when it isn't the one Keel is in
+    const sp = space !== mode ? `${space} ` : "";
     if (c.kind === "ask") return "Claude";
-    if (c.kind === "flag") return "the Flags board";
+    if (c.kind === "flag") return `the ${sp}Flags board`;
     if (c.kind === "scratch") return "the scratchpad";
+    if (c.kind === "list") return `${c.list?.name ?? "Shopping"} list`;
     if (c.kind === "note") {
       const path = c.note ? hold.resolveLink(c.note) : undefined;
       return path ? `note “${hold.get(path)?.title ?? c.note}”` : `new note “${c.note}”`;
     }
-    return c.date ? `${formatShort(c.date)} log` : "today's log";
+    return c.date ? `${formatShort(c.date)} ${sp}log` : `today's ${sp}log`;
   };
 
   const box = (

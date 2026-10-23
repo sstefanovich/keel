@@ -1,3 +1,4 @@
+import { getSpace } from "../space";
 import { useEffect, useRef, useState } from "react";
 import { addDays, formatLong, formatShort, today } from "../../core/dates";
 import { SearchFilter } from "../../core/hold";
@@ -45,6 +46,8 @@ export function SearchView({ initial = "" }: { initial?: string }) {
   // "client:key" or "project:key"; with a focused client, searches start narrowed to it
   const [owner, setOwner] = useState(focus ? `client:${focus}` : "");
   const [when, setWhen] = useState<keyof typeof WHEN>("any");
+  const mode = getSpace();
+  const [bothSpaces, setBothSpaces] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
   useEffect(() => setOwner(focus ? `client:${focus}` : ""), [focus]);
@@ -57,6 +60,7 @@ export function SearchView({ initial = "" }: { initial?: string }) {
     client: ownerKind === "client" ? ownerKey : undefined,
     project: ownerKind === "project" ? ownerKey : undefined,
     from: when === "year" ? `${t.slice(0, 4)}-01-01` : days ? addDays(t, -days) : undefined,
+    space: bothSpaces ? undefined : mode,
   };
   const hits = hold.search(q, 200, filter);
   const filtered = type !== "all" || !!owner || when !== "any";
@@ -106,6 +110,10 @@ export function SearchView({ initial = "" }: { initial?: string }) {
               </optgroup>
             ))}
           </select>
+          <label className="check-inline small" title={`Searching ${bothSpaces ? "work and personal" : `only ${mode}`}`}>
+            <input type="checkbox" checked={bothSpaces} onChange={(e) => setBothSpaces(e.target.checked)} />
+            Work and personal
+          </label>
           <select value={when} onChange={(e) => setWhen(e.target.value as keyof typeof WHEN)} aria-label="When">
             {(Object.keys(WHEN) as (keyof typeof WHEN)[]).map((k) => (
               <option key={k} value={k}>

@@ -6,6 +6,9 @@ import {
   FileKind,
   HOURS_RE,
   HoursEntry,
+  PERSONAL,
+  Space,
+  spaceOf,
   ParsedFile,
   Reminder,
   Task,
@@ -60,6 +63,8 @@ export interface Timesheet {
 /** Narrowing a search: file types, one client or project, and a date range (inclusive). */
 export interface SearchFilter {
   kinds?: FileKind[];
+  /** Only this space (both when unset) */
+  space?: Space;
   client?: string;
   project?: string;
   from?: ISODate;
@@ -178,8 +183,8 @@ export class Hold {
 
   // ---------- paths & creation ----------
 
-  logPath(date: ISODate): string {
-    return `logs/${date.slice(0, 4)}/${date}.md`;
+  logPath(date: ISODate, space: Space = "work"): string {
+    return `${space === "personal" ? PERSONAL : ""}logs/${date.slice(0, 4)}/${date}.md`;
   }
 
   private async template(name: string): Promise<string> {
@@ -200,31 +205,32 @@ export class Hold {
    * Open (creating if needed) the log for a date. Creating today's log carries
    * over top-level open tasks from the most recent earlier log and marks them [>].
    */
-  async ensureLog(date: ISODate, today: ISODate = todayISO()): Promise<string> {
+  async ensureLog(date: ISODate, today: ISODate = todayISO(), space: Space = "work"): Promise<string> {
     // concurrent calls for the same day share one creation (no double migration)
-    const pending = this.creatingLog.get(date);
+    const key = `${space}:${date}`;
+    const pending = this.creatingLog.get(key);
     if (pending) return pending;
-    const p = this.createLog(date, today).finally(() => this.creatingLog.delete(date));
-    this.creatingLog.set(date, p);
+    const p = this.createLog(date, today, space).finally(() => this.creatingLog.delete(key));
+    this.creatingLog.set(key, p);
     return p;
   }
 
-  private creatingLog = new Map<ISODate, Promise<string>>();
+  private creatingLog = new Map<string, Promise<string>>();
 
-  private async createLog(date: ISODate, today: ISODate): Promise<string> {
-    const path = this.logPath(date);
-    if (!(await this.fs.exists(path))) await this.save(path, fillTemplate(await this.template("log"), { date }));
+  private async createLog(date: ISODate, today: ISODate, space: Space): Promise<string> {
+    const path = this.logPath(date, space);
+    if (!(await this.fs.exists(path))) await this.save(path, fillTemplate(await this.template(space === "personal" ? "personal-log" : "log"), { date }));
     // Runs on every open of today's log, not just creation, so a log made early
     // (by browsing ahead) still receives the carry-over. Repeating it is harmless:
     // carried tasks are marked [>] in the old log.
-    if (date === today) await this.carryOver(path, date);
+    if (date === today) await this.carryOver(path, date, space);
     return path;
   }
 
-  /** Move open top-level tasks from the most recent earlier log into this one. */
-  private async carryOver(path: string, date: ISODate): Promise<void> {
+  /** Move open top-level tasks from the most recent earlier log (in the same space) into this one. */
+  private async carryOver(path: string, date: ISODate, space: Space): Promise<void> {
     const prev = this.all()
-      .filter((f) => f.kind === "log" && f.date && f.date < date)
+      .filter((f) => f.kind === "log" && f.date && f.date < date && spaceOf(f.path) === space)
       .sort((a, b) => (a.date! < b.date! ? 1 : -1))[0];
     const carry = prev?.tasks.filter((t) => t.status === "open" && t.indent === 0) ?? [];
     if (!prev || !carry.length) return;
@@ -330,6 +336,118 @@ export class Hold {
     await this.appendTo(path, workHeading(content), add.item ? `${head}\n  - ${add.item}` : head);
   }
 
+  // ---------- personal: lists and recipes ----------
+
+  /** Checklists (Shopping, Gift ideas, …), most recently changed first. */
+  lists(): ParsedFile[] {
+    return this.all()
+      .filter((f) => f.kind === "list")
+      .sort((a, b) => b.mtime - a.mtime);
+  }
+
+  listPath(name: string): string {
+    return `${PERSONAL}lists/${safeFileName(name) || "List"}.md`;
+  }
+
+  async createList(name: string): Promise<string> {
+    const path = this.listPath(name);
+    if (!(await this.fs.exists(path))) await this.save(path, `# ${name.trim()}\n\n`);
+    return path;
+  }
+
+  /**
+   * Add items to a list (created if needed), skipping any already on it and not ticked off.
+   * Returns how many were added.
+   */
+  async addToList(name: string, items: string[]): Promise<number> {
+    return this.addToListFile(await this.createList(name), items);
+  }
+
+  /** Add items to the list in this file (see addToList). */
+  async addToListFile(path: string, items: string[]): Promise<number> {
+    const have = new Set((this.get(path)?.tasks ?? []).filter((t) => t.status === "open").map((t) => t.text.toLowerCase()));
+    const fresh: string[] = [];
+    for (const raw of items) {
+      const item = raw.replace(/^\s*(?:[-*+]\s+)?(?:\[[ xX]\]\s+)?/, "").trim();
+      if (item && !have.has(item.toLowerCase())) {
+        have.add(item.toLowerCase());
+        fresh.push(`- [ ] ${item}`);
+      }
+    }
+    if (!fresh.length) return 0;
+    const content = (await this.fs.read(path)).replace(/\s+$/, "");
+    await this.save(path, `${content}\n${fresh.join("\n")}\n`);
+    return fresh.length;
+  }
+
+  /** Tick or untick a list item (no @done stamp: it's a shopping list, not a task log). */
+  async toggleListItem(item: Task): Promise<void> {
+    await this.editLines(item.file, (lines) => {
+      if (lines[item.line] !== item.raw) throw new Error("That list changed; try again.");
+      lines[item.line] = setTaskChar(item.raw, item.status === "done" ? "open" : "done");
+    });
+  }
+
+  /** Remove ticked-off items from a list. Returns how many went. */
+  async clearDone(path: string): Promise<number> {
+    let n = 0;
+    await this.editLines(path, (lines) => {
+      const keep = lines.filter((l) => {
+        const done = /^\s*[-*+] \[[xX]\]/.test(l);
+        if (done) n++;
+        return !done;
+      });
+      lines.splice(0, lines.length, ...keep);
+    });
+    return n;
+  }
+
+  recipes(): ParsedFile[] {
+    return this.all()
+      .filter((f) => f.kind === "recipe")
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }
+
+  /** A recipe note from what a recipe page says (or just its title and link). */
+  async createRecipe(r: { title: string; source?: string; ingredients?: string[]; steps?: string[]; servings?: string; time?: string; image?: string }): Promise<string> {
+    const path = await this.freePath(`${PERSONAL}recipes`, r.title);
+    const fm = ["---", `title: ${yamlScalar(r.title)}`];
+    if (r.source) fm.push(`source: ${yamlScalar(r.source)}`);
+    if (r.servings) fm.push(`servings: ${yamlScalar(r.servings)}`);
+    if (r.time) fm.push(`time: ${yamlScalar(r.time)}`);
+    if (r.image) fm.push(`image: ${yamlScalar(r.image)}`);
+    fm.push(`created: ${todayISO()}`, "---");
+    const body = [
+      `# ${r.title}`,
+      "",
+      "## Ingredients",
+      ...(r.ingredients?.length ? r.ingredients.map((i) => `- ${i}`) : ["- "]),
+      "",
+      "## Method",
+      ...(r.steps?.length ? r.steps.map((s, i) => `${i + 1}. ${s}`) : ["1. "]),
+      "",
+      "## Notes",
+      "",
+    ];
+    await this.save(path, [...fm, ...body].join("\n"));
+    return path;
+  }
+
+  /** The bullet lines under a recipe's "## Ingredients" heading. */
+  recipeIngredients(f: ParsedFile): string[] {
+    const out: string[] = [];
+    let inside = false;
+    for (const line of f.content.split(/\r?\n/)) {
+      if (/^#{1,6}\s/.test(line)) {
+        inside = /^#{1,6}\s+ingredients\b/i.test(line);
+        continue;
+      }
+      const m = inside && line.match(/^\s*[-*+]\s+(?:\[[ xX]\]\s+)?(.+)$/);
+      if (m && m[1].trim()) out.push(m[1].trim());
+    }
+    return out;
+  }
+
   /** Log meetings under a project: optionally add their hours, and list each title as a done item. */
   async logMeetings(date: ISODate, key: string, titles: string[], hours?: number): Promise<void> {
     if (!titles.length) return;
@@ -417,21 +535,22 @@ export class Hold {
   // ---------- flags ----------
 
   /** Flags still flying (not lowered), oldest first. With a client: that client's flags plus unassigned ones. */
-  flags(client?: string): ParsedFile[] {
+  flags(client?: string, space?: Space): ParsedFile[] {
     return this.all()
-      .filter((f) => f.kind === "flag" && !f.frontmatter.lowered && (!client || !this.fileClient(f) || this.fileClient(f) === client))
+      .filter((f) => f.kind === "flag" && !f.frontmatter.lowered && (!space || spaceOf(f.path) === space))
+      .filter((f) => !client || !this.fileClient(f) || this.fileClient(f) === client)
       .sort((a, b) => String(a.frontmatter.created ?? "").localeCompare(String(b.frontmatter.created ?? "")) || a.mtime - b.mtime);
   }
 
-  loweredFlags(): ParsedFile[] {
+  loweredFlags(space?: Space): ParsedFile[] {
     return this.all()
-      .filter((f) => f.kind === "flag" && !!f.frontmatter.lowered)
+      .filter((f) => f.kind === "flag" && !!f.frontmatter.lowered && (!space || spaceOf(f.path) === space))
       .sort((a, b) => String(b.frontmatter.lowered).localeCompare(String(a.frontmatter.lowered)));
   }
 
-  async hoistFlag(text: string, color: FlagColor = "yellow", client?: string): Promise<string> {
+  async hoistFlag(text: string, color: FlagColor = "yellow", client?: string, space: Space = "work"): Promise<string> {
     const words = text.split(/\s+/).slice(0, 6).join(" ");
-    const path = await this.freePath("flags", `${todayISO()} ${words}`);
+    const path = await this.freePath(space === "personal" ? `${PERSONAL}flags` : "flags", `${todayISO()} ${words}`);
     const created = `${todayISO()} ${hhmm(new Date())}`;
     const clientLine = client ? `client: ${client}\n` : "";
     await this.save(path, `---\ncolor: ${color}\ncreated: ${created}\n${clientLine}---\n${text.trim()}\n`);
@@ -536,8 +655,8 @@ export class Hold {
   }
 
   /** Open tasks marked @waiting, oldest first. */
-  waitingOn(client?: string): Task[] {
-    return this.tasks()
+  waitingOn(client?: string, space?: Space): Task[] {
+    return this.tasks(space)
       .filter((t) => t.status === "open" && t.waiting !== undefined && (!client || this.taskClient(t) === client))
       .sort((a, b) => (a.since ?? "").localeCompare(b.since ?? ""));
   }
@@ -714,9 +833,10 @@ export class Hold {
 
   // ---------- queries ----------
 
-  tasks(): Task[] {
+  /** Tasks (in one space, or both). List items and recipe lines are checklists, not tasks. */
+  tasks(space?: Space): Task[] {
     return this.all()
-      .filter((f) => f.kind !== "template")
+      .filter((f) => f.kind !== "template" && f.kind !== "list" && f.kind !== "recipe" && (!space || spaceOf(f.path) === space))
       .flatMap((f) => f.tasks);
   }
 
@@ -736,18 +856,18 @@ export class Hold {
   }
 
   /** Waiting items live on their own list, so the agenda leaves them out unless they have a due date. */
-  agenda(today: ISODate = todayISO(), horizonDays = 14, client?: string): Agenda {
-    const open = this.tasks().filter(
+  agenda(today: ISODate = todayISO(), horizonDays = 14, client?: string, space: Space = "work"): Agenda {
+    const open = this.tasks(space).filter(
       (t) => t.status === "open" && (t.waiting === undefined || t.due) && (!client || this.taskClient(t) === client),
     );
-    const todayLog = this.logPath(today);
+    const todayLog = this.logPath(today, space);
     const horizon = addDays(today, horizonDays);
     const byDue = (a: Task, b: Task) => (a.due! < b.due! ? -1 : a.due! > b.due! ? 1 : 0);
     const isToday = (t: Task) => t.due === today || (!t.due && t.file === todayLog);
     return {
       overdue: open.filter((t) => t.due && t.due < today).sort(byDue),
       today: open.filter(isToday),
-      reminders: this.remindersOn(today),
+      reminders: this.remindersOn(today).filter((r) => spaceOf(r.file) === space),
       upcoming: open.filter((t) => t.due && t.due > today && t.due <= horizon).sort(byDue),
       open: open.filter((t) => !t.due && !isToday(t)),
     };
@@ -765,6 +885,8 @@ export class Hold {
   timesheet(from: ISODate, to: ISODate, onlyClient?: string): Timesheet {
     const clients = this.clients();
     const entries: TimesheetEntry[] = this.all()
+      // hours are work: a personal log never reaches the timesheet
+      .filter((f) => spaceOf(f.path) === "work")
       .flatMap((f) => f.hours)
       .filter((h) => h.date >= from && h.date <= to)
       .map((h) => {
@@ -818,14 +940,14 @@ export class Hold {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     const hits: SearchHit[] = [];
-    const { kinds, client, project, from, to } = filter;
+    const { kinds, client, project, from, to, space } = filter;
     // logs belong to no one, so there a line counts when it names the client or project
     const keys = project ? [project] : client ? [client, ...this.projectsOf(client).map((p) => slugify(basename(p.path)))] : [];
     const mentions = keys.length ? new RegExp(`[#@](?:${keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![\\w-])`, "i") : null;
     const owned = (f: ParsedFile) => (project ? this.fileProject(f) === project : client ? this.fileClient(f) === client : true);
     const files = this.all()
       .filter((f) => f.kind !== "template")
-      .filter((f) => !kinds?.length || kinds.includes(f.kind))
+      .filter((f) => (!kinds?.length || kinds.includes(f.kind)) && (!space || spaceOf(f.path) === space))
       .filter((f) => (!from && !to) || ((!from || this.fileDate(f) >= from) && (!to || this.fileDate(f) <= to)))
       .filter((f) => !mentions || owned(f) || f.kind === "log")
       .sort((a, b) => b.mtime - a.mtime);

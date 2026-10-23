@@ -12,9 +12,11 @@ export type View =
   | { kind: "timesheet" }
   | { kind: "calendar"; date?: string; mode?: "month" | "week" }
   | { kind: "search"; q?: string }
-  | { kind: "settings"; section?: string };
+  | { kind: "settings"; section?: string }
+  | { kind: "lists" }
+  | { kind: "recipes" };
 
-const VIEW_KINDS = new Set(["file", "agenda", "scratch", "flags", "waiting", "dispatch", "charts", "timesheet", "calendar", "search", "settings"]);
+const VIEW_KINDS = new Set(["file", "agenda", "scratch", "flags", "waiting", "dispatch", "charts", "timesheet", "calendar", "search", "settings", "lists", "recipes"]);
 
 export function isView(v: unknown): v is View {
   if (typeof v !== "object" || v === null) return false;

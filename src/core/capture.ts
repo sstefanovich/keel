@@ -1,8 +1,11 @@
 import { ISODate, addDays, hhmm, isISODate, parseTime, toISO, weekdayOf } from "./dates";
-import { DURATION_SRC } from "./parse";
+import { DURATION_SRC, Space } from "./parse";
+
+/** The list "+ milk" goes to when it doesn't name one */
+export const DEFAULT_LIST = "Shopping";
 
 /** What a capture becomes; also the chips shown under the input, in Tab order. */
-export const CAPTURE_KINDS = ["log", "task", "work", "waiting", "reminder", "flag", "note", "scratch", "ask"] as const;
+export const CAPTURE_KINDS = ["log", "task", "work", "waiting", "reminder", "flag", "list", "note", "scratch", "ask"] as const;
 export type CaptureKind = (typeof CAPTURE_KINDS)[number];
 
 export interface Capture {
@@ -21,6 +24,10 @@ export interface Capture {
   note?: string;
   /** Question for Claude ("? …") */
   ask?: string;
+  /** Items for a list ("+ milk, eggs" → Shopping; "+Hardware: screws") */
+  list?: { name: string; items: string[] };
+  /** Picked with a "p:" / "w:" prefix; otherwise the current mode decides */
+  space?: Space;
   /** Why this text can't be captured as the chosen kind */
   error?: string;
 }
@@ -107,6 +114,17 @@ const BUILD: Record<CaptureKind, (body: string, c: Ctx) => Built> = {
     if (!m || !m[2].trim()) return { heading: "", line: "", error: "Use > Note name: what to add" };
     return { heading: "", line: `- ${m[2].trim()}`, note: m[1].trim() };
   },
+  list: (b) => {
+    const body = b.replace(/^\+\s*/, "").trim();
+    const named = body.match(/^([^:,]{1,30}):\s*(.+)$/);
+    const name = named ? named[1].trim() : DEFAULT_LIST;
+    const items = (named ? named[2] : body)
+      .split(/[,;]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!items.length) return { heading: "", line: "", error: "Add something, e.g. + milk, eggs  or  +Hardware: screws" };
+    return { heading: "", line: items.join(", "), list: { name, items } };
+  },
   scratch: (b) => {
     const text = b.replace(SCRATCH_START, "").trim();
     return text ? { heading: "", line: text } : { heading: "", line: "", error: "Type something to jot on the scratchpad" };
@@ -121,6 +139,7 @@ const BUILD: Record<CaptureKind, (body: string, c: Ctx) => Built> = {
 function detect(body: string, c: Ctx): CaptureKind {
   if (body.startsWith("?")) return "ask";
   if (body.startsWith(">")) return "note";
+  if (body.startsWith("+")) return "list";
   if (SCRATCH_START.test(body)) return "scratch";
   if (FLAG_START.test(body)) return "flag";
   const w = body.replace(/^work(?:ed)?:?\s+/i, "");
@@ -142,11 +161,14 @@ function detect(body: string, c: Ctx): CaptureKind {
  * With a focused client, hours without an @client go to it and tasks get its #tag.
  */
 export function parseCapture(input: string, now: Date = new Date(), focus?: string, force?: CaptureKind): Capture | null {
-  const text = input.trim();
+  // "p: …" / "w: …" (or personal: / work:) sends it to that space whatever mode Keel is in
+  const sp = input.trim().match(/^(p|w|personal|work):\s*(.*)$/i);
+  const space: Space | undefined = sp ? (/^p/i.test(sp[1]) ? "personal" : "work") : undefined;
+  const text = (sp ? sp[2] : input).trim();
   if (!text) return null;
   const today = toISO(now);
   // "?" and "> Note:" never take a day prefix; everything else may
-  const { date, rest } = /^[?>]/.test(text) ? { date: undefined, rest: text } : parseDayPrefix(text, today);
+  const { date, rest } = /^[?>+]/.test(text) ? { date: undefined, rest: text } : parseDayPrefix(text, today);
   const ctx: Ctx = { now, focus, date };
   const auto = detect(rest, ctx);
   const kind = force ?? auto;
@@ -155,8 +177,8 @@ export function parseCapture(input: string, now: Date = new Date(), focus?: stri
   const body =
     kind === "scratch" ? text : kind === "task" && REMIND_START.test(rest) ? rest.replace(REMIND_START, "").replace(/^to\s+/i, "") : rest;
   const built = BUILD[kind](body, ctx);
-  const keepsDate = kind !== "flag" && kind !== "note" && kind !== "ask" && kind !== "scratch";
-  return { ...built, kind, auto, date: keepsDate ? date : undefined };
+  const keepsDate = kind !== "flag" && kind !== "note" && kind !== "ask" && kind !== "scratch" && kind !== "list";
+  return { ...built, kind, auto, date: keepsDate ? date : undefined, space };
 }
 
 /** "tomorrow 9am call the bank", "at 15:00 to file taxes", "call mum friday 6pm" */

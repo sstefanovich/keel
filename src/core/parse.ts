@@ -2,7 +2,15 @@ import { parse as parseYaml } from "yaml";
 import { ISODate, isISODate } from "./dates";
 import { RemindRule, parseRemind } from "./schedule";
 
-export type FileKind = "log" | "meeting" | "note" | "client" | "project" | "flag" | "reminders" | "template";
+export type FileKind = "log" | "meeting" | "note" | "client" | "project" | "flag" | "reminders" | "template" | "list" | "recipe";
+
+/** Work (everything at the top of the hold) or personal (everything under personal/). */
+export type Space = "work" | "personal";
+export const PERSONAL = "personal/";
+
+export function spaceOf(path: string): Space {
+  return path.startsWith(PERSONAL) ? "personal" : "work";
+}
 
 /** [ ] open, [x] done, [>] migrated to a later log, [-] cancelled */
 export type TaskStatus = "open" | "done" | "migrated" | "cancelled";
@@ -136,6 +144,16 @@ const TAG_RE = /(?:^|\s)#([A-Za-z][\w/-]*)/g;
 const LINK_RE = /\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/g;
 
 export function kindOf(path: string): FileKind {
+  // the personal space has its own logs, flags, lists, recipes and notes (no clients, projects or meetings)
+  if (path.startsWith(PERSONAL)) {
+    const p = path.slice(PERSONAL.length);
+    if (p.startsWith("logs/")) return "log";
+    if (p.startsWith("flags/")) return "flag";
+    if (p.startsWith("lists/")) return "list";
+    if (p.startsWith("recipes/")) return "recipe";
+    if (p === "reminders.md") return "reminders";
+    return "note";
+  }
   if (path.startsWith("logs/")) return "log";
   if (path.startsWith("meetings/")) return "meeting";
   if (path.startsWith("clients/")) return "client";

@@ -74,22 +74,26 @@ fn title_of(html: &str) -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
-/// The title of a web page, for turning a pasted link into `[title](url)`. None when there isn't
-/// a useful one (sign-in pages, errors, timeouts).
-#[tauri::command]
-pub async fn link_title(url: String) -> Result<Option<String>, String> {
+/// A web page's HTML (up to `max` bytes), or None if it isn't reachable HTML.
+async fn fetch_html(url: &str, timeout: u64, max: usize) -> Option<String> {
     let lower = url.to_ascii_lowercase();
     if !(lower.starts_with("https://") || lower.starts_with("http://")) {
-        return Ok(None);
+        return None;
     }
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(6))
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Keel")
+        .timeout(Duration::from_secs(timeout))
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 Keel")
         .build()
-        .map_err(|e| e.to_string())?;
-    let Ok(res) = client.get(&url).send().await else { return Ok(None) };
+        .ok()?;
+    let res = client
+        .get(url)
+        .header(reqwest::header::ACCEPT, "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+        .header(reqwest::header::ACCEPT_LANGUAGE, "en-US,en;q=0.9")
+        .send()
+        .await
+        .ok()?;
     if !res.status().is_success() {
-        return Ok(None);
+        return None;
     }
     let is_html = res
         .headers()
@@ -97,10 +101,17 @@ pub async fn link_title(url: String) -> Result<Option<String>, String> {
         .and_then(|v| v.to_str().ok())
         .is_some_and(|v| v.contains("html"));
     if !is_html {
-        return Ok(None);
+        return None;
     }
-    let Ok(body) = res.bytes().await else { return Ok(None) };
-    let head = String::from_utf8_lossy(&body[..body.len().min(512 * 1024)]);
+    let body = res.bytes().await.ok()?;
+    Some(String::from_utf8_lossy(&body[..body.len().min(max)]).into_owned())
+}
+
+/// The title of a web page, for turning a pasted link into `[title](url)`. None when there isn't
+/// a useful one (sign-in pages, errors, timeouts).
+#[tauri::command]
+pub async fn link_title(url: String) -> Result<Option<String>, String> {
+    let Some(head) = fetch_html(&url, 6, 512 * 1024).await else { return Ok(None) };
     let title = title_of(&head);
     let useless = |t: &str| {
         let t = t.to_ascii_lowercase();
@@ -109,9 +120,175 @@ pub async fn link_title(url: String) -> Result<Option<String>, String> {
     Ok(title.filter(|t| !useless(t) && t.len() <= 300))
 }
 
+// ---------- recipes ----------
+
+#[derive(serde::Serialize, Default, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RecipeInfo {
+    title: String,
+    ingredients: Vec<String>,
+    steps: Vec<String>,
+    servings: Option<String>,
+    /// ISO 8601 duration as the page gives it ("PT1H30M")
+    total_time: Option<String>,
+    image: Option<String>,
+}
+
+/// Strip tags and decode the common entities in text taken from a page.
+fn clean_text(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut in_tag = false;
+    for c in s.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' if in_tag => in_tag = false,
+            _ if !in_tag => out.push(c),
+            _ => {}
+        }
+    }
+    let out = out
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&#039;", "'")
+        .replace("&#x27;", "'")
+        .replace("&nbsp;", " ")
+        .replace("&frac12;", "½")
+        .replace("&frac14;", "¼")
+        .replace("&frac34;", "¾");
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn is_recipe(v: &serde_json::Value) -> bool {
+    match v.get("@type") {
+        Some(serde_json::Value::String(t)) => t == "Recipe",
+        Some(serde_json::Value::Array(ts)) => ts.iter().any(|t| t == "Recipe"),
+        _ => false,
+    }
+}
+
+/// The first schema.org Recipe object anywhere in a JSON-LD value (top level, arrays, @graph).
+fn find_recipe(v: &serde_json::Value) -> Option<&serde_json::Value> {
+    match v {
+        serde_json::Value::Object(map) => {
+            if is_recipe(v) {
+                return Some(v);
+            }
+            map.values().find_map(find_recipe)
+        }
+        serde_json::Value::Array(items) => items.iter().find_map(find_recipe),
+        _ => None,
+    }
+}
+
+fn text_of(v: &serde_json::Value) -> Option<String> {
+    match v {
+        serde_json::Value::String(s) => Some(clean_text(s)),
+        serde_json::Value::Number(n) => Some(n.to_string()),
+        serde_json::Value::Array(a) => a.iter().find_map(text_of),
+        serde_json::Value::Object(o) => o.get("text").or_else(|| o.get("name")).or_else(|| o.get("url")).and_then(text_of),
+        _ => None,
+    }
+    .filter(|s| !s.is_empty())
+}
+
+/// recipeInstructions: a string, a list of strings, HowToSteps, or HowToSections of HowToSteps.
+fn steps_of(v: &serde_json::Value, out: &mut Vec<String>) {
+    match v {
+        serde_json::Value::String(s) => {
+            // one long string: split on line breaks when it has them
+            for part in s.split(['\n', '\r']).map(clean_text).filter(|p| !p.is_empty()) {
+                out.push(part);
+            }
+        }
+        serde_json::Value::Array(items) => items.iter().for_each(|i| steps_of(i, out)),
+        serde_json::Value::Object(o) => {
+            if let Some(list) = o.get("itemListElement") {
+                steps_of(list, out);
+            } else if let Some(t) = o.get("text").and_then(text_of) {
+                out.push(t);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Read a recipe out of a page's JSON-LD (what Google's recipe cards use); title-only if there's none.
+pub fn recipe_from_html(html: &str) -> RecipeInfo {
+    let lower = html.to_ascii_lowercase();
+    let mut from = 0;
+    while let Some(at) = lower[from..].find("<script") {
+        let start = from + at;
+        let Some(open_end) = lower[start..].find('>').map(|i| start + i + 1) else { break };
+        let Some(close) = lower[open_end..].find("</script>").map(|i| open_end + i) else { break };
+        from = close + 9;
+        if !lower[start..open_end].contains("application/ld+json") {
+            continue;
+        }
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(html[open_end..close].trim()) else { continue };
+        let Some(r) = find_recipe(&json) else { continue };
+        let mut steps = vec![];
+        if let Some(i) = r.get("recipeInstructions") {
+            steps_of(i, &mut steps);
+        }
+        let ingredients = r
+            .get("recipeIngredient")
+            .or_else(|| r.get("ingredients"))
+            .and_then(|v| v.as_array())
+            .map(|a| a.iter().filter_map(text_of).collect())
+            .unwrap_or_default();
+        return RecipeInfo {
+            title: r.get("name").and_then(text_of).or_else(|| title_of(html)).unwrap_or_default(),
+            ingredients,
+            steps,
+            servings: r.get("recipeYield").and_then(text_of),
+            total_time: r.get("totalTime").and_then(text_of),
+            image: r.get("image").and_then(text_of),
+        };
+    }
+    RecipeInfo { title: title_of(html).unwrap_or_default(), ..Default::default() }
+}
+
+/// Fetch a recipe page and read its recipe. Errors only when the page can't be read at all.
+#[tauri::command]
+pub async fn recipe_from_url(url: String) -> Result<RecipeInfo, String> {
+    let html = fetch_html(&url, 15, 4 * 1024 * 1024).await.ok_or("Couldn't open that page (is it a public recipe page?)")?;
+    Ok(recipe_from_html(&html))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recipes_from_json_ld() {
+        let html = r#"<html><head><title>Best Chilli | Food Site</title>
+        <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"x"},
+          {"@type":["Recipe"],"name":"Best Chilli &amp; Rice","recipeYield":["4","4 servings"],"totalTime":"PT1H30M",
+           "image":{"@type":"ImageObject","url":"https://img/x.jpg"},
+           "recipeIngredient":["2 onions, <b>chopped</b>","1 tin kidney beans"],
+           "recipeInstructions":[{"@type":"HowToSection","name":"Prep","itemListElement":[{"@type":"HowToStep","text":"Chop the onions."}]},
+                                 {"@type":"HowToStep","text":"Simmer for an hour."}]}]}
+        </script></head></html>"#;
+        let r = recipe_from_html(html);
+        assert_eq!(r.title, "Best Chilli & Rice");
+        assert_eq!(r.ingredients, vec!["2 onions, chopped", "1 tin kidney beans"]);
+        assert_eq!(r.steps, vec!["Chop the onions.", "Simmer for an hour."]);
+        assert_eq!(r.servings.as_deref(), Some("4"));
+        assert_eq!(r.total_time.as_deref(), Some("PT1H30M"));
+        assert_eq!(r.image.as_deref(), Some("https://img/x.jpg"));
+    }
+
+    #[test]
+    fn recipes_with_plain_instructions_or_none() {
+        let html = r#"<script type='application/ld+json'>[{"@type":"Recipe","name":"Toast","recipeIngredient":["bread"],"recipeInstructions":"Toast it.\nButter it."}]</script>"#;
+        let r = recipe_from_html(html);
+        assert_eq!(r.steps, vec!["Toast it.", "Butter it."]);
+        let none = recipe_from_html("<title>Just a blog</title><script>var x = 1;</script>");
+        assert_eq!(none, RecipeInfo { title: "Just a blog".into(), ..Default::default() });
+    }
 
     #[test]
     fn titles() {
@@ -134,3 +311,31 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 }
+
+#[cfg(test)]
+mod live {
+    /// Real network: `cargo test -- --ignored live_recipe`
+    #[test]
+    #[ignore]
+    fn live_recipe_sites() {
+        for url in [
+            "https://www.recipetineats.com/chilli-con-carne/",
+            "https://www.bbcgoodfood.com/recipes/chilli-con-carne-recipe",
+        ] {
+            match tauri::async_runtime::block_on(super::recipe_from_url(url.into())) {
+                Ok(r) => println!(
+                    "{url}\n  title={:?} ingredients={} steps={} servings={:?} time={:?} first={:?}\n  steps={:#?}",
+                    r.title,
+                    r.ingredients.len(),
+                    r.steps.len(),
+                    r.servings,
+                    r.total_time,
+                    r.ingredients.first(),
+                    &r.steps[..r.steps.len().min(4)]
+                ),
+                Err(e) => println!("{url}\n  error: {e}"),
+            }
+        }
+    }
+}
+

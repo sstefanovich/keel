@@ -274,9 +274,85 @@ describe("display text", () => {
 describe("guide upgrades", () => {
   it("knows both earlier guides", async () => {
     const { CLAUDE_GUIDE, PREVIOUS_GUIDES } = await import("./claudeGuide");
-    expect(PREVIOUS_GUIDES).toHaveLength(2);
+    expect(PREVIOUS_GUIDES).toHaveLength(3);
+    expect(PREVIOUS_GUIDES[2]).not.toContain("personal/");
     for (const p of PREVIOUS_GUIDES) expect(p).not.toBe(CLAUDE_GUIDE);
     expect(PREVIOUS_GUIDES[0]).not.toContain("capitalised");
     expect(PREVIOUS_GUIDES[1]).toContain("`@Name` on a task means the same (`- [ ] send the SOW @Jordan`); meeting action items use this form.\n");
+  });
+});
+
+describe("work and personal spaces", () => {
+  it("files belong to a space by folder", async () => {
+    const { spaceOf, kindOf } = await import("./parse");
+    expect(spaceOf("logs/2026/2026-10-23.md")).toBe("work");
+    expect(spaceOf("personal/logs/2026/2026-10-23.md")).toBe("personal");
+    expect(kindOf("personal/logs/2026/2026-10-23.md")).toBe("log");
+    expect(kindOf("personal/lists/Shopping.md")).toBe("list");
+    expect(kindOf("personal/recipes/Chilli.md")).toBe("recipe");
+    expect(kindOf("personal/flags/x.md")).toBe("flag");
+    expect(kindOf("personal/notes/Holiday.md")).toBe("note");
+    expect(kindOf("personal/clients/x.md")).toBe("note"); // no clients in the personal space
+  });
+
+  it("each space has its own logs, carry-over, agenda and flags; hours stay work", async () => {
+    const hold = await makeHold({
+      "logs/2026/2026-10-22.md": "# Thu\n## Tasks\n- [ ] work thing\n## Work\n- 2h @acme\n  - stuff\n",
+      "personal/logs/2026/2026-10-22.md": "# Thu\n## Tasks\n- [ ] dentist\n## Log\n- 3h @gardening\n",
+    });
+    const w = await hold.ensureLog("2026-10-23", "2026-10-23", "work");
+    const p = await hold.ensureLog("2026-10-23", "2026-10-23", "personal");
+    expect(p).toBe("personal/logs/2026/2026-10-23.md");
+    expect(hold.get(w)!.tasks.map((t) => t.text)).toEqual(["work thing"]);
+    expect(hold.get(p)!.tasks.map((t) => t.text)).toEqual(["dentist"]);
+    expect(hold.get(p)!.content).not.toContain("## Work");
+    expect(hold.agenda("2026-10-23", 14, undefined, "personal").today.map((t) => t.text)).toEqual(["dentist"]);
+    expect(hold.agenda("2026-10-23", 14, undefined, "work").today.map((t) => t.text)).toEqual(["work thing"]);
+    await hold.hoistFlag("passport renewal", "blue", undefined, "personal");
+    expect(hold.flags(undefined, "personal").map((f) => f.title)).toEqual(["passport renewal"]);
+    expect(hold.flags(undefined, "work")).toEqual([]);
+    expect(hold.timesheet("2026-10-22", "2026-10-22").totalHours).toBe(2);
+  });
+
+  it("lists add without duplicates, tick without stamps, and clear; they aren't tasks", async () => {
+    const hold = await makeHold();
+    expect(await hold.addToList("Shopping", ["milk", "- [ ] eggs", "Milk", " "])).toBe(2);
+    expect(await hold.addToList("Shopping", ["eggs", "bread"])).toBe(1);
+    const path = "personal/lists/Shopping.md";
+    expect(hold.get(path)!.tasks.map((t) => t.text)).toEqual(["milk", "eggs", "bread"]);
+    await hold.toggleListItem(hold.get(path)!.tasks[0]);
+    expect(hold.get(path)!.tasks[0].raw).toBe("- [x] milk");
+    expect(await hold.clearDone(path)).toBe(1);
+    expect(hold.get(path)!.tasks.map((t) => t.text)).toEqual(["eggs", "bread"]);
+    expect(hold.tasks().length).toBe(0);
+    expect(hold.lists().map((f) => f.path)).toEqual([path]);
+  });
+
+  it("recipes keep their ingredients for the shopping list", async () => {
+    const hold = await makeHold();
+    const path = await hold.createRecipe({ title: "Chilli: the good one", source: "https://example.com/chilli", ingredients: ["2 onions", "1 tin beans"], steps: ["Fry", "Simmer"], servings: "4" });
+    const f = hold.get(path)!;
+    expect(f.kind).toBe("recipe");
+    expect(f.frontmatter.source).toBe("https://example.com/chilli");
+    expect(hold.recipeIngredients(f)).toEqual(["2 onions", "1 tin beans"]);
+    expect(f.content).toContain("1. Fry\n2. Simmer");
+    expect(hold.tasks().length).toBe(0);
+  });
+});
+
+describe("capture: spaces and lists", () => {
+  const now = new Date(2026, 9, 23, 10, 0);
+  it("p: / w: pick the space; + adds to a list", async () => {
+    const { parseCapture } = await import("./capture");
+    expect(parseCapture("p: todo book the dentist", now)).toMatchObject({ kind: "task", space: "personal", line: "- [ ] book the dentist" });
+    expect(parseCapture("w: 2h @acme review", now)).toMatchObject({ kind: "work", space: "work" });
+    expect(parseCapture("todo thing", now)?.space).toBeUndefined();
+    expect(parseCapture("+ milk, eggs; bread", now)).toMatchObject({ kind: "list", list: { name: "Shopping", items: ["milk", "eggs", "bread"] } });
+    expect(parseCapture("p: +Hardware: screws, rawlplugs", now)).toMatchObject({ kind: "list", space: "personal", list: { name: "Hardware", items: ["screws", "rawlplugs"] } });
+    expect(parseCapture("+", now)).toMatchObject({ kind: "list", error: expect.any(String) });
+    // Tab to List on plain text
+    expect(parseCapture("printer ink", now, undefined, "list")).toMatchObject({ list: { name: "Shopping", items: ["printer ink"] } });
+    // "pm" or "w" words aren't prefixes without the colon
+    expect(parseCapture("print the boarding passes", now)?.space).toBeUndefined();
   });
 });

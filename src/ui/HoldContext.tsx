@@ -1,6 +1,7 @@
 import { ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Hold } from "../core/hold";
 import { isCaptureWindow } from "../lib/platform";
+import { useSpace } from "./space";
 
 interface HoldCtx {
   hold: Hold;
@@ -49,6 +50,8 @@ export function HoldProvider({ hold, dir, children }: { hold: Hold; dir: string;
   }, []);
   // forget a focus whose client file was deleted
   const focusValid = !focus || hold.clients().has(focus);
+  // clients are work: in personal mode nothing is focused (the choice comes back with work mode)
+  const space = useSpace();
 
   const push = useCallback((msg: string, error = false) => {
     const id = Date.now() + Math.random();
@@ -87,7 +90,7 @@ export function HoldProvider({ hold, dir, children }: { hold: Hold; dir: string;
   }, [hold, bump]);
 
   return (
-    <Ctx.Provider value={{ hold, dir, version, bump, reportError, toast: push, focus: focusValid ? focus : undefined, setFocus }}>
+    <Ctx.Provider value={{ hold, dir, version, bump, reportError, toast: push, focus: focusValid && space === "work" ? focus : undefined, setFocus }}>
       {children}
       <div className="toasts" role="status">
         {toasts.map((t) => (

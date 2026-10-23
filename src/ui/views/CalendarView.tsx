@@ -1,3 +1,4 @@
+import { getSpace } from "../space";
 import { CalendarPlus, ChevronLeft, ChevronRight, NotebookPen, RefreshCw, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { addDays, addMonths, dateRange, endOfMonth, formatLong, parseISO, startOfMonth, startOfWeek, today } from "../../core/dates";
@@ -68,9 +69,11 @@ export function CalendarView({ date, mode: initialMode }: { date?: string; mode?
   const first = mode === "week" ? weekFirst : startOfWeek(month);
   const last = mode === "week" ? addDays(weekFirst, 6) : addDays(startOfWeek(endOfMonth(month)), 6);
   const days = dateRange(first, last);
-  const ts = hold.timesheet(first, last);
-  const tasks = hold.tasks().filter((x) => x.status === "open" && x.due);
-  const meetings = hold.all().filter((f) => f.kind === "meeting" && f.date);
+  const work = getSpace() === "work";
+  // hours and meeting notes are work things
+  const ts = work ? hold.timesheet(first, last) : { byDay: new Map<string, number>() };
+  const tasks = hold.tasks(getSpace()).filter((x) => x.status === "open" && x.due);
+  const meetings = work ? hold.all().filter((f) => f.kind === "meeting" && f.date) : [];
 
   const events = useCalendarEvents(parseISO(first).getTime(), parseISO(addDays(last, 1)).getTime());
   const byDay = useMemo(() => {
@@ -94,7 +97,7 @@ export function CalendarView({ date, mode: initialMode }: { date?: string; mode?
   };
 
   const dayEvents = byDay.get(selected) ?? [];
-  const dayHours = hold.timesheet(selected, selected).byDay.get(selected);
+  const dayHours = work ? hold.timesheet(selected, selected).byDay.get(selected) : undefined;
   const dayNotes = meetings.filter((m) => m.date === selected && !dayEvents.some((e) => hold.meetingNote(selected, e.title)?.path === m.path));
   const dayDue = tasks.filter((x) => x.due === selected);
 
@@ -166,7 +169,7 @@ export function CalendarView({ date, mode: initialMode }: { date?: string; mode?
             </div>
           ))}
           {days.map((d) => {
-            const hasLog = !!hold.get(hold.logPath(d));
+            const hasLog = !!hold.get(hold.logPath(d, getSpace()));
             const hrs = ts.byDay.get(d);
             const due = tasks.filter((x) => x.due === d).length;
             const mtg = meetings.filter((m) => m.date === d).length;
