@@ -21,6 +21,7 @@ import { FlagsView } from "./ui/views/FlagsView";
 import { ClaudePanel } from "./ui/ClaudePanel";
 import { sendToClaude } from "./ui/claudeBridge";
 import { WaitingView } from "./ui/views/WaitingView";
+import { ScratchpadView } from "./ui/views/ScratchpadView";
 import { useReminders } from "./ui/useReminders";
 import { AgendaView } from "./ui/views/AgendaView";
 import { CalendarView } from "./ui/views/CalendarView";
@@ -378,6 +379,7 @@ function Shell() {
         ? {
             f: () => show({ kind: "search" }),
             m: () => newItem("meeting"),
+            s: () => show({ kind: "scratch" }),
             t: () => setTabs((s) => reopenClosed(s)),
             tab: () => setTabs((s) => cycleTab(s, -1)),
           }
@@ -414,6 +416,7 @@ function Shell() {
           <div className="main-content">
             {view.kind === "file" && <FileView path={view.path} line={view.line} />}
             {view.kind === "agenda" && <AgendaView />}
+            {view.kind === "scratch" && <ScratchpadView />}
             {view.kind === "flags" && <FlagsView />}
             {view.kind === "waiting" && <WaitingView />}
             {view.kind === "dispatch" && <DispatchView />}

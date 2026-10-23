@@ -23,6 +23,7 @@ won't show up anywhere. Prefer small, targeted edits over rewriting whole files.
 | \`projects/<Name>.md\` | One per project; frontmatter \`client: <client-key>\` and \`status: active / paused / done\` |
 | \`flags/…md\` | Sticky notes ("Flags"); frontmatter \`color\`, \`created\`, and \`lowered: <date>\` once done |
 | \`reminders.md\` | Recurring reminders |
+| \`scratchpad.txt\` | Plain-text scratchpad for transient jottings (no markdown); moved items are removed from it |
 | \`templates/\` | Templates for new files: don't change unless asked |
 
 Dates are always \`YYYY-MM-DD\`. Every file may start with YAML frontmatter between \`---\` lines: keep it valid.

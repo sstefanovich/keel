@@ -137,6 +137,7 @@ export function SettingsView({ section }: { section?: string }) {
               ["Ctrl+`", "Show / hide Claude"],
               ["Ctrl+P", "Go to any note, log, project, client or view"],
               ["Ctrl+B", "Collapse / expand the sidebar"],
+              ["Ctrl+Shift+S", "Scratchpad"],
               ["Ctrl+click", "Open in a new tab (or middle-click)"],
               ["Ctrl+W", "Close tab"],
               ["Ctrl+Tab", "Next tab (Ctrl+Shift+Tab: previous)"],

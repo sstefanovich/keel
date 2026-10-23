@@ -4,6 +4,7 @@ import type { PromptSpec } from "./Modals";
 export type View =
   | { kind: "file"; path: string; line?: number }
   | { kind: "agenda" }
+  | { kind: "scratch" }
   | { kind: "flags" }
   | { kind: "waiting" }
   | { kind: "dispatch" }
@@ -13,7 +14,7 @@ export type View =
   | { kind: "search"; q?: string }
   | { kind: "settings"; section?: string };
 
-const VIEW_KINDS = new Set(["file", "agenda", "flags", "waiting", "dispatch", "charts", "timesheet", "calendar", "search", "settings"]);
+const VIEW_KINDS = new Set(["file", "agenda", "scratch", "flags", "waiting", "dispatch", "charts", "timesheet", "calendar", "search", "settings"]);
 
 export function isView(v: unknown): v is View {
   if (typeof v !== "object" || v === null) return false;

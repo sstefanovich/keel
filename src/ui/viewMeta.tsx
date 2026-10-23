@@ -11,6 +11,7 @@ import {
   ListChecks,
   LucideIcon,
   NotebookPen,
+  NotepadText,
   Search,
   Send,
   Settings,
@@ -24,6 +25,7 @@ import { View } from "./nav";
 
 export const VIEW_ICONS: Record<Exclude<View["kind"], "file">, LucideIcon> = {
   agenda: ListChecks,
+  scratch: NotepadText,
   flags: Flag,
   waiting: Hourglass,
   dispatch: Send,
@@ -36,6 +38,7 @@ export const VIEW_ICONS: Record<Exclude<View["kind"], "file">, LucideIcon> = {
 
 export const VIEW_TITLES: Record<Exclude<View["kind"], "file">, string> = {
   agenda: "Agenda",
+  scratch: "Scratchpad",
   flags: "Flags",
   waiting: "Waiting on",
   dispatch: "Dispatch",

@@ -6,6 +6,7 @@ import {
   Flag,
   Hourglass,
   ListChecks,
+  NotepadText,
   LucideIcon,
   Monitor,
   Moon,
@@ -209,6 +210,7 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
 
       <nav className="nav">
         {item(Sun, "Today", current === todayPath, (o) => nav.openToday(o), { hint: "Ctrl+T" })}
+        {item(NotepadText, "Scratchpad", v.kind === "scratch", (o) => nav.go({ kind: "scratch" }, o), { hint: "Ctrl+Shift+S" })}
         {item(ListChecks, "Agenda", v.kind === "agenda", (o) => nav.go({ kind: "agenda" }, o), { badge: agenda.overdue.length + agenda.today.length, hint: "Ctrl+J" })}
         {item(Flag, "Flags", v.kind === "flags", (o) => nav.go({ kind: "flags" }, o), { badge: flagCount })}
         {item(Hourglass, "Waiting on", v.kind === "waiting", (o) => nav.go({ kind: "waiting" }, o), { badge: waitingCount })}

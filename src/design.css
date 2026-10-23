@@ -1251,3 +1251,70 @@ button.icon-text {
     margin: 0;
   }
 }
+
+/* ---------- scratchpad ---------- */
+
+.scratch-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 980px;
+  padding: 18px 40px 12px;
+}
+:root[data-editor-width="full"] .scratch-page {
+  max-width: none;
+}
+.scratch-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.scratch-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--accent);
+}
+.scratch-title h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+.scratch-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.scratch-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 4px 10px;
+}
+.scratch-area {
+  flex: 1;
+  min-height: 200px;
+  width: 100%;
+  resize: none;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.65;
+  box-shadow: var(--shadow-sm);
+}
+.scratch-area:focus {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+.scratch-foot {
+  padding: 8px 2px 0;
+}
