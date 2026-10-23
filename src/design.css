@@ -2167,3 +2167,106 @@ button.briefing-label {
 .search-filters select {
   max-width: 260px;
 }
+
+/* ---------- editor: folding, images ---------- */
+
+.editor .cm-gutters {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+}
+.editor .cm-foldGutter .cm-gutterElement {
+  padding: 0 2px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+  font-size: 12px;
+  line-height: inherit;
+}
+/* fold markers appear on hover, and stay visible on folded sections */
+.editor .cm-editor:hover .cm-foldGutter .cm-gutterElement {
+  opacity: 0.55;
+}
+.editor .cm-foldGutter .cm-gutterElement:hover {
+  opacity: 1 !important;
+  color: var(--accent);
+}
+.editor .cm-foldGutter .cm-gutterElement span[title="Unfold line"] {
+  opacity: 1;
+}
+.editor .cm-foldPlaceholder {
+  background: var(--accent-soft);
+  border: 0;
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 0 6px;
+  margin-left: 6px;
+  font-size: 12px;
+}
+.cm-image {
+  padding: 6px 0 8px;
+}
+.cm-image img {
+  display: block;
+  max-width: min(100%, 720px);
+  max-height: 420px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  cursor: zoom-in;
+}
+.cm-image.zoomed img {
+  max-width: 100%;
+  max-height: none;
+  cursor: zoom-out;
+}
+.cm-image.missing {
+  color: var(--danger);
+  font-size: 12.5px;
+  font-style: italic;
+}
+
+/* ---------- outline ---------- */
+
+.outline {
+  position: relative;
+}
+.outline-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  min-width: 240px;
+  max-width: 380px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  animation: keel-pop-in 0.12s ease-out;
+}
+.outline-menu button {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.outline-menu button.top {
+  color: var(--text);
+  font-weight: 600;
+}
+.outline-menu button:hover {
+  background: var(--hover);
+  color: var(--accent);
+}

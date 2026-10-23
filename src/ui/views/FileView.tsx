@@ -6,6 +6,7 @@ import { OPEN_HISTORY_EVENT } from "../commands";
 import { FlagBoard } from "../FlagBoard";
 import { WorkPanel } from "../WorkPanel";
 import { Briefing } from "../Briefing";
+import { Outline } from "../Outline";
 import { Glance } from "../Glance";
 import { useHold } from "../HoldContext";
 import { Editor, SaveStatus } from "../editor/Editor";
@@ -137,6 +138,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
             {saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Edited"}
           </span>
         )}
+        {(mode === "edit" || !hasChart) && <Outline content={file.content} onJump={(l) => nav.openFile(path, l)} />}
         {isTauri && (
           <button className="ghost icon-text" onClick={() => setHistory(true)} title="Earlier versions of this file">
             <History size={14} aria-hidden="true" />

@@ -213,6 +213,9 @@ export function SettingsView({ section }: { section?: string }) {
               ["Ctrl+Shift+F", "Search"],
               ["Ctrl+F", "Find in the current file"],
               ["Ctrl+click", "Follow a [[link]]"],
+              ["Ctrl+V", "Paste a screenshot as an image; a link gets a readable name"],
+              ["Ctrl+Shift+V", "Paste exactly as copied"],
+              ["Ctrl+Shift+[ / ]", "Fold / unfold the section at the cursor (or the ▾ beside a heading)"],
               ["Alt+← / Alt+→", "Previous / next day (in a log)"],
             ].map(([k, d]) => (
               <tr key={k}>

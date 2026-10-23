@@ -12,7 +12,7 @@ pub struct Entry {
     mtime: u64,
 }
 
-fn resolve(root: &str, rel: &str) -> Result<PathBuf, String> {
+pub(crate) fn resolve(root: &str, rel: &str) -> Result<PathBuf, String> {
     let rel_path = Path::new(rel);
     let safe = !rel.is_empty()
         && rel_path

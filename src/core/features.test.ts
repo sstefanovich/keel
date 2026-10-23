@@ -192,3 +192,47 @@ describe("search filters", () => {
     expect(paths({ from: "2026-10-01", kinds: ["note", "meeting", "log"] })).toEqual(["logs/2026/2026-10-20.md", "meetings/2026-10-21 Sync.md", "notes/Firewall.md"]);
   });
 });
+
+describe("pasted links", () => {
+  it("names well-known links", async () => {
+    const { knownLinkTitle, singleUrl, linkText } = await import("./links");
+    expect(singleUrl(" https://x.com/a ")).toBe("https://x.com/a");
+    expect(singleUrl("see https://x.com")).toBeNull();
+    expect(knownLinkTitle("https://dev.azure.com/hogan/FLIS/_workitems/edit/4411")).toBe("FLIS #4411");
+    expect(knownLinkTitle("https://hogan.visualstudio.com/FLIS/_workitems/edit/12/")).toBe("FLIS #12");
+    expect(knownLinkTitle("https://dev.azure.com/hogan/FLIS/_git/retain-api/pullrequest/381")).toBe("PR 381 · retain-api");
+    expect(knownLinkTitle("https://dev.azure.com/hogan/FLIS/_git/retain-api?path=/src/Policy.cs")).toBe("retain-api: Policy.cs");
+    expect(knownLinkTitle("https://dev.azure.com/hogan/FLIS/_wiki/wikis/FLIS.wiki/123/Retention-Design")).toBe("Retention Design (wiki)");
+    expect(knownLinkTitle("https://dev.azure.com/hogan/FLIS/_build/results?buildId=998")).toBe("Build 998 · FLIS");
+    expect(
+      knownLinkTitle(
+        "https://portal.azure.com/#@hogan.onmicrosoft.com/resource/subscriptions/0000/resourceGroups/rg-flis-prod/providers/Microsoft.Web/sites/app-flis-prod/overview",
+      ),
+    ).toBe("app-flis-prod (rg-flis-prod)");
+    expect(knownLinkTitle("https://portal.azure.com/#@x/resource/subscriptions/0/resourceGroups/rg-flis/overview")).toBe("rg-flis (resource group)");
+    expect(knownLinkTitle("https://github.com/tauri-apps/tauri/pull/123")).toBe("tauri#123");
+    expect(knownLinkTitle("https://github.com/tauri-apps/tauri")).toBe("tauri-apps/tauri");
+    expect(knownLinkTitle("https://hogan.sharepoint.com/sites/FLIS/Shared%20Documents/Design/Retention%20Plan.docx?web=1")).toBe("Retention Plan.docx");
+    expect(knownLinkTitle("https://example.com/whatever")).toBeNull();
+    expect(linkText("A [b] c")).toBe("A (b) c");
+  });
+});
+
+describe("outline and attachments", () => {
+  it("lists headings with levels and lines, skipping frontmatter and code", async () => {
+    const { outlineOf } = await import("./parse");
+    const doc = ["---", "title: x", "---", "# Design", "## Context", "```", "# not a heading", "```", "### Options", "text"].join("\n");
+    expect(outlineOf(doc)).toEqual([
+      { level: 1, text: "Design", line: 3 },
+      { level: 2, text: "Context", line: 4 },
+      { level: 3, text: "Options", line: 8 },
+    ]);
+  });
+
+  it("names attachments by time", async () => {
+    const { attachmentName } = await import("../ui/editor/pasteAndImages");
+    const d = new Date(2026, 9, 23, 14, 5, 9);
+    expect(attachmentName(d, "png")).toBe("attachments/2026-10-23-140509.png");
+    expect(attachmentName(d, "jpg", 2)).toBe("attachments/2026-10-23-140509-2.jpg");
+  });
+});

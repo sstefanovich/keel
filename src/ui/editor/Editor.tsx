@@ -1,7 +1,9 @@
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { syntaxHighlighting } from "@codemirror/language";
+import { foldGutter, foldKeymap, syntaxHighlighting } from "@codemirror/language";
+import { fetchLinkTitle, imageUrl, saveImage } from "../../lib/platform";
+import { attachmentName, pasteAndImages } from "./pasteAndImages";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
 import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemirror/view";
@@ -36,7 +38,7 @@ export type SaveStatus = "saved" | "pending" | "saving";
 export function Editor({ path, line, onOpenLink, onStatus }: Props) {
   const statusRef = useRef(onStatus);
   statusRef.current = onStatus;
-  const { hold, version, bump, reportError } = useHold();
+  const { hold, dir, version, bump, reportError } = useHold();
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const saved = useRef({ content: "", mtime: 0 });
@@ -90,6 +92,20 @@ export function Editor({ path, line, onOpenLink, onStatus }: Props) {
           mermaidPreview,
           propertiesView,
           keelClicks((t) => linkRef.current(t)),
+          foldGutter({ openText: "▾", closedText: "▸" }),
+          pasteAndImages({
+            saveImage: async (file) => {
+              const ext = { "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp", "image/bmp": "bmp" }[file.type] ?? "png";
+              const now = new Date();
+              let name = attachmentName(now, ext);
+              for (let n = 2; await hold.fs.exists(name); n++) name = attachmentName(now, ext, n);
+              await saveImage(dir, name, await toBase64(file));
+              return name;
+            },
+            loadImage: (p) => imageUrl(dir, p),
+            linkTitle: fetchLinkTitle,
+            onError: reportError,
+          }),
           previewSlot.current.of(livePreviewEnabled() ? livePreview(previewOpts) : []),
           autocompletion({
             override: [
@@ -102,6 +118,7 @@ export function Editor({ path, line, onOpenLink, onStatus }: Props) {
           keymap.of([
             ...closeBracketsKeymap,
             ...completionKeymap,
+            ...foldKeymap,
             ...searchKeymap,
             ...historyKeymap,
             indentWithTab,
@@ -187,6 +204,16 @@ export function Editor({ path, line, onOpenLink, onStatus }: Props) {
   }, [path]);
 
   return <div className="editor" ref={host} />;
+}
+
+/** A file's bytes as base64 (no data: prefix). */
+function toBase64(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ""));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
 }
 
 function jumpTo(v: EditorView, line?: number) {

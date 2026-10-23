@@ -213,6 +213,37 @@ export async function calendarForget(id: string): Promise<void> {
   if (isTauri) await invoke("calendar_forget", { id });
 }
 
+// ---------- images & links ----------
+
+/** Save an image (base64, no data: prefix) at a path inside the hold. */
+export async function saveImage(root: string, path: string, base64: string): Promise<void> {
+  if (!isTauri) throw new Error("Images can only be attached in the desktop app");
+  await invoke("hold_write_image", { root, path, data: base64 });
+}
+
+const imageCache = new Map<string, Promise<string>>();
+
+/** A hold image as a data: URL (cached: attachment names are never reused). */
+export function imageUrl(root: string, path: string): Promise<string> {
+  const key = `${root}|${path}`;
+  if (!imageCache.has(key)) {
+    const p = isTauri ? invoke<string>("hold_image_url", { root, path }) : Promise.reject(new Error("desktop only"));
+    p.catch(() => imageCache.delete(key));
+    imageCache.set(key, p);
+  }
+  return imageCache.get(key)!;
+}
+
+/** A web page's title, or null (offline, sign-in page, not HTML…). */
+export async function fetchLinkTitle(url: string): Promise<string | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<string | null>("link_title", { url });
+  } catch {
+    return null;
+  }
+}
+
 // ---------- file history (snapshots in a git repository in the hold) ----------
 
 export interface Snapshot {

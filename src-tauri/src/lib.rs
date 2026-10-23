@@ -1,3 +1,4 @@
+mod attach;
 mod calendar;
 mod history;
 mod hold;
@@ -196,6 +197,9 @@ pub fn run() {
             history::history_versions,
             history::history_read,
             notify::reminder_notify,
+            attach::hold_write_image,
+            attach::hold_image_url,
+            attach::link_title,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Keel");

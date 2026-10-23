@@ -367,6 +367,20 @@ export function parseChartItem(text: string): { label?: string; value: string; u
 }
 
 /** Level 2+ headings in document order (outside code fences). */
+/** Headings (# to ######) with their level and 0-based line, outside code blocks and frontmatter. */
+export function outlineOf(content: string): { level: number; text: string; line: number }[] {
+  const out: { level: number; text: string; line: number }[] = [];
+  const lines = content.split(/\r?\n/);
+  const { lines: fm } = splitFrontmatter(content, false);
+  let inFence = false;
+  for (let i = fm; i < lines.length; i++) {
+    if (/^\s*(```|~~~)/.test(lines[i])) inFence = !inFence;
+    const m = !inFence && lines[i].match(/^(#{1,6})\s+(.*?)\s*#*\s*$/);
+    if (m && m[2]) out.push({ level: m[1].length, text: m[2], line: i });
+  }
+  return out;
+}
+
 export function headingsOf(content: string): string[] {
   const out: string[] = [];
   let inFence = false;
