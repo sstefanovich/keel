@@ -33,9 +33,12 @@ function set(patch: Partial<State>) {
 
 let root = "";
 
-/** Take a snapshot now (skipped while one is running). Resolves true if anything was recorded. */
-export async function snapshotNow(message?: string): Promise<boolean> {
-  if (!isTauri || !root || state.busy) return false;
+/**
+ * Take a snapshot now (skipped while one is running, or when history is turned off unless `force`:
+ * an explicit "save a snapshot" from Settings or the command list). Resolves true if anything was recorded.
+ */
+export async function snapshotNow(message?: string, force = false): Promise<boolean> {
+  if (!isTauri || !root || state.busy || (!state.enabled && !force)) return false;
   set({ busy: true });
   try {
     const s = await historySnapshot(root, message);

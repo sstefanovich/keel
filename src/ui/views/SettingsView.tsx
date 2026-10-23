@@ -93,7 +93,7 @@ export function SettingsView({ section }: { section?: string }) {
           your Hold, only on this computer; nothing is uploaded. If your Hold is already a git repository, Keel adds its snapshots to it.
         </p>
         <div className="setting-row">
-          <button onClick={async () => toast((await snapshotNow("Snapshot from Settings")) ? "Snapshot saved" : "Nothing changed since the last snapshot")} disabled={!isTauri || history.busy}>
+          <button onClick={async () => toast((await snapshotNow("Snapshot from Settings", true)) ? "Snapshot saved" : "Nothing changed since the last snapshot")} disabled={!isTauri || history.busy}>
             Save a snapshot now
           </button>
           <span className={`small ${history.error ? "error-text" : "muted"}`}>

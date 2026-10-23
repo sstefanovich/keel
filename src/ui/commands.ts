@@ -83,7 +83,7 @@ export function buildCommands({ hold, nav, view, focus, setFocus, weekStart, toa
       title: "Save a history snapshot now",
       sub: "File history",
       Icon: History,
-      run: () => void snapshotNow("Snapshot from the command list").then((saved) => toast(saved ? "Snapshot saved" : "Nothing changed since the last snapshot")),
+      run: () => void snapshotNow("Snapshot from the command list", true).then((saved) => toast(saved ? "Snapshot saved" : "Nothing changed since the last snapshot")),
     },
     { id: "theme-light", title: "Theme: light", sub: "Appearance", Icon: Sun, run: () => setThemePref("light") },
     { id: "theme-dark", title: "Theme: dark", sub: "Appearance", Icon: Moon, run: () => setThemePref("dark") },

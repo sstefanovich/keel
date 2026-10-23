@@ -1,5 +1,6 @@
 import { ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Hold } from "../core/hold";
+import { isCaptureWindow } from "../lib/platform";
 
 interface HoldCtx {
   hold: Hold;
@@ -66,7 +67,8 @@ export function HoldProvider({ hold, dir, children }: { hold: Hold; dir: string;
   useEffect(() => {
     let busy = false;
     const tick = async () => {
-      if (busy || document.hidden) return;
+      // the capture window sits hidden most of the time and re-reads when it opens: no polling there
+      if (busy || document.hidden || isCaptureWindow) return;
       busy = true;
       try {
         if (await hold.reindex()) bump();

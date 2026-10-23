@@ -2,6 +2,7 @@ import { syntaxTree } from "@codemirror/language";
 import { EditorState, Range } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import { today } from "../../core/dates";
+import { trailingOwner } from "../../core/parse";
 
 /**
  * Live preview: hides markdown syntax (heading #, **, `, link URLs) except on the lines being
@@ -220,7 +221,10 @@ function build(view: EditorView, opts: LivePreviewOptions): DecorationSet {
       if (TASK_OR_WORK.test(line.text) || /^\s+[-*+] /.test(line.text)) {
         const masked = line.text.replace(/`[^`]*`/g, (c) => " ".repeat(c.length));
         const done = /^\s*[-*+] \[[xX]\]/.test(line.text);
+        // only a task's trailing @Name is who it waits on; other @Names stay as written
+        const owner = TASK.test(line.text) ? trailingOwner(masked) : null;
         for (const m of masked.matchAll(TOKEN)) {
+          if (m[3] && m.index !== owner?.at) continue;
           const d = tokenChip(m, done, opts);
           if (!d) continue;
           const s = line.from + m.index!;

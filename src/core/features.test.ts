@@ -32,7 +32,15 @@ describe("action items", () => {
       ].join("\n"),
       0,
     );
-    expect(f.tasks.map((t) => t.waiting)).toEqual(["Jordan", "Sam", undefined, undefined, "Pat"]);
+    // "@Sam, by Friday" isn't at the end, so that one stays a plain mention
+    expect(f.tasks.map((t) => t.waiting)).toEqual(["Jordan", undefined, undefined, undefined, "Pat"]);
+    // only a trailing @Name hands the task to someone; mid-sentence it's just a mention
+    const g = parseFile(
+      "notes/x.md",
+      ["- [ ] Call @Jordan about pricing", "- [ ] Cost model @Sam #flis @due(2026-10-30)", "- [ ] Review with @Sam, then ship"].join("\n"),
+      0,
+    );
+    expect(g.tasks.map((t) => t.waiting)).toEqual([undefined, "Sam", undefined]);
   });
 
   it("new meetings start with an action-item checkbox; untouched old templates are upgraded", async () => {
@@ -260,5 +268,15 @@ describe("display text", () => {
     const { flowItems } = await import("./parse");
     expect(flowItems('["Lee, Jordan", "Sam Patel"]')).toEqual(["Lee, Jordan", "Sam Patel"]);
     expect(flowItems("[a, b]")).toEqual(["a", "b"]);
+  });
+});
+
+describe("guide upgrades", () => {
+  it("knows both earlier guides", async () => {
+    const { CLAUDE_GUIDE, PREVIOUS_GUIDES } = await import("./claudeGuide");
+    expect(PREVIOUS_GUIDES).toHaveLength(2);
+    for (const p of PREVIOUS_GUIDES) expect(p).not.toBe(CLAUDE_GUIDE);
+    expect(PREVIOUS_GUIDES[0]).not.toContain("capitalised");
+    expect(PREVIOUS_GUIDES[1]).toContain("`@Name` on a task means the same (`- [ ] send the SOW @Jordan`); meeting action items use this form.\n");
   });
 });

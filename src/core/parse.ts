@@ -118,8 +118,18 @@ const BULLET_RE = /^\s*[-*+]\s+(.*)$/;
 const DUE_RE = /@due\((\d{4}-\d{2}-\d{2})\)/;
 const REMIND_RE = /@remind\(([^)]*)\)/;
 const WAITING_RE = /@waiting(?:\(([^)]*)\))?/;
-/** A capitalised @Name on a task is the person it's waiting on (client and project keys are lowercase) */
-const OWNER_RE = /(?:^|\s)@([A-Z][\w.'-]*[\w])(?=$|[\s,;:!?)])/;
+/**
+ * A capitalised @Name at the end of a task (only @tokens or #tags after it) is the person it's
+ * waiting on: "send the SOW @Jordan". Mid-sentence ("call @Jordan about pricing") it's just a
+ * mention, and the task stays yours. Client and project keys are lowercase, so never match.
+ */
+const OWNER_RE = /(?:^|\s)@([A-Z][\w.'-]*[\w])(?=(?:\s+(?:@[\w-]+(?:\([^)]*\))?|#[\w/-]+))*\s*$)/;
+
+/** Who a task line waits on by a trailing @Name, and where that @ is (for the editor's chip). */
+export function trailingOwner(text: string): { name: string; at: number } | null {
+  const m = OWNER_RE.exec(text);
+  return m ? { name: m[1], at: m.index + m[0].indexOf("@") } : null;
+}
 const SINCE_RE = /@since\((\d{4}-\d{2}-\d{2})\)/;
 const DONE_RE = /@done\((\d{4}-\d{2}-\d{2})\)/;
 const TAG_RE = /(?:^|\s)#([A-Za-z][\w/-]*)/g;
