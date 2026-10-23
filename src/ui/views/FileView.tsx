@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { addDays, formatLong, today } from "../../core/dates";
 import { confirmDialog, isTauri } from "../../lib/platform";
 import { HistoryPanel } from "../HistoryPanel";
+import { OPEN_HISTORY_EVENT } from "../commands";
 import { FlagBoard } from "../FlagBoard";
 import { WorkPanel } from "../WorkPanel";
+import { Briefing } from "../Briefing";
 import { Glance } from "../Glance";
 import { useHold } from "../HoldContext";
 import { Editor, SaveStatus } from "../editor/Editor";
@@ -27,6 +29,11 @@ export function FileView({ path, line }: { path: string; line?: number }) {
   useEffect(() => setSaveStatus("saved"), [path]);
   const [history, setHistory] = useState(false);
   useEffect(() => setHistory(false), [path]);
+  useEffect(() => {
+    const open = () => setHistory(true);
+    window.addEventListener(OPEN_HISTORY_EVENT, open);
+    return () => window.removeEventListener(OPEN_HISTORY_EVENT, open);
+  }, []);
   const [mode, setMode] = useState<"chart" | "edit">(hasChart && line == null ? "chart" : "edit");
   useEffect(() => setMode(hasChart && line == null ? "chart" : "edit"), [path, hasChart, line]);
 
@@ -153,6 +160,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
               {backlinkList}
             </div>
             <aside className="log-side">
+              {file.date === today() && <Briefing file={file} />}
               <WorkPanel file={file} />
             </aside>
           </div>

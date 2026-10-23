@@ -1909,3 +1909,261 @@ button.icon-text {
   color: var(--danger);
   font-weight: 600;
 }
+
+/* ---------- command list ---------- */
+
+kbd.switcher-keys {
+  flex: none;
+  font-size: 11px;
+  padding: 0 5px;
+  color: var(--muted);
+}
+
+/* ---------- calendar: week view ---------- */
+
+.week-cal {
+  --gutter: 54px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+.week-cal-head,
+.week-cal-allday,
+.week-cal-body {
+  display: grid;
+  grid-template-columns: var(--gutter) repeat(7, minmax(0, 1fr));
+}
+.week-cal-head {
+  border-bottom: 1px solid var(--border);
+}
+.week-cal-day-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 8px 6px;
+  cursor: pointer;
+  border-left: 1px solid var(--border);
+  min-width: 0;
+}
+.week-cal-day-head:hover {
+  background: var(--hover);
+}
+.week-cal-day-head.selected {
+  background: var(--accent-soft);
+}
+.week-cal-day-head.weekend,
+.week-cal-col.weekend {
+  background: color-mix(in srgb, var(--bg) 60%, var(--surface));
+}
+.week-cal-dow {
+  font-size: 12px;
+  color: var(--muted);
+}
+.week-cal-num {
+  font-size: 18px;
+  font-weight: 600;
+  font-family: var(--font-display);
+}
+.week-cal-day-head.today .week-cal-num {
+  color: var(--accent);
+}
+.week-cal-day-head .cal-tag {
+  margin-left: auto;
+}
+.week-cal-allday {
+  border-bottom: 1px solid var(--border);
+}
+.week-cal-allday .week-cal-gutter {
+  padding: 4px 6px;
+  text-align: right;
+}
+.week-cal-allday-col {
+  border-left: 1px solid var(--border);
+  padding: 3px;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  cursor: pointer;
+}
+.week-cal-scroll {
+  overflow-y: auto;
+  max-height: calc(100vh - 230px);
+  min-height: 300px;
+}
+.week-cal-body {
+  position: relative;
+}
+.week-cal-body > .week-cal-gutter {
+  position: relative;
+}
+.week-cal-hour {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.week-cal-hour:first-child {
+  transform: none;
+}
+.week-cal-col {
+  position: relative;
+  border-left: 1px solid var(--border);
+  cursor: pointer;
+  min-width: 0;
+}
+.week-cal-col.selected {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.week-cal-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  pointer-events: none;
+}
+.week-cal-event {
+  position: absolute;
+  margin-left: 2px;
+  padding: 2px 5px;
+  border-left: 3px solid var(--cal);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--cal) 16%, var(--surface));
+  color: var(--text);
+  font-size: 11.5px;
+  line-height: 1.3;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 0 1px var(--surface);
+}
+.week-cal-event.past {
+  opacity: 0.6;
+}
+.week-cal-event.tentative {
+  border-left-style: dashed;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--cal) 14%, var(--surface)) 0 6px, var(--surface) 6px 9px);
+}
+.week-cal-event.free {
+  background: var(--surface);
+}
+.week-cal-event-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.week-cal-event-time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.week-cal-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 2px solid var(--danger);
+  pointer-events: none;
+  z-index: 2;
+}
+.week-cal-now::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+/* ---------- today's briefing ---------- */
+
+@media (min-width: 1101px) {
+  /* the side column can outgrow the window now; let it scroll on its own */
+  .log-side {
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+  }
+}
+.briefing {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  background: linear-gradient(160deg, var(--accent-soft), var(--surface) 70%);
+  display: grid;
+  gap: 9px;
+  font-size: 13px;
+  animation: keel-fade-in 0.2s ease-out;
+}
+.briefing header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent);
+}
+.briefing h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+  font-family: var(--font-display);
+  color: var(--text);
+}
+.briefing-part ul {
+  list-style: none;
+  margin: 3px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.briefing-part li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.briefing-part li .link {
+  text-align: left;
+}
+.briefing-label {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+}
+button.briefing-label {
+  color: var(--text-2);
+}
+.briefing-time {
+  display: inline-block;
+  min-width: 62px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.briefing-late {
+  color: var(--danger);
+  font-size: 12px;
+}
+.briefing-done {
+  justify-self: start;
+  font-size: 12.5px;
+}
+
+/* ---------- search filters ---------- */
+
+.search-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.search-filters select {
+  max-width: 260px;
+}

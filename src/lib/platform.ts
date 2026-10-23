@@ -104,6 +104,25 @@ export async function notify(title: string, body: string) {
   if (await ensureNotificationPermission()) n.sendNotification({ title, body });
 }
 
+/** A reminder notification with Snooze buttons (Windows). Falls back to a plain one elsewhere. */
+export async function notifyReminder(id: string, title: string, body: string) {
+  if (!isTauri) return notify(title, body);
+  try {
+    await invoke("reminder_notify", { id, title, body });
+  } catch {
+    await notify(title, body);
+  }
+}
+
+/** A choice made on a reminder notification: "snooze:10", "snooze:60", "dismiss" or "open". */
+export function onReminderAction(cb: (id: string, action: string) => void): () => void {
+  if (!isTauri) return () => {};
+  const un = listen<{ id: string; action: string }>("reminder-action", (e) => cb(e.payload.id, e.payload.action));
+  return () => {
+    un.then((f) => f());
+  };
+}
+
 // ---------- dialogs & export ----------
 
 export async function pickFolder(current?: string): Promise<string | null> {

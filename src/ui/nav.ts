@@ -10,7 +10,7 @@ export type View =
   | { kind: "dispatch" }
   | { kind: "charts" }
   | { kind: "timesheet" }
-  | { kind: "calendar"; date?: string }
+  | { kind: "calendar"; date?: string; mode?: "month" | "week" }
   | { kind: "search"; q?: string }
   | { kind: "settings"; section?: string };
 

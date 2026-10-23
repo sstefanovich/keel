@@ -1,4 +1,4 @@
-import { CornerDownLeft } from "lucide-react";
+import { CornerDownLeft, LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatLong, formatShort, today } from "../core/dates";
 import { ParsedFile } from "../core/parse";
@@ -6,12 +6,26 @@ import { useHold } from "./HoldContext";
 import { View, useNav } from "./nav";
 import { FILE_ICONS, VIEW_ICONS, VIEW_TITLES } from "./viewMeta";
 
+/** An action for the command list (Ctrl+Shift+P, or > in the switcher). */
+export interface Command {
+  id: string;
+  title: string;
+  /** Group or detail shown on the right */
+  sub?: string;
+  Icon: LucideIcon;
+  /** Shortcut shown next to it */
+  keys?: string;
+  run: () => void;
+}
+
 interface Item {
   key: string;
   title: string;
   sub: string;
-  view: View;
-  Icon: (typeof VIEW_ICONS)[keyof typeof VIEW_ICONS];
+  view?: View;
+  run?: () => void;
+  keys?: string;
+  Icon: LucideIcon;
   /** Higher sorts first when nothing is typed */
   recency: number;
 }
@@ -28,11 +42,14 @@ function score(item: Item, words: string[]): number {
   return s;
 }
 
-/** Ctrl+P: jump to any note, log, meeting, client, project or view by typing part of its name. */
-export function QuickSwitcher({ onClose }: { onClose: () => void }) {
+/**
+ * Ctrl+P: jump to any note, log, meeting, client, project or view by typing part of its name.
+ * Starting with > (or opening with Ctrl+Shift+P) lists commands instead.
+ */
+export function QuickSwitcher({ onClose, commands, initial = "" }: { onClose: () => void; commands: Command[]; initial?: string }) {
   const { hold } = useHold();
   const nav = useNav();
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initial);
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
@@ -60,15 +77,23 @@ export function QuickSwitcher({ onClose }: { onClose: () => void }) {
     return [...views, ...files];
   }, [hold]);
 
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const commandMode = q.startsWith(">");
+  const commandItems = useMemo<Item[]>(
+    () => commands.map((c, i) => ({ key: `cmd:${c.id}`, title: c.title, sub: c.sub ?? "", run: c.run, keys: c.keys, Icon: c.Icon, recency: -i })),
+    [commands],
+  );
+  const pool = commandMode ? commandItems : items;
+  const words = (commandMode ? q.slice(1) : q).toLowerCase().split(/\s+/).filter(Boolean);
   const results = words.length
-    ? items
+    ? pool
         .map((i) => ({ i, s: score(i, words) }))
         .filter((r) => r.s >= 0)
         .sort((a, b) => b.s - a.s || b.i.recency - a.i.recency)
         .slice(0, 50)
         .map((r) => r.i)
-    : [...items].sort((a, b) => b.recency - a.recency).slice(0, 12);
+    : commandMode
+      ? commandItems
+      : [...items].sort((a, b) => b.recency - a.recency).slice(0, 12);
   const current = Math.min(sel, Math.max(0, results.length - 1));
 
   useEffect(() => {
@@ -77,17 +102,18 @@ export function QuickSwitcher({ onClose }: { onClose: () => void }) {
 
   const open = (item: Item | undefined, newTab: boolean) => {
     if (!item) return;
-    nav.go(item.view, { newTab });
     onClose();
+    if (item.run) item.run();
+    else if (item.view) nav.go(item.view, { newTab });
   };
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal switcher" role="dialog" aria-label="Go to" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modal switcher" role="dialog" aria-label={commandMode ? "Commands" : "Go to"} onMouseDown={(e) => e.stopPropagation()}>
         <input
           ref={input}
           value={q}
-          placeholder="Go to a note, log, project, client or view…"
+          placeholder="Go to a note, log, project, client or view… (type > for commands)"
           onChange={(e) => {
             setQ(e.target.value);
             setSel(0);
@@ -116,21 +142,27 @@ export function QuickSwitcher({ onClose }: { onClose: () => void }) {
                 <r.Icon size={16} className="switcher-icon" aria-hidden="true" />
                 <span className="switcher-title">{r.title}</span>
                 <span className="switcher-sub">{r.sub}</span>
+                {r.keys && <kbd className="switcher-keys">{r.keys}</kbd>}
                 {i === current && <CornerDownLeft size={14} className="switcher-enter" aria-hidden="true" />}
               </button>
             </li>
           ))}
-          {!results.length && <li className="switcher-empty">Nothing matches “{q}”.</li>}
+          {!results.length && <li className="switcher-empty">{commandMode ? "No command matches." : `Nothing matches “${q}”.`}</li>}
         </ul>
         <div className="switcher-foot">
           <span>
             <kbd>↑</kbd> <kbd>↓</kbd> to move
           </span>
           <span>
-            <kbd>Enter</kbd> to open
+            <kbd>Enter</kbd> to {commandMode ? "run" : "open"}
           </span>
+          {!commandMode && (
+            <span>
+              <kbd>Ctrl</kbd>+<kbd>Enter</kbd> in a new tab
+            </span>
+          )}
           <span>
-            <kbd>Ctrl</kbd>+<kbd>Enter</kbd> in a new tab
+            <kbd>&gt;</kbd> commands
           </span>
           <span>
             <kbd>Esc</kbd> to close

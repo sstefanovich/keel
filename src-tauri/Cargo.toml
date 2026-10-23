@@ -30,6 +30,9 @@ tauri-plugin-single-instance = "2"
 portable-pty = "0.9"
 tauri-plugin-window-state = "2"
 
+[target.'cfg(windows)'.dependencies]
+tauri-winrt-notification = "0.8"
+
 [profile.release]
 codegen-units = 1
 lto = true

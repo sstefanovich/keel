@@ -157,3 +157,38 @@ describe("diff", () => {
     expect(diffStats(diffLines("x\r\ny", "x\ny"))).toEqual({ added: 0, removed: 0 });
   });
 });
+
+describe("calendar day layout", () => {
+  const h = (n: number) => n * 3_600_000;
+  it("puts overlapping events side by side and lone ones full width", async () => {
+    const { layoutDay } = await import("./calendarLayout");
+    const a = { id: "a", start: h(9), end: h(10) };
+    const b = { id: "b", start: h(9.5), end: h(11) };
+    const c = { id: "c", start: h(10), end: h(10.5) }; // reuses a's column
+    const d = { id: "d", start: h(12), end: h(13) };
+    const placed = Object.fromEntries(layoutDay([d, c, b, a]).map((p) => [p.item.id, [p.col, p.cols]]));
+    expect(placed).toEqual({ a: [0, 2], b: [1, 2], c: [0, 2], d: [0, 1] });
+  });
+});
+
+describe("search filters", () => {
+  it("narrows by type, client/project (logs by mention) and date", async () => {
+    const hold = await makeHold({
+      "clients/hogan.md": "---\nname: Hogan\n---\n# Hogan\n",
+      "projects/FLIS.md": "---\nclient: hogan\n---\n# FLIS\nfirewall plan\n",
+      "notes/Firewall.md": "---\nproject: flis\ncreated: 2026-10-01\n---\n# Firewall\nfirewall rules\n",
+      "notes/Other.md": "---\ncreated: 2026-01-05\n---\n# Other\nfirewall at home\n",
+      "logs/2026/2026-10-20.md": "# Log\n## Work\n- 2h @flis\n  - firewall review\n## Log\n- firewall chat with Sam\n",
+      "meetings/2026-10-21 Sync.md": "---\ndate: 2026-10-21\nclient: hogan\n---\n# Sync\nfirewall owners\n",
+    });
+    const paths = (f: Parameters<typeof hold.search>[2]) => [...new Set(hold.search("firewall", 200, f).map((h) => h.path))].sort();
+    expect(paths({ kinds: ["note"] })).toEqual(["notes/Firewall.md", "notes/Other.md"]);
+    expect(paths({ project: "flis" })).toEqual(["logs/2026/2026-10-20.md", "notes/Firewall.md", "projects/FLIS.md"]);
+    // the log only for the line that names the project
+    // in a log, only the lines in the project's Work block (or naming it) count
+    expect(hold.search("firewall", 200, { project: "flis" }).filter((h) => h.path.startsWith("logs")).map((h) => h.snippet)).toEqual(["- firewall review"]);
+    expect(paths({ client: "hogan" })).toContain("meetings/2026-10-21 Sync.md");
+    expect(paths({ client: "hogan" })).not.toContain("notes/Other.md");
+    expect(paths({ from: "2026-10-01", kinds: ["note", "meeting", "log"] })).toEqual(["logs/2026/2026-10-20.md", "meetings/2026-10-21 Sync.md", "notes/Firewall.md"]);
+  });
+});

@@ -32,6 +32,7 @@ export function QuickCapture({
   standalone,
   status,
   boxRef,
+  initialKind,
 }: {
   onSubmit: (c: Capture) => Promise<void>;
   onClose: () => void;
@@ -41,10 +42,12 @@ export function QuickCapture({
   /** Replaces the preview line (a confirmation or an error) */
   status?: { text: string; error?: boolean };
   boxRef?: React.Ref<HTMLDivElement>;
+  /** Start on this type (e.g. "Log hours…" from the command list) */
+  initialKind?: CaptureKind;
 }) {
   const { hold } = useHold();
   const [text, setText] = useState("");
-  const [force, setForce] = useState<CaptureKind | undefined>(undefined);
+  const [force, setForce] = useState<CaptureKind | undefined>(initialKind);
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   useEscape(onClose);

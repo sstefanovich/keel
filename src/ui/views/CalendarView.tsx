@@ -5,18 +5,50 @@ import { round2 } from "../../core/hold";
 import { CalItem, eventDays, eventTime, refreshCalendars, useCalendarEvents, useCalendars } from "../calendars";
 import { EmptyState } from "../EmptyState";
 import { EventRow } from "../EventRow";
+import { CalendarWeek } from "../CalendarWeek";
 import { useHold } from "../HoldContext";
 import { openOpts, useNav } from "../nav";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** "Oct 19 – 25, 2026" / "Oct 26 – Nov 1, 2026" */
+function weekTitle(first: string, last: string): string {
+  const a = parseISO(first);
+  const b = parseISO(last);
+  const mon = (d: Date) => d.toLocaleDateString(undefined, { month: "short" });
+  return `${mon(a)} ${a.getDate()} – ${a.getMonth() === b.getMonth() ? "" : `${mon(b)} `}${b.getDate()}, ${b.getFullYear()}`;
+}
 const SHOWN = 3;
 
-export function CalendarView({ date }: { date?: string }) {
+type Mode = "month" | "week";
+const MODE_KEY = "keel.calendarMode";
+
+function loadMode(): Mode {
+  try {
+    return localStorage.getItem(MODE_KEY) === "week" ? "week" : "month";
+  } catch {
+    return "month";
+  }
+}
+
+export function CalendarView({ date, mode: initialMode }: { date?: string; mode?: Mode }) {
   const { hold } = useHold();
   const nav = useNav();
   const t = today();
   const [month, setMonth] = useState(startOfMonth(date ?? t));
   const [selected, setSelected] = useState(date ?? t);
+  const [mode, setModeState] = useState<Mode>(initialMode ?? loadMode);
+  const setMode = (m: Mode) => {
+    setModeState(m);
+    try {
+      localStorage.setItem(MODE_KEY, m);
+    } catch {
+      // per-machine preference only
+    }
+  };
+  useEffect(() => {
+    if (initialMode) setModeState(initialMode);
+  }, [initialMode]);
   const [now, setNow] = useState(Date.now());
   const { sources, states } = useCalendars();
 
@@ -32,8 +64,9 @@ export function CalendarView({ date }: { date?: string }) {
     }
   }, [date]);
 
-  const first = startOfWeek(month);
-  const last = addDays(startOfWeek(endOfMonth(month)), 6);
+  const weekFirst = startOfWeek(selected);
+  const first = mode === "week" ? weekFirst : startOfWeek(month);
+  const last = mode === "week" ? addDays(weekFirst, 6) : addDays(startOfWeek(endOfMonth(month)), 6);
   const days = dateRange(first, last);
   const ts = hold.timesheet(first, last);
   const tasks = hold.tasks().filter((x) => x.status === "open" && x.due);
@@ -68,8 +101,19 @@ export function CalendarView({ date }: { date?: string }) {
   return (
     <div className="page calendar-page">
       <header className="page-head row">
-        <h1>{parseISO(month).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</h1>
+        <h1>
+          {mode === "week"
+            ? weekTitle(first, last)
+            : parseISO(month).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+        </h1>
         <div className="toolbar">
+          <div className="seg" role="radiogroup" aria-label="Calendar view">
+            {(["month", "week"] as const).map((m) => (
+              <button key={m} role="radio" aria-checked={mode === m} className={mode === m ? "on" : ""} onClick={() => setMode(m)}>
+                {m === "month" ? "Month" : "Week"}
+              </button>
+            ))}
+          </div>
           {sources.length > 0 && (
             <span className="cal-sources" aria-label="Calendars">
               {enabled.map((s) => (
@@ -82,11 +126,11 @@ export function CalendarView({ date }: { date?: string }) {
               </button>
             </span>
           )}
-          <button onClick={() => go(addMonths(month, -1))} aria-label="Previous month">
+          <button onClick={() => (mode === "week" ? pick(addDays(selected, -7)) : go(addMonths(month, -1)))} aria-label={mode === "week" ? "Previous week" : "Previous month"}>
             <ChevronLeft size={16} aria-hidden="true" />
           </button>
           <button onClick={() => pick(t)}>Today</button>
-          <button onClick={() => go(addMonths(month, 1))} aria-label="Next month">
+          <button onClick={() => (mode === "week" ? pick(addDays(selected, 7)) : go(addMonths(month, 1)))} aria-label={mode === "week" ? "Next week" : "Next month"}>
             <ChevronRight size={16} aria-hidden="true" />
           </button>
         </div>
@@ -103,6 +147,18 @@ export function CalendarView({ date }: { date?: string }) {
       )}
 
       <div className="cal-layout">
+        {mode === "week" ? (
+          <CalendarWeek
+            days={days}
+            byDay={byDay}
+            hoursByDay={ts.byDay}
+            selected={selected}
+            today={t}
+            now={now}
+            onPick={pick}
+            onOpenLog={(d, e) => nav.openLog(d, openOpts(e))}
+          />
+        ) : (
         <div className="calendar" role="grid" aria-label="Month">
           {WEEKDAYS.map((w) => (
             <div key={w} className="cal-head" role="columnheader">
@@ -155,6 +211,7 @@ export function CalendarView({ date }: { date?: string }) {
             );
           })}
         </div>
+        )}
 
         <aside className="cal-day-panel panel" aria-label={formatLong(selected)}>
           <header className="cal-day-head">

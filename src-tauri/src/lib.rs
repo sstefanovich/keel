@@ -1,6 +1,7 @@
 mod calendar;
 mod history;
 mod hold;
+mod notify;
 mod pty;
 
 use tauri::menu::{Menu, MenuItem};
@@ -194,6 +195,7 @@ pub fn run() {
             history::history_snapshot,
             history::history_versions,
             history::history_read,
+            notify::reminder_notify,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Keel");

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Capture } from "./core/capture";
+import { Capture, CaptureKind } from "./core/capture";
+import { buildCommands } from "./ui/commands";
+import { useWeekStart } from "./ui/weekStart";
 import { formatShort, today } from "./core/dates";
 import { Hold } from "./core/hold";
 import { basename } from "./core/parse";
@@ -78,8 +80,8 @@ export default function App() {
 }
 
 function Shell() {
-  const { hold, dir, bump, reportError, toast, focus } = useHold();
-  useReminders(hold);
+  const { hold, dir, bump, reportError, toast, focus, setFocus } = useHold();
+  const weekStart = useWeekStart();
   useEffect(() => startCalendarSync(), []);
   useEffect(() => startHistory(dir), [dir]);
   // tabs, each with its own history; restored from the last session
@@ -107,9 +109,10 @@ function Shell() {
   const view = currentView(tabs);
   const show = useCallback((v: View, o?: OpenOpts) => setTabs((s) => navigate(s, v, o?.newTab)), []);
 
-  const [capture, setCapture] = useState<{ hideAfter: boolean } | null>(null);
+  const [capture, setCapture] = useState<{ hideAfter: boolean; kind?: CaptureKind } | null>(null);
   const [prompt, setPrompt] = useState<PromptSpec | null>(null);
-  const [switcher, setSwitcher] = useState(false);
+  /** The switcher's starting text: "" to go to a file, ">" for commands; null when closed */
+  const [switcher, setSwitcher] = useState<string | null>(null);
   const [tour, setTour] = useState(() => !tourSeen());
 
   // sidebar: collapsible to an icon rail, and resizable
@@ -124,6 +127,7 @@ function Shell() {
   const toggleSidebar = useCallback(() => setSidebar((s) => ({ ...s, collapsed: !s.collapsed })), []);
 
   const openFile = useCallback((path: string, line?: number, o?: OpenOpts) => show({ kind: "file", path, line }, o), [show]);
+  useReminders(hold, openFile);
 
   const openLog = useCallback(
     async (date: string, o?: OpenOpts) => {
@@ -156,9 +160,9 @@ function Shell() {
     [hold, bump, openFile, reportError],
   );
 
-  const startCapture = useCallback((hideAfter = false) => {
+  const startCapture = useCallback((hideAfter = false, kind?: CaptureKind) => {
     window.dispatchEvent(new Event(FLUSH_EVENT));
-    setCapture({ hideAfter });
+    setCapture({ hideAfter, kind });
   }, []);
 
   /** Save a capture (from either capture box); returns the confirmation to show. */
@@ -347,7 +351,7 @@ function Shell() {
       openLink,
       capture: () => startCapture(),
       newItem,
-      openSwitcher: () => setSwitcher(true),
+      openSwitcher: () => setSwitcher(""),
       openTour: () => setTour(true),
       prompt: askFor,
       claudeOpen,
@@ -411,6 +415,7 @@ function Shell() {
         ? {
             f: () => show({ kind: "search" }),
             m: () => newItem("meeting"),
+            p: () => setSwitcher(">"),
             s: () => show({ kind: "scratch" }),
             t: () => setTabs((s) => reopenClosed(s)),
             tab: () => setTabs((s) => cycleTab(s, -1)),
@@ -420,8 +425,8 @@ function Shell() {
             t: () => openToday(),
             j: () => show({ kind: "agenda" }),
             n: () => newItem("note"),
-            p: () => setSwitcher(true),
-            o: () => setSwitcher(true),
+            p: () => setSwitcher(""),
+            o: () => setSwitcher(""),
             w: () => setTabs((s) => closeTab(s, s.active, { kind: "agenda" })),
             tab: () => setTabs((s) => cycleTab(s, 1)),
             "[": () => setTabs((s) => go(s, -1)),
@@ -454,16 +459,22 @@ function Shell() {
             {view.kind === "dispatch" && <DispatchView />}
             {view.kind === "charts" && <ChartsView />}
             {view.kind === "timesheet" && <TimesheetView />}
-            {view.kind === "calendar" && <CalendarView date={view.date} />}
+            {view.kind === "calendar" && <CalendarView date={view.date} mode={view.mode} />}
             {view.kind === "search" && <SearchView initial={view.q} />}
             {view.kind === "settings" && <SettingsView section={view.section} />}
           </div>
           {claudeMounted && <ClaudePanel open={claudeOpen} onClose={() => setClaudeOpen(false)} />}
         </main>
       </div>
-      {capture && <QuickCapture onSubmit={submitCapture} onClose={() => setCapture(null)} focus={focus} />}
+      {capture && <QuickCapture onSubmit={submitCapture} onClose={() => setCapture(null)} focus={focus} initialKind={capture.kind} />}
       {prompt && <PromptModal spec={prompt} onClose={() => setPrompt(null)} />}
-      {switcher && <QuickSwitcher onClose={() => setSwitcher(false)} />}
+      {switcher !== null && (
+        <QuickSwitcher
+          initial={switcher}
+          onClose={() => setSwitcher(null)}
+          commands={buildCommands({ hold, nav, view, focus, setFocus, weekStart, toast, capture: (kind) => startCapture(false, kind) })}
+        />
+      )}
       {tour && <Tour onClose={() => setTour(false)} />}
       </ContextMenuProvider>
     </NavCtx.Provider>

@@ -1,8 +1,9 @@
 import { CLAUDE_GUIDE, PREVIOUS_GUIDES } from "./claudeGuide";
-import { ISODate, addDays, hhmm, today as todayISO } from "./dates";
+import { ISODate, addDays, hhmm, toISO, today as todayISO } from "./dates";
 import { HoldFs } from "./fs";
 import {
   ChartItem,
+  FileKind,
   HOURS_RE,
   HoursEntry,
   ParsedFile,
@@ -54,6 +55,15 @@ export interface Timesheet {
   byClient: ClientTotal[];
   byDay: Map<ISODate, number>;
   totalHours: number;
+}
+
+/** Narrowing a search: file types, one client or project, and a date range (inclusive). */
+export interface SearchFilter {
+  kinds?: FileKind[];
+  client?: string;
+  project?: string;
+  from?: ISODate;
+  to?: ISODate;
 }
 
 export interface SearchHit {
@@ -798,24 +808,46 @@ export class Hold {
   }
 
   /** Plain text search; a query like "#tag" matches tagged files. */
-  search(query: string, limit = 200): SearchHit[] {
+  /** The date a file is "from" for search: its own date, else when it was created, else last saved. */
+  fileDate(f: ParsedFile): ISODate {
+    const created = String(f.frontmatter.created ?? "");
+    return f.date ?? (/^\d{4}-\d{2}-\d{2}$/.test(created) ? created : toISO(new Date(f.mtime)));
+  }
+
+  search(query: string, limit = 200, filter: SearchFilter = {}): SearchHit[] {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     const hits: SearchHit[] = [];
+    const { kinds, client, project, from, to } = filter;
+    // logs belong to no one, so there a line counts when it names the client or project
+    const keys = project ? [project] : client ? [client, ...this.projectsOf(client).map((p) => slugify(basename(p.path)))] : [];
+    const mentions = keys.length ? new RegExp(`[#@](?:${keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![\\w-])`, "i") : null;
+    const owned = (f: ParsedFile) => (project ? this.fileProject(f) === project : client ? this.fileClient(f) === client : true);
     const files = this.all()
       .filter((f) => f.kind !== "template")
+      .filter((f) => !kinds?.length || kinds.includes(f.kind))
+      .filter((f) => (!from && !to) || ((!from || this.fileDate(f) >= from) && (!to || this.fileDate(f) <= to)))
+      .filter((f) => !mentions || owned(f) || f.kind === "log")
       .sort((a, b) => b.mtime - a.mtime);
+    // ...or sits in that project's (or client's) Work block
+    const inBlock = (f: ParsedFile, i: number) =>
+      f.hours.some((h) => {
+        if (i < h.line || i > h.end) return false;
+        const r = this.resolveHours(h.client);
+        return project ? r.project === project : r.client === client;
+      });
+    const lineOk = (f: ParsedFile, line: string, i: number) => !mentions || owned(f) || mentions.test(line) || inBlock(f, i);
     if (/^#[\w/-]+$/.test(q)) {
       const tag = q.slice(1);
-      for (const f of files) if (f.tags.includes(tag)) hits.push({ path: f.path, title: f.title, line: 0, snippet: "" });
+      for (const f of files) if (f.tags.includes(tag) && (owned(f) || !mentions || mentions.test(f.content))) hits.push({ path: f.path, title: f.title, line: 0, snippet: "" });
       return hits.slice(0, limit);
     }
     for (const f of files) {
       const lines = f.content.split(/\r?\n/);
-      const titleHit = f.title.toLowerCase().includes(q);
+      const titleHit = f.title.toLowerCase().includes(q) && owned(f);
       let found = false;
       lines.forEach((l, i) => {
-        if (hits.length < limit && l.toLowerCase().includes(q)) {
+        if (hits.length < limit && l.toLowerCase().includes(q) && lineOk(f, l, i)) {
           hits.push({ path: f.path, title: f.title, line: i, snippet: l.trim().slice(0, 200) });
           found = true;
         }

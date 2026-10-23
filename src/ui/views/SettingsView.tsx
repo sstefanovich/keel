@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getAutostart, isTauri, loadSettings, notify, pickFolder, saveSettings, setAutostart } from "../../lib/platform";
+import { getAutostart, isTauri, loadSettings, notifyReminder, pickFolder, saveSettings, setAutostart } from "../../lib/platform";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 import { useTheme } from "../theme";
@@ -186,7 +186,7 @@ export function SettingsView({ section }: { section?: string }) {
           Launch Keel when I sign in to Windows (starts in the tray so reminders keep running)
         </label>
         <p className="muted">Closing the window hides Keel to the tray. Use the tray icon's menu to quit.</p>
-        <button onClick={() => notify("Test reminder", "Keel notifications are working")}>Send a test notification</button>
+        <button onClick={() => notifyReminder("keel-test", "Test reminder", "Keel notifications are working")}>Send a test notification</button>
       </section>
 
       <section className="panel">
@@ -198,6 +198,7 @@ export function SettingsView({ section }: { section?: string }) {
               ["Ctrl+K", "Quick capture (inside Keel)"],
               ["Ctrl+`", "Show / hide Claude"],
               ["Ctrl+P", "Go to any note, log, project, client or view"],
+              ["Ctrl+Shift+P", "Commands: log hours, copy the week, theme, focus… (or type > in Ctrl+P)"],
               ["Ctrl+B", "Collapse / expand the sidebar"],
               ["Ctrl+Shift+S", "Scratchpad"],
               ["Ctrl+click", "Open in a new tab (or middle-click)"],
