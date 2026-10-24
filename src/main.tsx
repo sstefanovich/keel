@@ -7,7 +7,12 @@ import "./look.css";
 import "./ui/theme"; // applies the saved light/dark choice and follows the OS when set to System
 import "./ui/editorWidth"; // applies the saved text-column width
 import { applyBackdrop } from "./lib/platform";
+import { ErrorBoundary } from "./ui/ErrorBoundary";
 
 void applyBackdrop();
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(<App />);
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>,
+);
