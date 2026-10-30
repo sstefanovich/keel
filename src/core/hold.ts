@@ -496,6 +496,12 @@ export class Hold {
       if (tag.includes("/") || this.projectByKey(tag)) return this.resolveHours(tag);
       if (clients.has(tag)) return { client: tag };
     }
+    // "@portal" works like "#portal", but only for known keys (@Jordan is a person)
+    for (const key of t.mentions) {
+      const [c, p] = key.split("/");
+      if (this.projectByKey(p ?? c)) return this.resolveHours(key);
+      if (!p && clients.has(c)) return { client: c };
+    }
     const c = this.taskClient(t);
     return c ? { client: c } : undefined;
   }
@@ -632,7 +638,7 @@ export class Hold {
     const fromFile = f && this.fileClient(f);
     if (fromFile) return fromFile;
     const clients = this.clients();
-    for (const tag of t.tags) {
+    for (const tag of [...t.tags, ...t.mentions]) {
       const root = tag.split("/")[0];
       if (clients.has(root)) return root;
       const p = this.projectByKey(root);
@@ -652,6 +658,14 @@ export class Hold {
 
   projectName(key: string): string {
     return this.projectByKey(key)?.title ?? key;
+  }
+
+  /** The display name for "@client/project", "@project" or "@client", or undefined if it names neither. */
+  keyName(key: string): string | undefined {
+    const [c, p] = key.toLowerCase().split("/");
+    const proj = this.projectByKey(p ?? c);
+    if (proj) return proj.title;
+    return this.clients().get(c)?.name;
   }
 
   /** Open tasks marked @waiting, oldest first. */

@@ -1,7 +1,22 @@
 import { formatShort, today } from "../core/dates";
+import { Hold } from "../core/hold";
 import { Task, taskLabel } from "../core/parse";
 import { useHold } from "./HoldContext";
 import { useNav } from "./nav";
+
+/**
+ * A task's label and the project or client it's filed under by a #tag or @key, shown by name.
+ * The @key behind `ownerName` goes from the label; other known keys read as their names.
+ */
+export function taskWithOwner(hold: Hold, task: Task): { label: string; ownerName?: string } {
+  const owner = task.tags.length || task.mentions.length ? hold.taskProject(task) : undefined;
+  const ownerName = owner ? (owner.project && hold.projectByKey(owner.project) ? hold.projectName(owner.project) : hold.clients().get(owner.client)?.name) : undefined;
+  const label = taskLabel(task, (k) => {
+    const name = hold.keyName(k);
+    return name && name === ownerName ? "" : name;
+  });
+  return { label, ownerName };
+}
 
 /**
  * A task in a list. `inToday`: it's in a "today" list, so a due date of today and today's log as
@@ -24,10 +39,7 @@ export function TaskRow({
   const done = task.status === "done";
   const file = hold.get(task.file);
   const t = today();
-  const label = taskLabel(task);
-  // a #tag naming a project or client shows as its name
-  const owner = task.tags.length ? hold.taskProject(task) : undefined;
-  const ownerName = owner ? (owner.project && hold.projectByKey(owner.project) ? hold.projectName(owner.project) : hold.clients().get(owner.client)?.name) : undefined;
+  const { label, ownerName } = taskWithOwner(hold, task);
   const showDue = showDueChip && task.due && !(inToday && task.due === t);
   const fromToday = file?.kind === "log" && file.date === t;
 

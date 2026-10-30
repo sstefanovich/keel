@@ -1,4 +1,4 @@
-import { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
+import { CompletionContext, CompletionResult, completionStatus } from "@codemirror/autocomplete";
 import { HighlightStyle } from "@codemirror/language";
 import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
@@ -17,6 +17,46 @@ const TOKENS =
 
 const mark = (cls: string) => Decoration.mark({ class: cls });
 const lineDeco = (cls: string) => Decoration.line({ class: cls });
+const indentOf = (s: string) => s.replace(/\t/g, "    ").match(/^\s*/)![0].length;
+
+/** "- 6h @project …" or a bare "- @project": the head of a block of work items. */
+export function isWorkHead(text: string): boolean {
+  if (TASK.test(text)) return false;
+  const h = text.match(HOURS);
+  return h ? !!h[2].trim() || /^\s*[-*+]\s+@\S+\s*$/.test(text) : false;
+}
+
+/**
+ * Enter at the end of a work head starts an item under it ("- 3h @portal" ⏎ → "  - "), so what
+ * you did lands under the project instead of becoming a new top-level line.
+ */
+export function workEnter(view: EditorView): boolean {
+  const { state } = view;
+  const sel = state.selection.main;
+  if (!sel.empty || state.selection.ranges.length > 1 || completionStatus(state)) return false;
+  const line = state.doc.lineAt(sel.head);
+  if (!isWorkHead(line.text) || state.sliceDoc(sel.head, line.to).trim()) return false;
+  const indent = line.text.match(/^\s*/)![0];
+  const insert = `\n${indent}${indent.includes("\t") ? "\t" : "  "}- `;
+  view.dispatch({ changes: { from: sel.head, to: line.to, insert }, selection: { anchor: sel.head + insert.length }, scrollIntoView: true, userEvent: "input" });
+  return true;
+}
+
+/** The work head a line sits under (by indent), searching a little way up; -1 if none. */
+function workHeadAbove(state: EditorState, lineNo: number): number {
+  const doc = state.doc;
+  let indent = Infinity;
+  for (let n = lineNo; n >= Math.max(1, lineNo - 60); n--) {
+    const text = doc.line(n).text;
+    if (!text.trim()) return -1;
+    const i = indentOf(text);
+    if (i >= indent) continue;
+    if (isWorkHead(text)) return n;
+    if (i === 0) return -1;
+    indent = i;
+  }
+  return -1;
+}
 
 function build(view: EditorView): DecorationSet {
   const b = new RangeSetBuilder<Decoration>();
@@ -33,6 +73,9 @@ function build(view: EditorView): DecorationSet {
     }
   }
   for (const { from, to } of view.visibleRanges) {
+    // indent of the work head the current lines sit under ("- 6h @project" with items below), or -1
+    const above = workHeadAbove(view.state, doc.lineAt(from).number);
+    let workIndent = above > 0 ? indentOf(doc.line(above).text) : -1;
     for (let pos = from; pos <= to; ) {
       const line = doc.lineAt(pos);
       const text = line.text;
@@ -41,6 +84,14 @@ function build(view: EditorView): DecorationSet {
         pos = line.to + 1;
         continue;
       }
+      if (isWorkHead(text)) {
+        workIndent = indentOf(text);
+        b.add(line.from, line.from, lineDeco("cm-k-workhead"));
+      } else if (workIndent >= 0 && text.trim() && indentOf(text) > workIndent) {
+        const next = line.number < doc.lines ? doc.line(line.number + 1).text : "";
+        const last = !next.trim() || indentOf(next) <= workIndent;
+        b.add(line.from, line.from, lineDeco(last ? "cm-k-workitem cm-k-workitem-last" : "cm-k-workitem"));
+      } else workIndent = -1;
       const ranges: [number, number, Decoration][] = [];
 
       const task = text.match(TASK);
@@ -49,6 +100,8 @@ function build(view: EditorView): DecorationSet {
         if (st !== " ") b.add(line.from, line.from, lineDeco(st === ">" ? "cm-k-migrated" : "cm-k-done"));
         const start = line.from + task[1].length - 1;
         ranges.push([start, start + 3, mark(`cm-k-box${st === " " ? "" : " cm-k-box-checked"}`)]);
+        // struck through from the text on, not across the indent before the box
+        if (st !== " " && st !== ">" && line.to > start + 4) ranges.push([start + 4, line.to, mark("cm-k-struck")]);
       } else {
         const h = text.match(HOURS);
         if (h && h[2].trim()) {

@@ -1,6 +1,6 @@
 import { ISODate, addDays, formatShort, parseISO, today } from "./dates";
 import { Client, ClientTotal, Hold, round2 } from "./hold";
-import { ParsedFile, Task, taskLabel } from "./parse";
+import { ParsedFile, Task, renameMentions, taskLabel } from "./parse";
 
 /** A client status update ("Dispatch") for a date range, built from the hold. */
 export interface StatusReport {
@@ -19,7 +19,17 @@ export interface StatusReport {
 
 export function buildReport(hold: Hold, clientKey: string, from: ISODate, to: ISODate, asOf: ISODate = today()): StatusReport {
   const client = hold.clients().get(clientKey) ?? { key: clientKey, name: clientKey };
-  const mine = hold.tasks().filter((t) => hold.taskClient(t) === clientKey);
+  // "Kickoff deck @portal-rebuild" reads as "Kickoff deck (Portal Rebuild)" in what goes to the client
+  const named = (t: Task): Task => {
+    const names: string[] = [];
+    const text = renameMentions(t.text, (k) => {
+      const name = hold.keyName(k);
+      if (name && name !== client.name && !names.includes(name)) names.push(name);
+      return name && "";
+    });
+    return { ...t, text: names.length ? `${text} (${names.join(", ")})` : text };
+  };
+  const mine = hold.tasks().filter((t) => hold.taskClient(t) === clientKey).map(named);
   const fileDate = (t: Task) => hold.get(t.file)?.date;
   const inRange = (d?: ISODate) => !!d && d >= from && d <= to;
   const horizon = addDays(to, 14);
@@ -36,7 +46,7 @@ export function buildReport(hold: Hold, clientKey: string, from: ISODate, to: IS
       .filter((f) => f.kind === "meeting" && hold.fileClient(f) === clientKey && inRange(f.date))
       .sort((a, b) => a.date!.localeCompare(b.date!)),
     inProgress: mine.filter((t) => t.status === "open" && t.waiting === undefined && !(t.due && t.due <= horizon)),
-    waiting: hold.waitingOn(clientKey),
+    waiting: hold.waitingOn(clientKey).map(named),
     upcoming: mine.filter((t) => t.status === "open" && t.waiting === undefined && t.due && t.due <= horizon).sort(byDue),
   };
 }

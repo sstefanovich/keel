@@ -1,5 +1,6 @@
 import { ISODate, addDays, formatShort } from "./dates";
 import { Hold, round2 } from "./hold";
+import { renameMentions } from "./parse";
 
 /** One project (or a client's general time) across a 7-day timesheet week. */
 export interface WeekRow {
@@ -65,7 +66,13 @@ export function buildWeek(hold: Hold, start: ISODate, client?: string): Week {
     if (d < 0) continue;
     const target = hold.taskProject(t);
     if (!target || (client && target.client !== client)) continue;
-    add(row(target.client, target.project), d, t.text.replace(/(^|\s)#[\w/-]+/g, "$1").replace(/\s{2,}/g, " ").trim());
+    const r = row(target.client, target.project);
+    // the row already names the project: drop its @key, name any others
+    const text = renameMentions(t.text, (k) => {
+      const name = hold.keyName(k);
+      return name && name === r.label ? "" : name;
+    });
+    add(r, d, text.replace(/(^|\s)#[\w/-]+/g, "$1").replace(/\s{2,}/g, " ").trim());
   }
 
   const list = [...rows.values()]

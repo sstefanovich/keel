@@ -2335,6 +2335,39 @@ button.briefing-label {
   color: var(--accent);
 }
 
+/* ---------- a day's work: each "- 6h @project" and the items under it read as one card ---------- */
+
+.editor .cm-line.cm-k-workhead,
+.editor .cm-line.cm-k-workitem {
+  background: color-mix(in srgb, var(--accent) 5%, transparent) padding-box;
+  /* a 3px rule down the left (a border would push the text; the gaps between cards are borders
+     because CodeMirror doesn't measure line margins) */
+  background-image: linear-gradient(color-mix(in srgb, var(--accent) 45%, transparent), color-mix(in srgb, var(--accent) 45%, transparent));
+  background-size: 3px 100%;
+  background-repeat: no-repeat;
+  background-origin: padding-box;
+  padding-left: 12px;
+}
+.editor .cm-line.cm-k-workhead {
+  border-top: 8px solid transparent;
+  padding-top: 4px;
+  padding-bottom: 2px;
+  border-radius: 0 8px 0 0;
+  font-weight: 600;
+}
+.editor .cm-line.cm-k-workhead .cm-lp-token.project {
+  font-size: 0.86em;
+}
+.editor .cm-line.cm-k-workitem {
+  color: var(--text-2);
+}
+.editor .cm-line.cm-k-workitem-last,
+.editor .cm-line.cm-k-workhead:has(+ .cm-line:not(.cm-k-workitem)) {
+  padding-bottom: 4px;
+  border-bottom: 4px solid transparent;
+  border-bottom-right-radius: 8px;
+}
+
 /* ---------- polish: properties bar values ---------- */
 
 .cm-k-prop-val + .cm-k-prop-val {
