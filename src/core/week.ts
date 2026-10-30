@@ -171,3 +171,47 @@ export function checkWeek(w: Week, target: DayTarget, today: ISODate): WeekCheck
   });
   return { issues, daysLeft, today: inProgress, ready: !issues.length && daysLeft === 0 };
 }
+
+/** One gap in words, e.g. "6h of 8h logged" or "Portal: work listed but no hours". */
+export function describeIssue(x: WeekIssue): string {
+  switch (x.kind) {
+    case "short":
+      return x.hours ? `${fmt(x.hours)}h of ${x.target}h logged` : `no hours logged (${x.target}h expected)`;
+    case "no-hours":
+      return `${x.row.label}: work listed but no hours`;
+    case "no-items":
+      return `${x.row.label}: ${fmt(x.row.hours[x.day])}h but nothing listed to report`;
+  }
+}
+
+/**
+ * The week as markdown for Claude's timecard and status-report skills: the hours grid, the gaps
+ * still open, and what was done per project per day. Claude enters these numbers as they are.
+ */
+export function weekBrief(w: Week, check: WeekCheck, clientName?: string): string {
+  const out = [
+    `# Week of ${formatShort(w.days[0])} – ${formatShort(w.days[6])} (${w.days[0]} to ${w.days[6]})`,
+    "",
+    "Written by Keel from the logs. Enter these numbers exactly as they are; don't add them up again from the logs.",
+  ];
+  if (clientName) out.push("", `Only ${clientName}: Keel was focused on that client.`);
+
+  out.push("", "## Hours", "", `| Project | Client | ${w.days.join(" | ")} | Total |`, `|---|---|${w.days.map(() => "---:|").join("")}---:|`);
+  for (const r of w.rows) out.push(`| ${r.project ? r.label : "(general)"} | ${r.clientName} | ${r.hours.map(fmt).join(" | ")} | ${fmt(r.total)} |`);
+  out.push(`| **Total** | | ${w.dayTotals.map(fmt).join(" | ")} | ${fmt(w.total)} |`);
+
+  out.push("", "## Gaps", "");
+  if (check.issues.length) check.issues.forEach((x) => out.push(`- ${w.days[x.day]}: ${describeIssue(x)}`));
+  else out.push(check.daysLeft ? `None so far; ${check.daysLeft} working day${check.daysLeft === 1 ? "" : "s"} still to come.` : "None: the week is complete.");
+
+  out.push("", "## Work by project");
+  for (const r of w.rows) {
+    out.push("", `### ${r.project ? `${r.label} (${r.clientName})` : `${r.clientName} (general)`} · ${fmt(r.total) || 0}h`);
+    w.days.forEach((d, i) => {
+      if (!r.items[i].length && !r.hours[i]) return;
+      out.push("", `**${formatShort(d)} (${d})** · ${r.hours[i] ? `${fmt(r.hours[i])}h` : "no hours"}`);
+      r.items[i].forEach((x) => out.push(`- ${x}`));
+    });
+  }
+  return out.join("\n") + "\n";
+}

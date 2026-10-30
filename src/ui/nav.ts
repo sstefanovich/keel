@@ -61,6 +61,8 @@ export interface Nav {
   /** The Claude terminal panel */
   claudeOpen: boolean;
   toggleClaude: () => void;
+  /** Open the Claude panel and type this prompt into it once Claude is ready */
+  askClaude: (prompt: string) => void;
   /** Tabs */
   tabs: TabInfo[];
   activeTab: string;

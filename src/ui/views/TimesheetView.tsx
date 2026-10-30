@@ -2,12 +2,13 @@ import { ReactNode, useState } from "react";
 import { ISODate, addDays, addMonths, endOfMonth, formatShort, startOfMonth, startOfWeek, today, weekdayOf } from "../../core/dates";
 import { round2 } from "../../core/hold";
 import { copyText, exportText } from "../../lib/platform";
-import { TaskListStyle, WeekCheck, WeekIssue, WeekRow, buildWeek, checkWeek, dayItems, rowReport, rowTsv, weekTsv } from "../../core/week";
+import { TaskListStyle, WeekCheck, WeekRow, buildWeek, checkWeek, dayItems, describeIssue, rowReport, rowTsv, weekTsv } from "../../core/week";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 import { useWeekStart } from "../weekStart";
 import { useDayTarget } from "../dayTarget";
-import { CircleCheck, Clock, TriangleAlert } from "lucide-react";
+import { CircleCheck, Clock, Sparkles, TriangleAlert } from "lucide-react";
+import { handToClaude } from "../claudeTasks";
 import { EmptyState } from "../EmptyState";
 
 type Preset = "this-week" | "last-week" | "this-month" | "last-month" | "this-year" | "custom";
@@ -263,16 +264,6 @@ function WeekCheckBar({ check, days, total, onOpen }: { check: WeekCheck; days: 
       </p>
     );
   }
-  const text = (x: WeekIssue) => {
-    switch (x.kind) {
-      case "short":
-        return x.hours ? `${cell(x.hours)}h of ${x.target}h logged` : `no hours logged (${x.target}h expected)`;
-      case "no-hours":
-        return `${x.row.label}: work listed but no hours`;
-      case "no-items":
-        return `${x.row.label}: ${cell(x.row.hours[x.day])}h but nothing listed to report`;
-    }
-  };
   const shown = all ? check.issues : check.issues.slice(0, MAX_ISSUES);
   return (
     <section className="week-check issues" aria-label="Gaps in this week">
@@ -291,7 +282,7 @@ function WeekCheckBar({ check, days, total, onOpen }: { check: WeekCheck; days: 
             <button className="link" onClick={() => onOpen(days[x.day])}>
               {formatShort(days[x.day])}
             </button>{" "}
-            {text(x)}
+            {describeIssue(x)}
           </li>
         ))}
       </ul>
@@ -306,7 +297,7 @@ function WeekCheckBar({ check, days, total, onOpen }: { check: WeekCheck; days: 
 
 /** Projects × days grid for entering into a timesheet system, plus per-project daily reports. */
 function WeekSheet({ toggle }: { toggle: ReactNode }) {
-  const { hold, toast, focus } = useHold();
+  const { hold, toast, focus, reportError } = useHold();
   const nav = useNav();
   const weekStart = useWeekStart();
   // weeks relative to the current one, so changing the start day in Settings re-aligns at once
@@ -363,6 +354,20 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
           </button>
           <button onClick={() => copy(weekTsv(week), "the week grid")} disabled={!week.rows.length} title="Tab-separated, pastes into Excel or a form grid">
             Copy grid
+          </button>
+          <button
+            onClick={() => void handToClaude(hold, nav, week, check, "timecard", focus).catch(reportError)}
+            disabled={!week.rows.length}
+            title="Claude opens your timecard site in a browser and enters this week's hours, then stops for you to review and submit"
+          >
+            <Sparkles size={14} aria-hidden="true" /> Fill timecard
+          </button>
+          <button
+            onClick={() => void handToClaude(hold, nav, week, check, "status-report", focus).catch(reportError)}
+            disabled={!week.rows.length}
+            title="Claude drafts this week's status report from your logs for you to edit, then enters it where it goes"
+          >
+            <Sparkles size={14} aria-hidden="true" /> Status report
           </button>
           <label className="check-inline" title="How copied task lists are formatted">
             Tasks as
