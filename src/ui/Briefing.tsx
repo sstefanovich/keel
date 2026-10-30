@@ -5,6 +5,7 @@ import { ParsedFile, spaceOf, taskLabel } from "../core/parse";
 import { CalItem, eventTime, useCalendarEvents } from "./calendars";
 import { useHold } from "./HoldContext";
 import { openOpts, useNav } from "./nav";
+import { taskWithOwner } from "./TaskRow";
 
 const KEY = "keel.briefingDismissed";
 /** Shows the briefing again (from the command list) */
@@ -97,14 +98,18 @@ export function Briefing({ file }: { file: ParsedFile }) {
             {agenda.today.length} due today
           </button>
           <ul>
-            {due.slice(0, SHOW).map((t) => (
-              <li key={t.file + t.line}>
-                <button className="link" onClick={() => nav.openFile(t.file, t.line)}>
-                  {taskLabel(t)}
-                </button>
-                {t.due && t.due < date && <span className="briefing-late"> · due {formatShort(t.due)}</span>}
-              </li>
-            ))}
+            {due.slice(0, SHOW).map((t) => {
+              const { label, ownerName } = taskWithOwner(hold, t);
+              return (
+                <li key={t.file + t.line}>
+                  <button className="link" onClick={() => nav.openFile(t.file, t.line)}>
+                    {label}
+                  </button>
+                  {ownerName && <span className="muted"> · {ownerName}</span>}
+                  {t.due && t.due < date && <span className="briefing-late"> · due {formatShort(t.due)}</span>}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -128,7 +133,7 @@ export function Briefing({ file }: { file: ParsedFile }) {
                 <button className="link" onClick={() => nav.openFile(t.file, t.line)}>
                   {t.waiting ? <b>{t.waiting}</b> : null}
                   {t.waiting ? " · " : ""}
-                  {taskLabel(t)}
+                  {taskLabel(t, (k) => hold.keyName(k))}
                 </button>
                 <span className="muted"> · {daysBetween(t.since!, date)}d</span>
               </li>

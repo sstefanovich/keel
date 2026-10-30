@@ -759,6 +759,8 @@ mark {
 }
 .cm-k-done {
   color: var(--muted);
+}
+.cm-k-struck {
   text-decoration: line-through;
   text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent);
 }

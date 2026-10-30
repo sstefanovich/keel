@@ -177,8 +177,9 @@ and list what you did underneath:
     - 1.5h @contoso
       - Fixed the SSO redirect bug
 
-Start a project with just \`- @portal-rebuild\` and fill in the hours later. The **Work** panel above
-the log does the same with a form. Ticked tasks tagged \`#portal-rebuild\` also count as that day's work.
+Start a project with just \`- @portal-rebuild\` and fill in the hours later; press Enter at the end of
+that line and the next one starts indented under it. The **Work** panel above the log does the same
+with a form. Ticked tasks tagged \`#portal-rebuild\` or naming \`@portal-rebuild\` also count as that day's work.
 
 The **Timesheet** shows the week as projects × days for entering into your time system (copy a cell,
 a row, or the whole grid), with a daily report per project underneath (**Copy report** / **Copy day**).

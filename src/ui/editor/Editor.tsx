@@ -5,12 +5,12 @@ import { foldGutter, foldKeymap, syntaxHighlighting } from "@codemirror/language
 import { fetchLinkTitle, imageUrl, saveImage } from "../../lib/platform";
 import { attachmentName, pasteAndImages } from "./pasteAndImages";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { EditorView, drawSelection, highlightActiveLine, keymap } from "@codemirror/view";
 import { useEffect, useRef } from "react";
 import { basename } from "../../core/parse";
 import { useHold } from "../HoldContext";
-import { hideLogTitle, keelClicks, keelCompletions, keelDecorations, keelHighlight, mermaidPreview, propertiesView, refreshMermaid } from "./keelSyntax";
+import { hideLogTitle, keelClicks, keelCompletions, keelDecorations, keelHighlight, mermaidPreview, propertiesView, refreshMermaid, workEnter } from "./keelSyntax";
 import { workTargets } from "../workTargets";
 import { onThemeChange } from "../theme";
 import { LivePreviewOptions, livePreview, livePreviewEnabled, onLivePreviewChange } from "./livePreview";
@@ -50,12 +50,7 @@ export function Editor({ path, line, onOpenLink, onStatus, isLog = false }: Prop
   const previewOpts: LivePreviewOptions = {
     open: (target, newTab) => linkRef.current(target, newTab),
     exists: (target) => !!hold.resolveLink(target),
-    label: (key) => {
-      const [c, p] = key.split("/");
-      const proj = hold.projectByKey(p ?? c);
-      if (proj) return proj.title;
-      return hold.clients().get(c)?.name ?? null;
-    },
+    label: (key) => hold.keyName(key) ?? null,
   };
   linkRef.current = onOpenLink;
 
@@ -137,6 +132,8 @@ export function Editor({ path, line, onOpenLink, onStatus, isLog = false }: Prop
               ),
             ],
           }),
+          // ahead of markdown's own Enter, which would continue the list at the project's level
+          Prec.highest(keymap.of([{ key: "Enter", run: workEnter }])),
           keymap.of([
             ...closeBracketsKeymap,
             ...completionKeymap,

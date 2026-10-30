@@ -27,6 +27,8 @@ export interface Task {
   due?: ISODate;
   remind?: RemindRule;
   tags: string[];
+  /** @keys named on the task, lowercased ("@flis-retain-pa" → "flis-retain-pa"); may be projects, clients or people */
+  mentions: string[];
   /** Who this is waiting on: @waiting(Name), or "Name: …" before a bare @waiting. "" if unknown. */
   waiting?: string;
   /** When the item was first logged: @since(date), else the file's date */
@@ -117,7 +119,7 @@ export const DURATION_SRC = String.raw`(?:(\d*\.?\d+)\s?(?:h|hrs?|hours?)(?![a-z
  * Groups: indent, hours, minutes, key, description.
  */
 export const HOURS_RE = new RegExp(
-  String.raw`^(\s*)[-*+]\s+(?:work(?:ed)?:?\s+)?(?:${DURATION_SRC}\s+)?(?:on\s+)?@([\w.-]+(?:\/[\w.-]+)?)\s*(?:[-–:]\s*)?(.*)$`,
+  String.raw`^(\s*)[-*+]\s+(?:work(?:ed)?:?\s+)?(?:${DURATION_SRC}\s+)?(?:on\s+)?@([\w-]+(?:\.[\w-]+)*(?:\/[\w-]+(?:\.[\w-]+)*)?)\.?(?![\w-])\s*(?:[-–:]\s*)?(.*)$`,
   "i",
 );
 
@@ -141,6 +143,11 @@ export function trailingOwner(text: string): { name: string; at: number } | null
 const SINCE_RE = /@since\((\d{4}-\d{2}-\d{2})\)/;
 const DONE_RE = /@done\((\d{4}-\d{2}-\d{2})\)/;
 const TAG_RE = /(?:^|\s)#([A-Za-z][\w/-]*)/g;
+/**
+ * "@key" or "@client/project" anywhere on a line. Dots are allowed inside a key but not at its
+ * end, so "… @portal." at the end of a sentence is still "portal". Not @due(…) and friends.
+ */
+export const MENTION_RE = /(?<=^|\s)@(?!(?:due|remind|waiting|since|done)\b)([\w-]+(?:\.[\w-]+)*(?:\/[\w-]+(?:\.[\w-]+)*)?)(?![\w(])/g;
 const LINK_RE = /\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/g;
 
 export function kindOf(path: string): FileKind {
@@ -218,6 +225,10 @@ function stripTokens(s: string): string {
 
 function tagsIn(s: string): string[] {
   return [...s.matchAll(TAG_RE)].map((m) => m[1].toLowerCase());
+}
+
+function mentionsIn(s: string): string[] {
+  return [...new Set([...s.matchAll(MENTION_RE)].map((m) => m[1].toLowerCase()))];
 }
 
 export function parseFile(path: string, content: string, mtime = 0): ParsedFile {
@@ -307,6 +318,7 @@ export function parseFile(path: string, content: string, mtime = 0): ParsedFile 
         due: isISODate(due) ? due : undefined,
         remind,
         tags: tagsIn(tokens),
+        mentions: mentionsIn(tokens),
         // explicit @waiting(Name), else a person named on the task ("send the deck @Jordan")
         waiting: w ? (w[1]?.trim() || text.match(/^([^:]{1,40}):\s/)?.[1].trim() || "") : tokens.match(OWNER_RE)?.[1],
         since: isISODate(since) ? since : date,
@@ -398,14 +410,25 @@ export function parseChartItem(text: string): { label?: string; value: string; u
 /**
  * A task as shown in lists: no #tags (they're shown as chips), and no "Jordan:" prefix or @Jordan
  * when Jordan is the person it waits on (lists already group or label by person).
+ * `rename` turns an @key into what to show instead ("" drops it), or undefined to leave it as typed.
  */
-export function taskLabel(t: Task): string {
+export function taskLabel(t: Task, rename?: (key: string) => string | undefined): string {
   let s = t.text.replace(/(^|\s)#[\w/-]+/g, "$1");
   if (t.waiting) {
     if (s.startsWith(`${t.waiting}:`)) s = s.slice(t.waiting.length + 1);
     s = s.replace(new RegExp(`(^|\\s)@${t.waiting.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=$|[\\s,;:!?)])`), "$1");
   }
+  if (rename) s = renameMentions(s, rename);
   return s.replace(/\s{2,}/g, " ").trim() || t.text;
+}
+
+/** Each @key in `s` replaced by `rename(key)` ("" drops it, undefined leaves it as typed). */
+export function renameMentions(s: string, rename: (key: string) => string | undefined): string {
+  // a dropped mention takes the space before it along ("send it @portal." → "send it.")
+  return s.replace(new RegExp(`\\s?${MENTION_RE.source}`, "g"), (raw, key: string) => {
+    const to = rename(key.toLowerCase());
+    return to === undefined ? raw : to && `${raw.startsWith("@") ? "" : " "}${to}`;
+  });
 }
 
 /** `["Jordan Lee", "Sam Patel"]` / `[a, b]` → the items, quotes removed. */

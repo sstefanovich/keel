@@ -7,7 +7,7 @@ import { mentionAt } from "../ui/workTargets";
 import { parseTime, startOfWeek, today } from "./dates";
 import { MemoryFs } from "./fs";
 import { Hold } from "./hold";
-import { appendToSection, parseFile, replaceBody, setFrontmatterField, setTaskChar, yamlScalar } from "./parse";
+import { appendToSection, parseFile, replaceBody, setFrontmatterField, setTaskChar, taskLabel, yamlScalar } from "./parse";
 import { occursOn, parseRemind } from "./schedule";
 
 const LOG = `---
@@ -857,6 +857,42 @@ date: 2026-10-21
     // a project whose client is written as @key still lists under that client
     expect(hold.projectsOf("hogan-lovells").map((p) => p.title)).toEqual(["FLIS"]);
     expect(hold.notesOf("flis-retain-pa").map((n) => n.title).sort()).toEqual(["A", "C"]);
+  });
+
+  it("files tasks by @project mentions and shows them by name", async () => {
+    const hold = await makeHold({
+      "clients/hogan-lovells.md": "---\nname: Hogan Lovells\n---\n",
+      "projects/FLIS Retain PA.md": "---\nclient: hogan-lovells\n---\n# FLIS Retain PA\n",
+      "projects/Portal v2.1.md": "---\nclient: hogan-lovells\n---\n# Portal v2.1\n",
+      "logs/2026/2026-10-21.md":
+        "---\ndate: 2026-10-21\n---\n# Log\n## Tasks\n- [ ] Update the ADR @flis-retain-pa\n- [ ] Send the timeline @portal-v21.\n- [x] Weekly call @Hogan-Lovells @done(2026-10-21)\n- [ ] Ask @Jordan about @flis-retain-pa costs\n\n## Work\n- 3h @flis-retain-pa.\n",
+    });
+    const log = hold.get("logs/2026/2026-10-21.md")!;
+    const [adr, timeline, call, ask] = log.tasks;
+    expect(adr.mentions).toEqual(["flis-retain-pa"]);
+    expect(timeline.mentions).toEqual(["portal-v21"]); // the full stop ends the sentence, not the key
+    expect(ask.mentions).toEqual(["jordan", "flis-retain-pa"]);
+    expect(hold.taskProject(adr)).toEqual({ client: "hogan-lovells", project: "flis-retain-pa" });
+    expect(hold.taskProject(call)).toEqual({ client: "hogan-lovells" });
+    expect(hold.taskProject(ask)).toEqual({ client: "hogan-lovells", project: "flis-retain-pa" }); // @Jordan is a person
+    expect(hold.taskClient(timeline)).toBe("hogan-lovells");
+    expect(log.hours[0].client).toBe("flis-retain-pa");
+
+    expect(hold.keyName("flis-retain-pa")).toBe("FLIS Retain PA");
+    expect(hold.keyName("Hogan-Lovells")).toBe("Hogan Lovells");
+    expect(hold.keyName("hogan-lovells/flis-retain-pa")).toBe("FLIS Retain PA");
+    expect(hold.keyName("jordan")).toBeUndefined();
+
+    const name = (k: string) => hold.keyName(k);
+    expect(taskLabel(adr, name)).toBe("Update the ADR FLIS Retain PA");
+    expect(taskLabel(timeline, (k) => (name(k) === "Portal v2.1" ? "" : name(k)))).toBe("Send the timeline.");
+    expect(taskLabel(ask, name)).toBe("Ask @Jordan about FLIS Retain PA costs");
+    // the timesheet row already says which project: its @key doesn't repeat in the item
+    expect(buildWeek(hold, "2026-10-17").rows.find((r) => !r.project)?.items[4]).toEqual(["Weekly call"]);
+    // what goes to the client names projects, not keys
+    const report = buildReport(hold, "hogan-lovells", "2026-10-19", "2026-10-25", "2026-10-21");
+    expect(report.inProgress.map((t) => t.text)).toContain("Update the ADR (FLIS Retain PA)");
+    expect(report.completed.map((t) => t.text)).toEqual(["Weekly call"]); // its own client goes without saying
   });
 
   it("ties notes to a project with project: frontmatter", async () => {

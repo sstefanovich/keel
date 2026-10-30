@@ -9,11 +9,10 @@ import { EmptyState } from "../EmptyState";
 
 const days = (since?: string) => (since ? Math.max(0, Math.round((parseISO(today()).getTime() - parseISO(since).getTime()) / 86_400_000)) : 0);
 
-/** "Jordan: firewall rules" / "firewall rules @Jordan" → "firewall rules" (they're listed under Jordan) */
-const what = (t: Task) => taskLabel(t);
-
 export function WaitingView() {
   const { hold, bump, reportError, toast, focus } = useHold();
+  /** "Jordan: firewall rules @portal" → "firewall rules Portal" (they're listed under Jordan) */
+  const what = (t: Task) => taskLabel(t, (k) => hold.keyName(k));
   const nav = useNav();
   const items = hold.waitingOn(focus, getSpace());
   const clients = hold.clients();

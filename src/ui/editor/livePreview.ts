@@ -121,8 +121,9 @@ class TokenWidget extends WidgetType {
   }
 }
 
-const TOKEN = /(?<=^|\s)(?:@(due|remind|waiting|since|done)(?:\(([^)]*)\))?|@([A-Z][\w.'-]*[\w])|#([\w/-]+)|@([a-z0-9][\w.-]*(?:\/[\w.-]+)?))(?=$|[\s,;:!?)])/g;
-const TASK_OR_WORK = /^\s*[-*+] (?:\[[ xX>\-]\] |\d|@)/;
+// a key may hold dots ("v2.1") but a dot after it ends the sentence ("… @portal.")
+const TOKEN = /(?<=^|\s)(?:@(due|remind|waiting|since|done)(?:\(([^)]*)\))?|@([A-Z][\w'-]*(?:\.[\w'-]+)*[\w])|#([\w/-]+)|@([a-z0-9][\w-]*(?:\.[\w-]+)*(?:\/[\w-]+(?:\.[\w-]+)*)?))(?=$|[\s,;:!?).'])/g;
+const LIST_ITEM = /^\s*[-*+] /;
 
 function shortDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
@@ -136,7 +137,7 @@ function clock(t: string): string {
 }
 
 /** The chip for one token on a task or work line, or null to leave it as typed. */
-function tokenChip(m: RegExpMatchArray, done: boolean, opts: LivePreviewOptions): Decoration | null {
+function tokenChip(m: RegExpMatchArray, done: boolean, asPerson: boolean, opts: LivePreviewOptions): Decoration | null {
   const [raw, kw, arg, person, tag, key] = m;
   const chip = (text: string, kind: string) => Decoration.replace({ widget: new TokenWidget(text, kind, raw) });
   const t = today();
@@ -154,16 +155,10 @@ function tokenChip(m: RegExpMatchArray, done: boolean, opts: LivePreviewOptions)
     case "done":
       return arg ? chip(`✓ ${shortDate(arg)}`, "done") : null;
   }
-  if (person) return chip(`⏳ ${person}`, "waiting");
-  if (tag) {
-    const name = opts.label?.(tag.toLowerCase());
-    return name ? chip(name, "project") : null;
-  }
-  if (key) {
-    const name = opts.label?.(key.toLowerCase());
-    return name ? chip(name, "project") : null;
-  }
-  return null;
+  // "@Hogan-Lovells" written with capitals is still the client, not a person
+  const name = opts.label?.((tag ?? key ?? person).toLowerCase());
+  if (name) return chip(name, "project");
+  return person && asPerson ? chip(`⏳ ${person}`, "waiting") : null;
 }
 
 function frontmatterEnd(state: EditorState): number {
@@ -217,15 +212,14 @@ function build(view: EditorView, opts: LivePreviewOptions): DecorationSet {
         const target = m[1].trim();
         add(s, s + m[0].length, Decoration.replace({ widget: new WikiLinkWidget(target, (m[2] ?? target).trim(), opts.exists(target), opts.open) }));
       }
-      // tokens on task and work lines as chips (not inside `code`)
-      if (TASK_OR_WORK.test(line.text) || /^\s+[-*+] /.test(line.text)) {
+      // tokens on list items (tasks, work lines, log bullets) as chips (not inside `code`)
+      if (LIST_ITEM.test(line.text)) {
         const masked = line.text.replace(/`[^`]*`/g, (c) => " ".repeat(c.length));
         const done = /^\s*[-*+] \[[xX]\]/.test(line.text);
         // only a task's trailing @Name is who it waits on; other @Names stay as written
         const owner = TASK.test(line.text) ? trailingOwner(masked) : null;
         for (const m of masked.matchAll(TOKEN)) {
-          if (m[3] && m.index !== owner?.at) continue;
-          const d = tokenChip(m, done, opts);
+          const d = tokenChip(m, done, m.index === owner?.at, opts);
           if (!d) continue;
           const s = line.from + m.index!;
           // a hidden @since takes its leading space with it
