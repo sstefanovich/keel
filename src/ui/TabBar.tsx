@@ -76,7 +76,8 @@ export function TabBar() {
         </button>
       </div>
       <div className="tabbar-drag" data-tauri-drag-region />
-      <WindowControls />
+      {/* with the Claude chat open, the controls move to its header, at the window's corner */}
+      {!nav.claudeOpen && <WindowControls />}
     </div>
   );
 }

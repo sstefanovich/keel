@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { copyText, isTauri } from "../lib/platform";
 import { useHold } from "./HoldContext";
 import { Theme, useTheme } from "./theme";
-import { onClaudePrompt, takeClaudePrompts } from "./claudeBridge";
 
 type Status = "starting" | "running" | "exited" | "missing" | "error" | "browser";
 
@@ -41,7 +40,8 @@ export function ClaudeIcon({ size = 18 }: { size?: number }) {
 }
 
 /**
- * Claude Code running in a terminal docked under the main view, in the Hold folder.
+ * Claude Code running in a terminal docked under the main view, in the Hold folder: the full
+ * terminal app, for what the chat sidebar can't do (/login, /mcp approvals, /config).
  * Mounted once and only hidden when closed, so the conversation survives toggling.
  */
 export function ClaudePanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -54,9 +54,6 @@ export function ClaudePanel({ open, onClose }: { open: boolean; onClose: () => v
   // Output can arrive before pty_spawn has returned the session id. Windows asks for the cursor
   // position at startup and waits for xterm's reply, so dropping that output would hang the terminal.
   const early = useRef(new Map<number, string[]>());
-  // when the current session can take typed input: a little after it first drew something
-  const readyAt = useRef(Infinity);
-  const deliverTimer = useRef<number | undefined>(undefined);
   const statusRef = useRef<Status>("starting");
   const [status, setStatusState] = useState<Status>(isTauri ? "starting" : "browser");
   const [error, setError] = useState("");
@@ -66,42 +63,20 @@ export function ClaudePanel({ open, onClose }: { open: boolean; onClose: () => v
     setStatusState(s);
   };
 
-  /** Type queued prompts (from "? …" in quick capture) into Claude once it's ready for input. */
-  const deliver = async () => {
-    window.clearTimeout(deliverTimer.current);
-    const id = idRef.current;
-    if (id === undefined || statusRef.current !== "running") return;
-    const wait = readyAt.current - Date.now();
-    if (wait > 0) {
-      deliverTimer.current = window.setTimeout(deliver, Math.min(wait, 5000));
-      return;
-    }
-    const { invoke } = await import("@tauri-apps/api/core");
-    for (const prompt of takeClaudePrompts()) {
-      await invoke("pty_write", { id, data: prompt });
-      await new Promise((r) => setTimeout(r, 150)); // let Claude take the text before Enter
-      await invoke("pty_write", { id, data: "\r" });
-    }
-    termRef.current?.focus();
-  };
-
   const start = async () => {
     const term = termRef.current;
     if (!term || !isTauri) return;
     const { invoke } = await import("@tauri-apps/api/core");
-    readyAt.current = Infinity;
     setStatus("starting");
     try {
       if (!(await invoke<string | null>("claude_path"))) return setStatus("missing");
       fitRef.current?.fit();
       const id = await invoke<number>("pty_spawn", { cwd: dir, cols: term.cols, rows: term.rows });
       idRef.current = id;
-      if (early.current.get(id)?.length) readyAt.current = Date.now() + 2500;
       early.current.get(id)?.forEach((d) => term.write(d));
       early.current.clear();
       setStatus("running");
       term.focus();
-      void deliver();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStatus("error");
@@ -161,10 +136,7 @@ export function ClaudePanel({ open, onClose }: { open: boolean; onClose: () => v
         const { invoke } = await import("@tauri-apps/api/core");
         const u1 = await listen<{ id: number; data: string }>("pty-output", (e) => {
           const { id, data } = e.payload;
-          if (id === idRef.current) {
-            if (readyAt.current === Infinity) readyAt.current = Date.now() + 2500;
-            term.write(data);
-          }
+          if (id === idRef.current) term.write(data);
           else if (idRef.current === undefined && statusRef.current === "starting") early.current.set(id, [...(early.current.get(id) ?? []), data]);
         });
         const u2 = await listen<{ id: number }>("pty-exit", (e) => {
@@ -208,17 +180,6 @@ export function ClaudePanel({ open, onClose }: { open: boolean; onClose: () => v
   useEffect(() => {
     if (termRef.current) termRef.current.options.theme = THEMES[theme];
   }, [theme]);
-
-  // prompts sent from elsewhere (quick capture "? …"): restart Claude if it had exited
-  useEffect(
-    () =>
-      onClaudePrompt(() => {
-        if (statusRef.current === "exited") void start();
-        else void deliver();
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
 
   useEffect(() => {
     if (!open) return;

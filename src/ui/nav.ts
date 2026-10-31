@@ -58,11 +58,14 @@ export interface Nav {
   openTour: () => void;
   /** Ask for a value (rename, new folder, …); closes itself when onSubmit succeeds */
   prompt: (spec: PromptSpec) => void;
-  /** The Claude terminal panel */
+  /** The Claude chat sidebar */
   claudeOpen: boolean;
   toggleClaude: () => void;
-  /** Open the Claude panel and type this prompt into it once Claude is ready */
+  /** Open the Claude chat and send it this prompt */
   askClaude: (prompt: string) => void;
+  /** Claude in a terminal under the main view, for terminal-only commands */
+  claudeTerminalOpen: boolean;
+  toggleClaudeTerminal: () => void;
   /** Tabs */
   tabs: TabInfo[];
   activeTab: string;

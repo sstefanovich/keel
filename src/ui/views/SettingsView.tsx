@@ -214,7 +214,8 @@ export function SettingsView({ section }: { section?: string }) {
             {[
               ["Ctrl+Alt+K", "Quick capture, from anywhere in Windows"],
               ["Ctrl+K", "Quick capture (inside Keel)"],
-              ["Ctrl+`", "Show / hide Claude"],
+              ["Ctrl+`", "Show / hide the Claude chat"],
+              ["Ctrl+Shift+`", "Claude in a terminal, for /login, /mcp and other terminal-only commands"],
               ["Ctrl+P", "Go to any note, log, project, client or view"],
               ["Ctrl+Shift+P", "Commands: log hours, copy the week, theme, focus… (or type > in Ctrl+P)"],
               ["Ctrl+B", "Collapse / expand the sidebar"],

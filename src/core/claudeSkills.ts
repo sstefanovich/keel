@@ -14,7 +14,8 @@ const BROWSER_SETUP = `Check that you have browser tools (such as \`browser_navi
    { "mcpServers": { "browser": { "command": "npx", "args": ["@playwright/mcp@latest", "--browser", "msedge",
      "--user-data-dir", "C:/Users/<owner>/AppData/Local/Keel/browser"] } } }
    \`\`\`
-   Then ask the owner to restart Claude in Keel's panel and approve the server, and stop until they have.`;
+   Then ask the owner to open Claude's terminal in Keel (Ctrl+Shift+\`), approve the server there, and start a
+   new chat; stop until they have.`;
 
 const SIGN_IN_RULE = `- Never type, store or ask for passwords or MFA codes. When a site wants a sign-in, ask the owner to sign in
   in the browser window and tell you when they're done.`;

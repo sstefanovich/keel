@@ -28,6 +28,7 @@ import { ChartsView } from "./ui/views/ChartsView";
 import { DispatchView } from "./ui/views/DispatchView";
 import { FlagsView } from "./ui/views/FlagsView";
 import { ClaudePanel } from "./ui/ClaudePanel";
+import { ClaudeChat } from "./ui/ClaudeChat";
 import { sendToClaude } from "./ui/claudeBridge";
 import { WaitingView } from "./ui/views/WaitingView";
 import { ScratchpadView } from "./ui/views/ScratchpadView";
@@ -315,12 +316,19 @@ function Shell() {
     [hold, bump, openFile, reportError, focus],
   );
 
-  // Claude panel: mounted on first open, then only hidden, so its session survives toggling
+  // Claude chat sidebar (and the terminal, for what chat can't do): mounted on first open,
+  // then only hidden, so their sessions survive toggling
   const [claudeOpen, setClaudeOpen] = useState(false);
   const [claudeMounted, setClaudeMounted] = useState(false);
+  const [termOpen, setTermOpen] = useState(false);
+  const [termMounted, setTermMounted] = useState(false);
   const toggleClaude = useCallback(() => {
     setClaudeMounted(true);
     setClaudeOpen((o) => !o);
+  }, []);
+  const toggleClaudeTerminal = useCallback(() => {
+    setTermMounted(true);
+    setTermOpen((o) => !o);
   }, []);
   const askClaude = useCallback((prompt: string) => {
     setClaudeMounted(true);
@@ -385,6 +393,8 @@ function Shell() {
       claudeOpen,
       toggleClaude,
       askClaude,
+      claudeTerminalOpen: termOpen,
+      toggleClaudeTerminal,
       tabs: tabs.tabs.map((t) => ({ id: t.id, view: t.history[t.index] })),
       activeTab: tabs.active,
       selectTab: (id) => setTabs((s) => selectTab(s, id)),
@@ -398,7 +408,7 @@ function Shell() {
       sidebarCollapsed: sidebar.collapsed,
       toggleSidebar,
     }),
-    [view, show, openFile, openToday, openLog, openLink, startCapture, newItem, claudeOpen, toggleClaude, askClaude, tabs, closeTabById, newTab, sidebar.collapsed, toggleSidebar, askFor],
+    [view, show, openFile, openToday, openLog, openLink, startCapture, newItem, claudeOpen, toggleClaude, askClaude, termOpen, toggleClaudeTerminal, tabs, closeTabById, newTab, sidebar.collapsed, toggleSidebar, askFor],
   );
 
   // start on today's log, unless tabs were restored (then just make sure today's log exists and has its carry-over)
@@ -431,9 +441,10 @@ function Shell() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-      if (e.key === "`") {
+      if (e.key === "`" || e.code === "Backquote") {
         e.preventDefault();
-        toggleClaude();
+        if (e.shiftKey) toggleClaudeTerminal();
+        else toggleClaude();
         return;
       }
       // inside the Claude terminal, its own keys (Ctrl+T, Ctrl+J, …) win
@@ -470,12 +481,12 @@ function Shell() {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [startCapture, openToday, newItem, toggleClaude, show, toggleSidebar]);
+  }, [startCapture, openToday, newItem, toggleClaude, toggleClaudeTerminal, show, toggleSidebar]);
 
   return (
     <NavCtx.Provider value={nav}>
       <ContextMenuProvider>
-      <div className={`app${sidebar.collapsed ? " sidebar-collapsed" : ""}`} style={{ gridTemplateColumns: `${sidebar.collapsed ? 56 : sidebar.width}px 1fr` }}>
+      <div className={`app${sidebar.collapsed ? " sidebar-collapsed" : ""}`} style={{ gridTemplateColumns: `${sidebar.collapsed ? 56 : sidebar.width}px minmax(0, 1fr) auto` }}>
         <Sidebar onResize={(width) => setSidebar((s) => ({ ...s, width }))} />
         <main className="main">
           <TabBar />
@@ -495,8 +506,9 @@ function Shell() {
             {view.kind === "lists" && <ListsView />}
             {view.kind === "recipes" && <RecipesView />}
           </div>
-          {claudeMounted && <ClaudePanel open={claudeOpen} onClose={() => setClaudeOpen(false)} />}
+          {termMounted && <ClaudePanel open={termOpen} onClose={() => setTermOpen(false)} />}
         </main>
+        {claudeMounted && <ClaudeChat open={claudeOpen} onClose={() => setClaudeOpen(false)} onTerminal={toggleClaudeTerminal} />}
       </div>
       {capture && <QuickCapture onSubmit={submitCapture} onClose={() => setCapture(null)} focus={focus} initialKind={capture.kind} />}
       {prompt && <PromptModal spec={prompt} onClose={() => setPrompt(null)} />}

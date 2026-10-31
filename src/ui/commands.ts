@@ -17,6 +17,7 @@ import {
   PanelLeft,
   RefreshCw,
   Sparkles,
+  SquareTerminal,
   Sun,
   SunMoon,
   Timer,
@@ -116,6 +117,7 @@ export function buildCommands({ hold, nav, view, focus, setFocus, weekStart, day
     { id: "theme-system", title: "Theme: follow Windows", sub: "Appearance", Icon: SunMoon, run: () => setThemePref("system") },
     { id: "sidebar", title: "Toggle the sidebar", sub: "Layout", Icon: PanelLeft, keys: "Ctrl+B", run: nav.toggleSidebar },
     { id: "claude", title: nav.claudeOpen ? "Hide Claude" : "Show Claude", sub: "Layout", Icon: Sparkles, keys: "Ctrl+`", run: nav.toggleClaude },
+    { id: "claude-terminal", title: nav.claudeTerminalOpen ? "Hide Claude terminal" : "Claude in a terminal (/login, /mcp)", sub: "Layout", Icon: SquareTerminal, keys: "Ctrl+Shift+`", run: nav.toggleClaudeTerminal },
     { id: "tour", title: "Show the tour", sub: "Help", Icon: Compass, run: nav.openTour },
     {
       id: "briefing",

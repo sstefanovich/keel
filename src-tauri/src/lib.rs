@@ -1,5 +1,6 @@
 mod attach;
 mod calendar;
+mod chat;
 mod history;
 mod hold;
 mod notify;
@@ -113,6 +114,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(pty::Ptys::default())
+        .manage(chat::Chats::default())
         // must be first: a second launch just focuses the running instance
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
         .plugin(tauri_plugin_notification::init())
@@ -219,6 +221,9 @@ pub fn run() {
             pty::pty_write,
             pty::pty_resize,
             pty::pty_kill,
+            chat::chat_spawn,
+            chat::chat_send,
+            chat::chat_kill,
             calendar::calendar_fetch,
             calendar::calendar_cached,
             calendar::calendar_forget,
