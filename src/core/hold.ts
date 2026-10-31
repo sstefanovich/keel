@@ -1,4 +1,5 @@
 import { CLAUDE_GUIDE, PREVIOUS_GUIDES } from "./claudeGuide";
+import { STATUS_REPORT_SKILL, TIMECARD_SKILL } from "./claudeSkills";
 import { ISODate, addDays, hhmm, toISO, today as todayISO } from "./dates";
 import { HoldFs } from "./fs";
 import {
@@ -102,6 +103,9 @@ export class Hold {
       ...DEFAULT_TEMPLATES,
       "reminders.md": DEFAULT_REMINDERS,
       "CLAUDE.md": CLAUDE_GUIDE,
+      // Claude fills these in with the owner on first use, so they're never replaced
+      ".claude/skills/timecard/SKILL.md": TIMECARD_SKILL,
+      ".claude/skills/status-report/SKILL.md": STATUS_REPORT_SKILL,
       "notes/Welcome to Keel.md": WELCOME_NOTE,
     };
     const listing = await this.fs.list();

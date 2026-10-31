@@ -29,7 +29,8 @@ import {
 import { CaptureKind } from "../core/capture";
 import { addDays, startOfWeek, today } from "../core/dates";
 import { Hold } from "../core/hold";
-import { buildWeek, weekTsv } from "../core/week";
+import { DayTarget, buildWeek, checkWeek, weekTsv } from "../core/week";
+import { WeekSkill, handToClaude } from "./claudeTasks";
 import { copyText } from "../lib/platform";
 import { refreshCalendars } from "./calendars";
 import { snapshotNow } from "./history";
@@ -50,18 +51,24 @@ interface Ctx {
   focus?: string;
   setFocus: (client?: string) => void;
   weekStart: number;
+  dayTarget: DayTarget;
   toast: (msg: string) => void;
   capture: (kind?: CaptureKind) => void;
 }
 
 /** Everything the command list (Ctrl+Shift+P) can do. */
-export function buildCommands({ hold, nav, view, focus, setFocus, weekStart, toast, capture }: Ctx): Command[] {
+export function buildCommands({ hold, nav, view, focus, setFocus, weekStart, dayTarget, toast, capture }: Ctx): Command[] {
   const copyWeek = async (offset: number) => {
     const start = addDays(startOfWeek(today(), weekStart), offset * 7);
     const week = buildWeek(hold, start, focus);
     if (!week.rows.length) return toast("No hours logged that week");
     await copyText(weekTsv(week));
     toast(`Copied ${offset ? "last" : "this"} week's timesheet grid`);
+  };
+  const weekToClaude = (offset: number, skill: WeekSkill) => {
+    const week = buildWeek(hold, addDays(startOfWeek(today(), weekStart), offset * 7), focus);
+    if (!week.rows.length) return toast("No hours logged that week");
+    handToClaude(hold, nav, week, checkWeek(week, dayTarget, today()), skill, focus).catch((e) => toast(String(e)));
   };
 
   const cmds: Command[] = [
@@ -91,6 +98,10 @@ export function buildCommands({ hold, nav, view, focus, setFocus, weekStart, toa
     { id: "new-client", title: "New client…", sub: "Create", Icon: Building2, run: () => nav.newItem("client") },
     { id: "copy-week", title: "Copy this week's timesheet grid", sub: "Timesheet", Icon: ClipboardCopy, run: () => void copyWeek(0) },
     { id: "copy-last-week", title: "Copy last week's timesheet grid", sub: "Timesheet", Icon: ClipboardCopy, run: () => void copyWeek(-1) },
+    { id: "timecard", title: "Fill this week's timecard with Claude", sub: "Timesheet", Icon: Sparkles, run: () => weekToClaude(0, "timecard") },
+    { id: "timecard-last", title: "Fill last week's timecard with Claude", sub: "Timesheet", Icon: Sparkles, run: () => weekToClaude(-1, "timecard") },
+    { id: "status-report", title: "Draft this week's status report with Claude", sub: "Timesheet", Icon: Sparkles, run: () => weekToClaude(0, "status-report") },
+    { id: "status-report-last", title: "Draft last week's status report with Claude", sub: "Timesheet", Icon: Sparkles, run: () => weekToClaude(-1, "status-report") },
     { id: "calendar-week", title: "This week's calendar", sub: "Calendar", Icon: CalendarDays, run: () => nav.go({ kind: "calendar", mode: "week" }) },
     { id: "refresh-calendars", title: "Refresh calendars", sub: "Calendar", Icon: RefreshCw, run: () => void refreshCalendars().then(() => toast("Calendars refreshed")) },
     {

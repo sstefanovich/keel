@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Capture, CaptureKind } from "./core/capture";
 import { buildCommands } from "./ui/commands";
 import { useWeekStart } from "./ui/weekStart";
+import { useDayTarget } from "./ui/dayTarget";
 import { getSpace, useSpace } from "./ui/space";
 import { ListsView } from "./ui/views/ListsView";
 import { RecipesView } from "./ui/views/RecipesView";
@@ -85,6 +86,7 @@ export default function App() {
 function Shell() {
   const { hold, dir, bump, reportError, toast, focus, setFocus } = useHold();
   const weekStart = useWeekStart();
+  const dayTarget = useDayTarget();
   // re-render everything on a mode switch (views read the mode as they draw)
   const space = useSpace();
   useEffect(() => startCalendarSync(), []);
@@ -320,6 +322,11 @@ function Shell() {
     setClaudeMounted(true);
     setClaudeOpen((o) => !o);
   }, []);
+  const askClaude = useCallback((prompt: string) => {
+    setClaudeMounted(true);
+    setClaudeOpen(true);
+    sendToClaude(prompt);
+  }, []);
 
   const newTab = useCallback(() => openToday({ newTab: true }), [openToday]);
 
@@ -377,6 +384,7 @@ function Shell() {
       prompt: askFor,
       claudeOpen,
       toggleClaude,
+      askClaude,
       tabs: tabs.tabs.map((t) => ({ id: t.id, view: t.history[t.index] })),
       activeTab: tabs.active,
       selectTab: (id) => setTabs((s) => selectTab(s, id)),
@@ -390,7 +398,7 @@ function Shell() {
       sidebarCollapsed: sidebar.collapsed,
       toggleSidebar,
     }),
-    [view, show, openFile, openToday, openLog, openLink, startCapture, newItem, claudeOpen, toggleClaude, tabs, closeTabById, newTab, sidebar.collapsed, toggleSidebar, askFor],
+    [view, show, openFile, openToday, openLog, openLink, startCapture, newItem, claudeOpen, toggleClaude, askClaude, tabs, closeTabById, newTab, sidebar.collapsed, toggleSidebar, askFor],
   );
 
   // start on today's log, unless tabs were restored (then just make sure today's log exists and has its carry-over)
@@ -496,7 +504,7 @@ function Shell() {
         <QuickSwitcher
           initial={switcher}
           onClose={() => setSwitcher(null)}
-          commands={buildCommands({ hold, nav, view, focus, setFocus, weekStart, toast, capture: (kind) => startCapture(false, kind) })}
+          commands={buildCommands({ hold, nav, view, focus, setFocus, weekStart, dayTarget, toast, capture: (kind) => startCapture(false, kind) })}
         />
       )}
       {tour && <Tour onClose={() => setTour(false)} />}

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { azureContext, azurePortalUrl } from "./azure";
 import { parseCapture, parseDayPrefix } from "./capture";
 import { buildReport, reportHtml, reportMarkdown } from "./report";
-import { buildWeek, dayItems, rowReport, rowTsv, weekTsv } from "./week";
+import { buildWeek, checkWeek, dayItems, rowReport, rowTsv, weekBrief, weekTsv } from "./week";
 import { mentionAt } from "../ui/workTargets";
 import { parseTime, startOfWeek, today } from "./dates";
 import { MemoryFs } from "./fs";
@@ -747,6 +747,32 @@ date: 2026-10-21
     expect(rowReport(w, portal, "plain")).toBe("Mon, Oct 19 (6h)\nAPI gateway design\n\nTue, Oct 20 (7.5h)\nAuth PR review\nCost model");
     expect(weekTsv(w).split("\r\n")[2]).toBe("Portal rebuild (Contoso)\t6\t7.5\t\t\t\t\t\t13.5");
     expect(buildWeek(hold, "2026-10-19", "globex").rows.map((r) => r.label)).toEqual(["globex"]);
+  });
+
+  it("writes a week brief for Claude: grid, gaps and work per project", async () => {
+    const hold = await makeHold({
+      "clients/contoso.md": "---\nname: Contoso\n---\n",
+      "projects/Portal rebuild.md": "---\nclient: contoso\n---\n# Portal rebuild\n",
+      "logs/2026/2026-10-19.md": "---\ndate: 2026-10-19\n---\n- 6h @portal-rebuild\n  - API gateway design\n",
+      "logs/2026/2026-10-20.md": "---\ndate: 2026-10-20\n---\n- 8h @portal-rebuild\n  - Auth PR review\n",
+    });
+    const w = buildWeek(hold, "2026-10-19");
+    const brief = weekBrief(w, checkWeek(w, { hours: 8, workdays: [1, 2] }, "2026-10-25"), "Contoso");
+    expect(brief).toContain("(2026-10-19 to 2026-10-25)");
+    expect(brief).toContain("Only Contoso");
+    expect(brief).toContain("| Portal rebuild | Contoso | 6 | 8 |  |  |  |  |  | 14 |");
+    expect(brief).toContain("- 2026-10-19: 6h of 8h logged");
+    expect(brief).toContain("### Portal rebuild (Contoso) · 14h");
+    expect(brief).toContain("**Mon, Oct 19 (2026-10-19)** · 6h\n- API gateway design");
+    const done = weekBrief(w, checkWeek(w, { hours: 0, workdays: [] }, "2026-10-25"));
+    expect(done).toContain("None: the week is complete.");
+  });
+
+  it("seeds the timecard and status-report skills once, without listing them as files", async () => {
+    const hold = await makeHold({ "notes/x.md": "# x\n", ".claude/skills/timecard/SKILL.md": "mine\n" });
+    expect(await hold.fs.read(".claude/skills/timecard/SKILL.md")).toBe("mine\n");
+    expect(await hold.fs.read(".claude/skills/status-report/SKILL.md")).toContain("name: status-report");
+    expect(hold.all().some((f) => f.path.startsWith(".claude"))).toBe(false);
   });
 
   it("builds a Saturday–Friday week", async () => {
