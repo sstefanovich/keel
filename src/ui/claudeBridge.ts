@@ -1,6 +1,6 @@
 /**
- * Hands prompts to the Claude panel (e.g. "? question" from quick capture). Prompts queue
- * until the panel's Claude session is running and has had a moment to draw its input box.
+ * Hands prompts to the Claude chat (e.g. "? question" from quick capture). Prompts queue
+ * until the chat sidebar has mounted and takes them.
  */
 const queue: string[] = [];
 const listeners = new Set<() => void>();

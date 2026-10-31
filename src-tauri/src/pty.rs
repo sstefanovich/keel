@@ -39,7 +39,7 @@ fn home() -> Option<PathBuf> {
 
 /// Folders Claude Code installs into. Keel may have been started before Claude Code was
 /// installed (or the installer didn't touch PATH), so don't rely on the inherited PATH alone.
-fn claude_dirs() -> Vec<PathBuf> {
+pub(crate) fn claude_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     if let Some(h) = home() {
         dirs.push(h.join(".local").join("bin"));
@@ -53,7 +53,7 @@ fn claude_dirs() -> Vec<PathBuf> {
 
 /// Locate the Claude Code CLI. Deliberately ignores the Claude *desktop app*
 /// (…\AnthropicClaude\claude.exe), which shares the executable name.
-fn find_claude() -> Option<PathBuf> {
+pub(crate) fn find_claude() -> Option<PathBuf> {
     let names: &[&str] = if cfg!(windows) { &["claude.exe", "claude.cmd"] } else { &["claude"] };
     let path_dirs = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect::<Vec<_>>()).unwrap_or_default();
     claude_dirs()

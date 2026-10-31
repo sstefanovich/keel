@@ -118,8 +118,9 @@ const STEPS: Step[] = [
     body: (
       <>
         <p>
-          The spark at the bottom of the sidebar (or <kbd>Ctrl</kbd>+<kbd>`</kbd>) opens Claude Code right inside Keel, working in your Keel
-          folder with your Claude account. Ask it to log hours, summarise a week or tidy up notes.
+          The spark at the bottom of the sidebar (or <kbd>Ctrl</kbd>+<kbd>`</kbd>) opens a chat with Claude Code beside your notes, working in
+          your Keel folder with your Claude account. Ask it to log hours, summarise a week or tidy up notes; it asks before changing anything,
+          and files it mentions open with a click.
         </p>
         <p>You can replay this tour any time from Settings.</p>
       </>
