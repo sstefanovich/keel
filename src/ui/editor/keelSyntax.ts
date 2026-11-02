@@ -7,7 +7,7 @@ import { addDays, today } from "../../core/dates";
 import { flowItems } from "../../core/parse";
 import { mountMermaid } from "../mermaid";
 import { currentTheme } from "../theme";
-import type { WorkTarget } from "../workTargets";
+import { mentionAt, type WorkTarget } from "../workTargets";
 
 const TASK = /^(\s*[-*+] \[)([ xX>\-])(\])/;
 const HOURS =
@@ -189,7 +189,7 @@ export function keelClicks(onOpenLink: (target: string) => void) {
 }
 
 
-/** Autocomplete for [[links]], @project/@client on work lines, and @due/@remind/@waiting on tasks. */
+/** Autocomplete for [[links]], @project/@client, and @due/@remind/@waiting on tasks. */
 export function keelCompletions(getNames: () => string[], getTargets: () => WorkTarget[]) {
   return (ctx: CompletionContext): CompletionResult | null => {
     const link = ctx.matchBefore(/\[\[[^\]]*/);
@@ -204,9 +204,10 @@ export function keelCompletions(getNames: () => string[], getTargets: () => Work
     if (!at) return null;
     const line = ctx.state.doc.lineAt(ctx.pos);
     const lineText = line.text;
+    const col = ctx.pos - line.from;
 
     // frontmatter "client: @…" suggests clients, "project: @…" suggests projects
-    const fm = lineText.slice(0, ctx.pos - line.from).match(/^\s*(client|project):\s*@([\w.-]*)(\/[\w.-]*)?$/i);
+    const fm = lineText.slice(0, col).match(/^\s*(client|project):\s*@([\w.-]*)(\/[\w.-]*)?$/i);
     if (fm) {
       const wantProject = fm[1].toLowerCase() === "project";
       if (wantProject && fm[3] !== undefined) {
@@ -228,43 +229,39 @@ export function keelCompletions(getNames: () => string[], getTargets: () => Work
       };
     }
 
-    // a bullet that isn't a task: "- @", "- 6h @", "- 6 hours @", "- @contoso/" → projects and clients
-    if (!TASK.test(lineText) && /^\s*[-*+]\s+(?:\S+\s+){0,3}@[\w.-]*(?:\/[\w.-]*)?$/.test(lineText.slice(0, ctx.pos - line.from))) {
-      const typed = at.text.slice(1);
-      const slash = typed.indexOf("/");
-      if (slash >= 0) {
-        const client = typed.slice(0, slash).toLowerCase();
-        return {
-          from: at.from + 1 + slash + 1,
-          options: getTargets()
-            .filter((t) => t.project && t.client === client)
-            .map((t) => ({ label: t.project!, detail: t.detail, type: "class" })),
-          validFor: /^[\w.-]*$/,
-        };
-      }
-      return {
-        from: at.from + 1,
-        options: getTargets().map((t, i) => ({ label: t.key, detail: t.detail, type: t.project ? "class" : "variable", boost: -i / 1000 })),
-        validFor: /^[\w.-]*$/,
-      };
-    }
-    if (TASK.test(lineText) || /^\s*[-*+]\s/.test(lineText)) {
-      const d0 = today();
-      return {
-        from: at.from + 1,
-        options: [
-          { label: `due(${d0})`, detail: "today" },
-          { label: `due(${addDays(d0, 1)})`, detail: "tomorrow" },
-          { label: `due(${addDays(d0, 7)})`, detail: "in a week" },
-          { label: "waiting()", detail: "waiting on someone", apply: "waiting(" },
-          { label: "remind(09:00)", detail: "at a time" },
-          { label: "remind(daily 09:00)", detail: "recurring" },
-          { label: "remind(weekdays 09:00)", detail: "recurring" },
-        ].map((o) => ({ ...o, type: "keyword" })),
-        validFor: /^[\w(]*$/,
-      };
-    }
-    return null;
+    const typed = at.text.slice(1);
+    const slash = typed.indexOf("/");
+    // uncapped: validFor reuses this result while typing, so CodeMirror needs every target to filter
+    const mention = mentionAt(lineText, col, getTargets(), Infinity);
+    const projectOpts = (mention?.options ?? []).map((o, i) => ({
+      label: slash >= 0 ? o.target.project! : o.target.key,
+      detail: o.target.detail,
+      type: o.target.project ? "class" : "variable",
+      boost: 1 - i / 1000,
+    }));
+
+    const keywordOpts =
+      TASK.test(lineText) && slash < 0
+        ? (() => {
+            const d0 = today();
+            return [
+              { label: `due(${d0})`, detail: "today" },
+              { label: `due(${addDays(d0, 1)})`, detail: "tomorrow" },
+              { label: `due(${addDays(d0, 7)})`, detail: "in a week" },
+              { label: "waiting()", detail: "waiting on someone", apply: "waiting(" },
+              { label: "remind(09:00)", detail: "at a time" },
+              { label: "remind(daily 09:00)", detail: "recurring" },
+              { label: "remind(weekdays 09:00)", detail: "recurring" },
+            ].map((o) => ({ ...o, type: "keyword", boost: 0 }));
+          })()
+        : [];
+
+    if (!projectOpts.length && !keywordOpts.length) return null;
+    return {
+      from: slash >= 0 ? at.from + 1 + slash + 1 : at.from + 1,
+      options: [...projectOpts, ...keywordOpts],
+      validFor: /^[\w.(-]*$/, // "(" keeps due(/remind( open while typed by hand
+    };
   };
 }
 

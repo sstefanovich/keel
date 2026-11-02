@@ -42,7 +42,12 @@ export function workTargets(hold: Hold): WorkTarget[] {
  * "@fl" matches keys and names containing "fl" (prefix matches first); "@client/" lists that
  * client's projects. `from`/`to` is the span to replace.
  */
-export function mentionAt(text: string, caret: number, targets: WorkTarget[]): { from: number; to: number; options: { insert: string; target: WorkTarget }[] } | null {
+export function mentionAt(
+  text: string,
+  caret: number,
+  targets: WorkTarget[],
+  limit = 8,
+): { from: number; to: number; options: { insert: string; target: WorkTarget }[] } | null {
   const m = text.slice(0, caret).match(/(^|\s)@([\w.-]*)(?:\/([\w.-]*))?$/);
   if (!m) return null;
   const from = caret - m[0].length + m[1].length;
@@ -65,5 +70,5 @@ export function mentionAt(text: string, caret: number, targets: WorkTarget[]): {
     options = targets.map((t) => ({ insert: `@${t.key}`, target: t, r: rank(q, t, t.key) }));
   }
   const sorted = options.filter((o) => o.r >= 0).sort((a, b) => a.r - b.r);
-  return { from, to, options: sorted.slice(0, 8).map(({ insert, target }) => ({ insert, target })) };
+  return { from, to, options: sorted.slice(0, limit).map(({ insert, target }) => ({ insert, target })) };
 }

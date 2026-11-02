@@ -410,6 +410,7 @@ describe("@ suggestions for quick capture", () => {
     expect(at("6h flis")).toBeNull();
     expect(at("email me@acme")).toBeNull(); // not after a space
     expect(at("6h @")!.options.map((o) => o.insert)).toHaveLength(5);
+    expect(at("@")!.options.map((o) => o.insert)).toHaveLength(5);
   });
   it("matches key prefixes first, then names", () => {
     expect(at("6h @al")!.options.map((o) => o.insert)).toEqual(["@alex-lee", "@mdi-retainer-fy27-pa", "@vbs-2026-2027-pa"]);
