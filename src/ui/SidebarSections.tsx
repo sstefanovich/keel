@@ -17,7 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { DragEvent, MouseEvent, ReactNode, useEffect, useState } from "react";
-import { parseISO, today } from "../core/dates";
+import { formatDate, parseISO, today } from "../core/dates";
 import { Hold } from "../core/hold";
 import { ParsedFile, basename } from "../core/parse";
 import { confirmDialog } from "../lib/platform";
@@ -171,7 +171,7 @@ export function FileRow({ file, label, depth = 0, current }: { file: ParsedFile;
       onContextMenu={(e) => openMenu(e, fileMenu(file, hold, nav, bump, reportError))}
     >
       <Icon size={14} className="file-row-icon" aria-hidden="true" />
-      <span className="file-row-label">{label ?? file.title}</span>
+      <span className="file-row-label">{label ?? (file.kind === "log" && file.date ? formatDate(file.date) : file.title)}</span>
       {pinned && <Pin size={11} className="file-row-pin" aria-label="Pinned" />}
     </button>
   );
@@ -183,8 +183,18 @@ function folderLabel(path: string) {
   return path === "notes" ? "Notes (top level)" : path.replace(/^notes\//, "").split("/").join(" › ");
 }
 
-/** Right-click actions for a file. */
-export function fileMenu(f: ParsedFile, hold: Hold, nav: Nav, bump: () => void, reportError: (e: unknown) => void): MenuEntry[] {
+/**
+ * Right-click actions for a file. From the file's own header (`inView`), "Open in new tab" is left
+ * out and `afterDelete` runs once the file is gone.
+ */
+export function fileMenu(
+  f: ParsedFile,
+  hold: Hold,
+  nav: Nav,
+  bump: () => void,
+  reportError: (e: unknown) => void,
+  opts: { inView?: boolean; afterDelete?: () => void } = {},
+): MenuEntry[] {
   const run = (fn: () => Promise<unknown>) => () => {
     fn()
       .then(bump)
@@ -194,7 +204,7 @@ export function fileMenu(f: ParsedFile, hold: Hold, nav: Nav, bump: () => void, 
   const archived = hold.isArchived(f);
   const canRename = f.kind === "note" || f.kind === "meeting" || f.kind === "flag";
   const entries: MenuEntry[] = [
-    { label: "Open in new tab", icon: SquareArrowOutUpRight, onSelect: () => nav.openFile(f.path, undefined, { newTab: true }) },
+    ...(opts.inView ? [] : [{ label: "Open in new tab", icon: SquareArrowOutUpRight, onSelect: () => nav.openFile(f.path, undefined, { newTab: true }) }]),
     pinned
       ? { label: "Unpin", icon: PinOff, onSelect: run(() => hold.setPinned(f.path, false)) }
       : { label: "Pin to top", icon: Pin, onSelect: run(() => hold.setPinned(f.path, true)) },
@@ -259,6 +269,7 @@ export function fileMenu(f: ParsedFile, hold: Hold, nav: Nav, bump: () => void, 
       run(async () => {
         if (pinned) await hold.setPinned(f.path, false);
         await hold.remove(f.path);
+        opts.afterDelete?.();
       })();
     },
   });
@@ -274,7 +285,7 @@ export function PinnedSection({ current }: { current?: string }) {
   return (
     <Section id="pinned" title="Pinned" count={pinned.length}>
       {pinned.map((f) => (
-        <FileRow key={f.path} file={f} current={current} label={f.kind === "log" && f.date ? f.date : undefined} />
+        <FileRow key={f.path} file={f} current={current} />
       ))}
     </Section>
   );

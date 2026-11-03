@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { addDays, formatLong, today } from "../../core/dates";
-import { confirmDialog, isTauri, openUrl } from "../../lib/platform";
+import { isTauri, openUrl } from "../../lib/platform";
+import { useContextMenu } from "../ContextMenu";
+import { fileMenu } from "../SidebarSections";
 import { spaceOf } from "../../core/parse";
 import { shopForRecipe } from "../recipes";
 import { HistoryPanel } from "../HistoryPanel";
@@ -12,7 +14,7 @@ import { Outline } from "../Outline";
 import { Glance } from "../Glance";
 import { useHold } from "../HoldContext";
 import { Editor, SaveStatus, flushEditors } from "../editor/Editor";
-import { Check, ExternalLink, FileX, History, ShoppingCart, Trash2 } from "lucide-react";
+import { Check, ExternalLink, FileX, History, MoreHorizontal, ShoppingCart } from "lucide-react";
 import { EmptyState } from "../EmptyState";
 import { useNav } from "../nav";
 import { ChartView } from "./ChartView";
@@ -20,6 +22,8 @@ import { ChartView } from "./ChartView";
 export function FileView({ path, line }: { path: string; line?: number }) {
   const { hold, bump, reportError, toast } = useHold();
   const nav = useNav();
+  const openMenu = useContextMenu();
+  const moreClosedAt = useRef(0);
   const file = hold.get(path);
   const backlinks = hold.backlinks(path);
   const isLog = file?.kind === "log" && !!file.date;
@@ -64,17 +68,6 @@ export function FileView({ path, line }: { path: string; line?: number }) {
       </div>
     );
   }
-
-  const remove = async () => {
-    if (!(await confirmDialog(`Delete "${file.title}"? The file is removed from disk.`, "Delete"))) return;
-    try {
-      await hold.remove(path);
-      bump();
-      nav.go({ kind: "agenda" });
-    } catch (e) {
-      reportError(e);
-    }
-  };
 
   const backlinkList =
     backlinks.length > 0 ? (
@@ -173,9 +166,21 @@ export function FileView({ path, line }: { path: string; line?: number }) {
             History
           </button>
         )}
-        <button className="ghost danger icon-text" onClick={remove} title="Delete file">
-          <Trash2 size={14} aria-hidden="true" />
-          Delete
+        {/* rarer and destructive actions (rename, move, archive, delete…) live in a menu, the same one as the sidebar's right-click */}
+        <button
+          className="ghost icon-btn file-more"
+          title="More actions"
+          aria-label="More actions"
+          aria-haspopup="menu"
+          onClick={(e) => {
+            // a click while the menu is open closes it (the press already did) rather than reopening it
+            if (performance.now() - moreClosedAt.current < 300) return;
+            const r = e.currentTarget.getBoundingClientRect();
+            const entries = fileMenu(file, hold, nav, bump, reportError, { inView: true, afterDelete: () => nav.go({ kind: "agenda" }) });
+            openMenu({ clientX: r.right, clientY: r.bottom + 4, alignRight: true, preventDefault: () => {} }, entries, () => (moreClosedAt.current = performance.now()));
+          }}
+        >
+          <MoreHorizontal size={16} aria-hidden="true" />
         </button>
       </header>
       <div className="file-body">

@@ -23,7 +23,24 @@ import { QuickSwitcher } from "./ui/QuickSwitcher";
 import { Tour, tourSeen } from "./ui/Tour";
 import { ContextMenuProvider } from "./ui/ContextMenu";
 import { pushRecent, renameRecent } from "./ui/sidebarStore";
-import { TabsState, canBack, canForward, closeTab, currentView, cycleTab, go, initTabs, moveTab, navigate, reopenClosed, restoreTabs, selectTab, serializeTabs } from "./ui/tabs";
+import {
+  TabsState,
+  canBack,
+  canForward,
+  closeTab,
+  closeTabs,
+  currentView,
+  cycleTab,
+  duplicateTab,
+  go,
+  initTabs,
+  moveTab,
+  navigate,
+  reopenClosed,
+  restoreTabs,
+  selectTab,
+  serializeTabs,
+} from "./ui/tabs";
 import { ChartsView } from "./ui/views/ChartsView";
 import { DispatchView } from "./ui/views/DispatchView";
 import { FlagsView } from "./ui/views/FlagsView";
@@ -401,6 +418,10 @@ function Shell() {
       activeTab: tabs.active,
       selectTab: (id) => setTabs((s) => selectTab(s, id)),
       closeTab: closeTabById,
+      closeTabs: (ids) => setTabs((s) => closeTabs(s, ids, { kind: "agenda" })),
+      duplicateTab: (id) => setTabs((s) => duplicateTab(s, id)),
+      reopenClosedTab: () => setTabs((s) => reopenClosed(s)),
+      canReopenTab: tabs.closed.length > 0,
       newTab,
       moveTab: (id, to) => setTabs((s) => moveTab(s, id, to)),
       back: () => setTabs((s) => go(s, -1)),

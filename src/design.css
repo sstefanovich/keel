@@ -1198,6 +1198,15 @@ button.icon-text {
   width: 14px;
   flex: none;
 }
+.context-shortcut {
+  margin-left: auto;
+  padding-left: 18px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+}
 .context-sep {
   height: 1px;
   background: var(--border);

@@ -99,7 +99,7 @@ export function AgendaView() {
         </Section>
       </div>
 
-      <Section title="Upcoming · 14 days" count={a.upcoming.length}>
+      <Section title="Next 14 days" count={a.upcoming.length}>
         {a.upcoming.length ? (
           groupBy(a.upcoming, (t: Task) => t.due!).map(([due, tasks]) => (
             <div key={due} className="group">

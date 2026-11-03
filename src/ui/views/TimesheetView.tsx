@@ -7,7 +7,8 @@ import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 import { useWeekStart } from "../weekStart";
 import { useDayTarget } from "../dayTarget";
-import { CircleCheck, Clock, Sparkles, TriangleAlert } from "lucide-react";
+import { ChevronDown, CircleCheck, Clock, Copy, Sparkles, TriangleAlert } from "lucide-react";
+import { useContextMenu } from "../ContextMenu";
 import { handToClaude } from "../claudeTasks";
 import { EmptyState } from "../EmptyState";
 
@@ -299,6 +300,7 @@ function WeekCheckBar({ check, days, total, onOpen }: { check: WeekCheck; days: 
 function WeekSheet({ toggle }: { toggle: ReactNode }) {
   const { hold, toast, focus, reportError } = useHold();
   const nav = useNav();
+  const openMenu = useContextMenu();
   const weekStart = useWeekStart();
   // weeks relative to the current one, so changing the start day in Settings re-aligns at once
   const [offset, setOffset] = useState(0);
@@ -343,45 +345,60 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
         </div>
         <div className="toolbar">
           {toggle}
-          <button onClick={() => setOffset(offset - 1)} aria-label="Previous week">
-            ‹
-          </button>
-          <button onClick={() => setOffset(0)} disabled={offset === 0}>
-            This week
-          </button>
-          <button onClick={() => setOffset(offset + 1)} aria-label="Next week">
-            ›
-          </button>
-          <button onClick={() => copy(weekTsv(week), "the week grid")} disabled={!week.rows.length} title="Tab-separated, pastes into Excel or a form grid">
-            Copy grid
-          </button>
-          <button
-            onClick={() => void handToClaude(hold, nav, week, check, "timecard", focus).catch(reportError)}
-            disabled={!week.rows.length}
-            title="Claude opens your timecard site in a browser and enters this week's hours, then stops for you to review and submit"
-          >
-            <Sparkles size={14} aria-hidden="true" /> Fill timecard
+          <div className="btn-group" role="group" aria-label="Week">
+            <button onClick={() => setOffset(offset - 1)} aria-label="Previous week" title="Previous week">
+              ‹
+            </button>
+            <button onClick={() => setOffset(0)} disabled={offset === 0} title={offset === 0 ? "Showing this week" : "Back to this week"}>
+              This week
+            </button>
+            <button onClick={() => setOffset(offset + 1)} aria-label="Next week" title="Next week">
+              ›
+            </button>
+          </div>
+          <button className="icon-text" onClick={() => copy(weekTsv(week), "the week grid")} disabled={!week.rows.length} title="Tab-separated, pastes into Excel or a form grid">
+            <Copy size={14} aria-hidden="true" /> Copy grid
           </button>
           <button
-            onClick={() => void handToClaude(hold, nav, week, check, "status-report", focus).catch(reportError)}
+            className="icon-text"
             disabled={!week.rows.length}
-            title="Claude drafts this week's status report from your logs for you to edit, then enters it where it goes"
+            aria-haspopup="menu"
+            title="Hand this week to Claude"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              openMenu({ clientX: r.left, clientY: r.bottom + 4, preventDefault: () => {} }, [
+                {
+                  label: "Fill timecard",
+                  icon: Sparkles,
+                  hint: "Claude opens your timecard site in a browser and enters this week's hours, then stops for you to review and submit",
+                  onSelect: () => void handToClaude(hold, nav, week, check, "timecard", focus).catch(reportError),
+                },
+                {
+                  label: "Draft status report",
+                  icon: Sparkles,
+                  hint: "Claude drafts this week's status report from your logs for you to edit, then enters it where it goes",
+                  onSelect: () => void handToClaude(hold, nav, week, check, "status-report", focus).catch(reportError),
+                },
+              ]);
+            }}
           >
-            <Sparkles size={14} aria-hidden="true" /> Status report
+            <Sparkles size={14} aria-hidden="true" /> Claude <ChevronDown size={13} aria-hidden="true" />
           </button>
-          <label className="check-inline" title="How copied task lists are formatted">
-            Tasks as
+        </div>
+      </header>
+      {week.rows.length > 0 && (
+        <div className="week-hint">
+          <p className="muted small">
+            Click hours to copy them; click <span className="cell-tasks demo">☰</span> to copy that project's tasks for that day.
+          </p>
+          <label className="check-inline small" title="How copied task lists are formatted">
+            Copy tasks as
             <select value={style} onChange={(e) => setStyle(e.target.value as TaskListStyle)} aria-label="Copy tasks as">
               <option value="bullets">- bullets</option>
               <option value="plain">plain lines</option>
             </select>
           </label>
         </div>
-      </header>
-      {week.rows.length > 0 && (
-        <p className="muted small week-hint">
-          Click hours to copy them; click <span className="cell-tasks demo">☰</span> to copy that project's tasks for that day.
-        </p>
       )}
 
       {!week.rows.length ? (
@@ -459,7 +476,8 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
                     })}
                     <td className="num week-total">{cell(r.total)}</td>
                     <td>
-                      <button className="ghost small" onClick={() => copy(rowTsv(r), `${r.label} hours`)} title="This row's hours for the week, tab-separated">
+                      <button className="ghost small icon-text copy-btn" onClick={() => copy(rowTsv(r), `${r.label} hours`)} title="This row's hours for the week, tab-separated">
+                        <Copy size={12} aria-hidden="true" />
                         Copy row
                       </button>
                     </td>
@@ -492,7 +510,8 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
                   {r.label}
                   {r.project && <span className="muted"> · {r.clientName}</span>} <span className="count">{cell(r.total) || 0}h</span>
                 </h2>
-                <button className="ghost small" onClick={() => copy(rowReport(week, r, style), `${r.label} report`)}>
+                <button className="ghost small icon-text copy-btn" onClick={() => copy(rowReport(week, r, style), `${r.label} report`)} title="Every day's tasks for this project, as a report">
+                  <Copy size={12} aria-hidden="true" />
                   Copy report
                 </button>
               </div>
@@ -505,7 +524,8 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
                       </button>
                       <span className={`chip${r.hours[i] ? "" : " chip-warn"}`}>{r.hours[i] ? `${cell(r.hours[i])}h` : "no hours"}</span>
                       {r.items[i].length > 0 && (
-                        <button className="small copy-tasks-btn" onClick={() => copyTasks(r, i)}>
+                        <button className="ghost small icon-text copy-btn copy-tasks-btn" onClick={() => copyTasks(r, i)} title="This day's tasks for this project">
+                          <Copy size={12} aria-hidden="true" />
                           Copy tasks
                         </button>
                       )}
