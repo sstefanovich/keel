@@ -3,7 +3,7 @@ import { HighlightStyle } from "@codemirror/language";
 import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
-import { addDays, today } from "../../core/dates";
+import { addDays, formatDate, formatTime, isISODate, parseTime, today } from "../../core/dates";
 import { flowItems } from "../../core/parse";
 import { mountMermaid } from "../mermaid";
 import { currentTheme } from "../theme";
@@ -266,7 +266,7 @@ export function keelCompletions(getNames: () => string[], getTargets: () => Work
 }
 
 export const keelHighlight = HighlightStyle.define([
-  { tag: t.heading1, fontSize: "1.75em", fontWeight: "650", fontFamily: "var(--font-title)", letterSpacing: "-0.01em" },
+  { tag: t.heading1, fontSize: "1.75em", fontWeight: "600", fontFamily: "var(--font-title)", letterSpacing: "-0.01em" },
   { tag: t.heading2, fontSize: "1.32em", fontWeight: "600", fontFamily: "var(--font-title)" },
   { tag: t.heading3, fontSize: "1.12em", fontWeight: "600" },
   { tag: [t.heading4, t.heading5, t.heading6], fontWeight: "600" },
@@ -420,7 +420,10 @@ class PropertiesWidget extends WidgetType {
         const v = document.createElement("span");
         v.className = "cm-k-prop-val";
         const found = this.lookup.resolve(key, item);
-        v.textContent = found?.label ?? item;
+        // dates and times read the way they do everywhere else in Keel; the raw value is in the tooltip
+        const friendly = isISODate(item) ? formatDate(item) : /^\d{1,2}:\d{2}$/.test(item) && parseTime(item) ? formatTime(parseTime(item)!) : null;
+        v.textContent = found?.label ?? friendly ?? item;
+        if (friendly && !found) v.title = item;
         if (found?.open) {
           const open = found.open;
           v.classList.add("link");

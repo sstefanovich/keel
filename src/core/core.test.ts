@@ -4,7 +4,7 @@ import { parseCapture, parseDayPrefix } from "./capture";
 import { buildReport, reportHtml, reportMarkdown } from "./report";
 import { buildWeek, checkWeek, dayItems, rowReport, rowTsv, weekBrief, weekTsv } from "./week";
 import { mentionAt } from "../ui/workTargets";
-import { parseTime, startOfWeek, today } from "./dates";
+import { formatDate, parseTime, startOfWeek, today } from "./dates";
 import { MemoryFs } from "./fs";
 import { Hold } from "./hold";
 import { appendToSection, parseFile, replaceBody, setFrontmatterField, setTaskChar, taskLabel, yamlScalar } from "./parse";
@@ -991,5 +991,14 @@ date: 2026-10-21
     const hold = await makeHold({ "logs/2026/2026-10-19.md": LOG });
     expect(hold.search("dentist").map((h) => h.line)).toEqual([8]);
     expect(hold.search("#admin").map((h) => h.path)).toEqual(["logs/2026/2026-10-19.md"]);
+  });
+});
+
+describe("formatDate", () => {
+  it("adds the year only for other years", () => {
+    const y = Number(today().slice(0, 4));
+    expect(formatDate(`${y}-03-04`)).not.toMatch(String(y));
+    expect(formatDate(`${y - 1}-03-04`)).toMatch(String(y - 1));
+    expect(formatDate(`${y}-03-04`)).toBe(new Date(y, 2, 4).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }));
   });
 });

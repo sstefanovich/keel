@@ -586,3 +586,148 @@ button.link:hover:not(:disabled) {
   border-radius: var(--radius-sm);
   white-space: pre-wrap;
 }
+
+/* ---------- 5. type consistency ----------
+ * One rule: the serif is for titles (page titles, file titles, document headings, a day's date);
+ * everything that labels a part of the UI (sections, cards, panels) is the sans at 15px/650.
+ * Serif titles are all 600; sans headings are all 650. Small text is one fixed size, not a
+ * fraction of whatever it sits in (which gave 11px, 11.05px, 11.9px… side by side).
+ */
+.small {
+  font-size: 12px;
+}
+
+/* sans section and card headings */
+.briefing h3,
+.history-head h2,
+.search-group h3 {
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+.cal-help h3,
+.dispatch-preview h3,
+.group h3 {
+  font-weight: 650;
+}
+
+/* serif titles */
+.page-head h1,
+.scratch-title h1,
+.file-head .file-title,
+.empty-state h2,
+.modal.tour h2,
+.cal-day-panel .cal-day-head h2,
+.list-title,
+.recipe-title {
+  font-weight: 600;
+}
+
+/* ---------- 6. usability touches ---------- */
+
+/* the tab a right-click menu belongs to stays marked while the menu is open */
+.tab.menu-open:not(.active) {
+  background: var(--hover);
+  color: var(--text);
+  border-color: var(--border);
+}
+.tab.menu-open .tab-close {
+  opacity: 1;
+}
+
+/* the file header's "more" button (rename, move, archive, delete…) */
+.file-more {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* joined buttons: ‹ This week › */
+.btn-group {
+  display: inline-flex;
+}
+.btn-group > button {
+  border-radius: 0;
+}
+.btn-group > button + button {
+  margin-left: -1px;
+}
+.btn-group > button:first-child {
+  border-radius: var(--radius-sm, 7px) 0 0 var(--radius-sm, 7px);
+}
+.btn-group > button:last-child {
+  border-radius: 0 var(--radius-sm, 7px) var(--radius-sm, 7px) 0;
+}
+.btn-group > button:disabled {
+  opacity: 1;
+  color: var(--muted);
+}
+
+/* timesheet: the copy hint and the "copy tasks as" choice share one line */
+.week-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.week-hint p {
+  margin: 0;
+}
+.week-hint select {
+  font-size: 12px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+/* every "Copy …" button on the timesheet looks the same */
+.copy-btn {
+  gap: 5px;
+  color: var(--accent);
+}
+.copy-btn svg {
+  flex: none;
+}
+.copy-tasks-btn {
+  background: transparent;
+}
+
+/* flags: bigger, clearer buttons */
+.flag-foot {
+  gap: 4px;
+  font-size: 12px;
+  opacity: 1;
+}
+.flag-age {
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.flag-btn {
+  flex: none;
+  height: 26px;
+  min-width: 26px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 13px;
+  border-radius: 6px;
+}
+.flag-icon-btn {
+  padding: 0;
+}
+.flag-swatch {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  padding: 0;
+  border-radius: 50%;
+}

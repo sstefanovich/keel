@@ -89,16 +89,42 @@ export function cycleTab<V>(s: TabsState<V>, delta: 1 | -1): TabsState<V> {
 
 /** Close a tab; closing the last one leaves a fresh tab showing `fallback`. */
 export function closeTab<V>(s: TabsState<V>, id: string, fallback: V): TabsState<V> {
+  return closeTabs(s, [id], fallback);
+}
+
+/**
+ * Close several tabs at once (close others, to the right, all). If the active one goes, the nearest
+ * surviving tab to its right takes over, else the nearest to its left; closing every tab leaves a
+ * fresh one showing `fallback`. Closed tabs can be reopened one by one, last closed first.
+ */
+export function closeTabs<V>(s: TabsState<V>, ids: string[], fallback: V): TabsState<V> {
+  const drop = new Set(ids);
+  const gone = s.tabs.filter((t) => drop.has(t.id));
+  if (!gone.length) return s;
+  const closed = [...s.closed, ...gone].slice(-MAX_CLOSED);
+  const tabs = s.tabs.filter((t) => !drop.has(t.id));
+  if (!tabs.length) return { ...initTabs(fallback), closed };
+  let active = s.active;
+  if (drop.has(active)) {
+    const i = s.tabs.findIndex((t) => t.id === s.active);
+    const keep = (t: Tab<V>) => !drop.has(t.id);
+    active = (s.tabs.slice(i + 1).find(keep) ?? s.tabs.slice(0, i).reverse().find(keep) ?? tabs[0]).id;
+  }
+  return { tabs, active, closed };
+}
+
+/** The ids of every tab after this one (for "close tabs to the right"). */
+export function tabsAfter<V>(s: TabsState<V>, id: string): string[] {
+  const i = s.tabs.findIndex((t) => t.id === id);
+  return i < 0 ? [] : s.tabs.slice(i + 1).map((t) => t.id);
+}
+
+/** Open a copy of a tab (with its history) right after it, and switch to it. */
+export function duplicateTab<V>(s: TabsState<V>, id: string): TabsState<V> {
   const i = s.tabs.findIndex((t) => t.id === id);
   if (i < 0) return s;
-  const closed = [...s.closed, s.tabs[i]].slice(-MAX_CLOSED);
-  const tabs = s.tabs.filter((t) => t.id !== id);
-  if (!tabs.length) {
-    const fresh = initTabs(fallback);
-    return { ...fresh, closed };
-  }
-  const active = s.active === id ? tabs[Math.min(i, tabs.length - 1)].id : s.active;
-  return { tabs, active, closed };
+  const copy = { ...s.tabs[i], id: newId(), history: [...s.tabs[i].history] };
+  return { ...s, tabs: [...s.tabs.slice(0, i + 1), copy, ...s.tabs.slice(i + 1)], active: copy.id };
 }
 
 export function reopenClosed<V>(s: TabsState<V>): TabsState<V> {

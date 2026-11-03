@@ -71,6 +71,12 @@ export interface Nav {
   activeTab: string;
   selectTab: (id: string) => void;
   closeTab: (id: string) => void;
+  /** Close several tabs at once (close others / to the right / all) */
+  closeTabs: (ids: string[]) => void;
+  duplicateTab: (id: string) => void;
+  /** Bring back the most recently closed tab (Ctrl+Shift+T) */
+  reopenClosedTab: () => void;
+  canReopenTab: boolean;
   newTab: () => void;
   moveTab: (id: string, to: number) => void;
   back: () => void;

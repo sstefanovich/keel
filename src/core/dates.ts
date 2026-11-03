@@ -80,6 +80,12 @@ export function formatShort(iso: ISODate): string {
   return parseISO(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
 
+/** "Tue, Nov 3", with the year added when it isn't this year ("Thu, Oct 22, 2025"). */
+export function formatDate(iso: ISODate): string {
+  const sameYear = iso.slice(0, 4) === today().slice(0, 4);
+  return parseISO(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
+}
+
 /** "3pm", "3:30 pm", "15:00", "9" → "HH:MM" (24h), or null. */
 export function parseTime(s: string): string | null {
   const m = s.trim().toLowerCase().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);

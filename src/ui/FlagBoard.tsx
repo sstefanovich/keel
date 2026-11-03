@@ -1,3 +1,4 @@
+import { Check, ExternalLink } from "lucide-react";
 import { getSpace } from "./space";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { FLAG_COLORS, FlagColor } from "../core/hold";
@@ -8,11 +9,13 @@ import { useNav } from "./nav";
 const colorOf = (f: ParsedFile): FlagColor =>
   FLAG_COLORS.includes(f.frontmatter.color as FlagColor) ? (f.frontmatter.color as FlagColor) : "yellow";
 
-function age(created: unknown): string {
+/** How long a flag has been up: short ("14d", like waiting ages elsewhere) and in words for the tooltip. */
+function age(created: unknown): { short: string; long: string } {
   const d = typeof created === "string" ? new Date(created.replace(" ", "T")) : null;
-  if (!d || isNaN(d.getTime())) return "";
+  if (!d || isNaN(d.getTime())) return { short: "", long: "" };
   const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
-  return days <= 0 ? "today" : days === 1 ? "1 day" : `${days} days`;
+  if (days <= 0) return { short: "today", long: "Hoisted today" };
+  return { short: `${days}d`, long: `Hoisted ${days === 1 ? "1 day" : `${days} days`} ago` };
 }
 
 /** Textarea that grows with its content. Enter saves, Shift+Enter adds a line, Esc cancels. */
@@ -95,10 +98,12 @@ function FlagCard({ flag }: { flag: ParsedFile }) {
         </button>
       )}
       <div className="flag-foot">
-        <span className="flag-age">{age(flag.frontmatter.created)}</span>
+        <span className="flag-age" title={age(flag.frontmatter.created).long}>
+          {age(flag.frontmatter.created).short}
+        </span>
         <button className="flag-btn flag-swatch" onClick={() => update({ color: nextColor })} title={`Color: ${color} (click to change)`} aria-label="Change color" />
-        <button className="flag-btn" onClick={() => nav.openFile(flag.path)} title="Open as a file" aria-label="Open as a file">
-          ↗
+        <button className="flag-btn flag-icon-btn" onClick={() => nav.openFile(flag.path)} title="Open as a file" aria-label="Open as a file">
+          <ExternalLink size={14} aria-hidden="true" />
         </button>
         <button
           className="flag-btn flag-lower"
@@ -108,7 +113,7 @@ function FlagCard({ flag }: { flag: ParsedFile }) {
           }}
           title="Done: lower this flag"
         >
-          ✓ Done
+          <Check size={14} aria-hidden="true" /> Done
         </button>
       </div>
     </div>

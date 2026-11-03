@@ -4,8 +4,10 @@ import {
   canBack,
   canForward,
   closeTab,
+  closeTabs,
   currentView,
   cycleTab,
+  duplicateTab,
   go,
   initTabs,
   moveTab,
@@ -13,6 +15,7 @@ import {
   reopenClosed,
   restoreTabs,
   serializeTabs,
+  tabsAfter,
 } from "./tabs";
 
 type V = { kind: string; path?: string; line?: number };
@@ -69,6 +72,65 @@ describe("tabs", () => {
     expect(s.tabs).toHaveLength(1);
     expect(currentView(s)).toEqual(A);
     expect(reopenClosed(s).tabs).toHaveLength(2);
+  });
+
+  it("closes others, to the right and all, and reopens them", () => {
+    let s = initTabs<V>(A);
+    const a = s.active;
+    s = navigate(s, T, true);
+    const t = s.active;
+    s = navigate(s, F("x.md"), true);
+    s = navigate(s, F("y.md"), true);
+    // close to the right of the timesheet while y.md is active: the timesheet takes over
+    s = closeTabs(s, tabsAfter(s, t), A);
+    expect(s.tabs.map((x) => x.id)).toEqual([a, t]);
+    expect(s.active).toBe(t);
+    expect(s.closed).toHaveLength(2);
+    // reopening brings back the last closed first
+    s = reopenClosed(s);
+    expect(currentView(s)).toEqual(F("y.md"));
+    // close others keeps just the chosen tab, active
+    s = closeTabs(
+      s,
+      s.tabs.filter((x) => x.id !== a).map((x) => x.id),
+      A,
+    );
+    expect(s.tabs.map((x) => x.id)).toEqual([a]);
+    expect(s.active).toBe(a);
+    // close all leaves a fresh tab
+    s = closeTabs(
+      s,
+      s.tabs.map((x) => x.id),
+      T,
+    );
+    expect(s.tabs).toHaveLength(1);
+    expect(currentView(s)).toEqual(T);
+    expect(closeTabs(s, ["nope"], A)).toBe(s);
+  });
+
+  it("closing the active tab picks the nearest survivor, right first", () => {
+    let s = initTabs<V>(A);
+    const a = s.active;
+    s = navigate(s, T, true);
+    const t = s.active;
+    s = navigate(s, F("x.md"), true);
+    const x = s.active;
+    s = { ...s, active: t };
+    expect(closeTabs(s, [t], A).active).toBe(x);
+    expect(closeTabs(s, [t, x], A).active).toBe(a);
+  });
+
+  it("duplicates a tab with its history, right after it", () => {
+    let s = initTabs<V>(A);
+    s = navigate(s, T);
+    const a = s.active;
+    s = navigate(s, F("x.md"), true);
+    s = duplicateTab(s, a);
+    expect(s.tabs).toHaveLength(3);
+    expect(s.tabs[1].id).toBe(s.active);
+    expect(activeTab(s).history).toEqual([A, T]);
+    expect(currentView(s)).toEqual(T);
+    expect(s.active).not.toBe(a);
   });
 
   it("reorders tabs", () => {
