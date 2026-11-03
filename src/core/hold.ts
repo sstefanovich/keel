@@ -221,14 +221,41 @@ export class Hold {
 
   private creatingLog = new Map<string, Promise<string>>();
 
+  /** Whether a new work log starts with the projects from the last day's Work section (a setting, read when a log is created). */
+  carryWorkProjects: () => boolean = () => false;
+
   private async createLog(date: ISODate, today: ISODate, space: Space): Promise<string> {
     const path = this.logPath(date, space);
-    if (!(await this.fs.exists(path))) await this.save(path, fillTemplate(await this.template(space === "personal" ? "personal-log" : "log"), { date }));
+    if (!(await this.fs.exists(path))) {
+      let content = fillTemplate(await this.template(space === "personal" ? "personal-log" : "log"), { date });
+      if (space === "work" && this.carryWorkProjects()) {
+        const work = this.lastWorkProjects(date);
+        if (work.length) {
+          const lines = work.map(([k, h]) => (h ? `- ${round2(h)}h @${k}` : `- @${k}`));
+          content = appendToSection(content, workHeading(content), lines.join("\n"));
+        }
+      }
+      await this.save(path, content);
+    }
     // Runs on every open of today's log, not just creation, so a log made early
     // (by browsing ahead) still receives the carry-over. Repeating it is harmless:
     // carried tasks are marked [>] in the old log.
     if (date === today) await this.carryOver(path, date, space);
     return path;
+  }
+
+  /**
+   * The @keys of the work blocks in the most recent earlier work log that has any, in order, once each,
+   * with each one's hours for that day (blocks for the same key added up).
+   * Skips empty logs in between (a weekend day opened by accident shouldn't lose Friday's projects).
+   */
+  private lastWorkProjects(date: ISODate): [string, number][] {
+    const prev = this.all()
+      .filter((f) => f.kind === "log" && f.date && f.date < date && spaceOf(f.path) === "work" && f.hours.length)
+      .sort((a, b) => (a.date! < b.date! ? 1 : -1))[0];
+    const totals = new Map<string, number>();
+    for (const h of prev?.hours ?? []) totals.set(h.client, (totals.get(h.client) ?? 0) + h.hours);
+    return [...totals];
   }
 
   /** Move open top-level tasks from the most recent earlier log (in the same space) into this one. */

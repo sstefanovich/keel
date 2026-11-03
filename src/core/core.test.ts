@@ -477,6 +477,38 @@ describe("Hold", () => {
     expect(hold.get(path)!.tasks).toHaveLength(1);
   });
 
+  it("a new work log starts with the last day's projects when the setting is on", async () => {
+    const hold = await makeHold({
+      "logs/2026/2026-10-16.md":
+        "---\ndate: 2026-10-16\n---\n## Tasks\n\n## Work\n- 6h @portal-rebuild\n  - Designed the gateway\n- 1.5h @acme/sso\n- 1h @portal-rebuild\n\n## Log\n",
+      "logs/2026/2026-10-17.md": "---\ndate: 2026-10-17\n---\n## Tasks\n\n## Work\n\n## Log\n", // empty day: skipped
+    });
+    await hold.ensureLog("2026-10-19", "2026-10-19"); // off by default
+    expect(hold.get("logs/2026/2026-10-19.md")!.hours).toEqual([]);
+
+    hold.carryWorkProjects = () => true;
+    const path = await hold.ensureLog("2026-10-20", "2026-10-20");
+    const content = await hold.fs.read(path);
+    // hours come along (two blocks for one project add up); what was done doesn't
+    expect(content).toContain("## Work\n- 7h @portal-rebuild\n- 1.5h @acme/sso\n");
+    expect(content).not.toContain("Designed the gateway");
+    expect(hold.get(path)!.hours.map((h) => [h.client, h.hours])).toEqual([
+      ["portal-rebuild", 7],
+      ["acme/sso", 1.5],
+    ]);
+    // a project with no hours yet stays a bare "- @key"
+    await hold.save(path, content.replace("- 1.5h @acme/sso", "- @acme/sso"));
+    const next = await hold.ensureLog("2026-10-21", "2026-10-21");
+    expect(await hold.fs.read(next)).toContain("## Work\n- 7h @portal-rebuild\n- @acme/sso\n");
+    // only on creation: emptying the Work section and reopening doesn't bring them back
+    await hold.save(path, content.replace("- 7h @portal-rebuild\n- 1.5h @acme/sso\n", ""));
+    await hold.ensureLog("2026-10-20", "2026-10-20");
+    expect(hold.get(path)!.hours).toEqual([]);
+    // personal logs have no Work section to fill
+    const p = await hold.ensureLog("2026-10-20", "2026-10-20", "personal");
+    expect(hold.get(p)!.hours).toEqual([]);
+  });
+
   it("carries tasks into today's log even if it was created early by browsing ahead", async () => {
     const hold = await makeHold({
       "logs/2026/2026-10-20.md": "---\ndate: 2026-10-20\n---\n## Tasks\n- [ ] finish deck\n",
