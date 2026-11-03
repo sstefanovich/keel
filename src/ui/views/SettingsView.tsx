@@ -8,6 +8,7 @@ import { CalendarSettings } from "../CalendarSettings";
 import { WEEKDAY_NAMES } from "../../core/dates";
 import { setWeekStart, useWeekStart } from "../weekStart";
 import { setDayTarget, useDayTarget } from "../dayTarget";
+import { setCarryWork, useCarryWork } from "../carryWork";
 import { setHistoryEnabled, snapshotNow, useHistory } from "../history";
 import { livePreviewEnabled, setLivePreview } from "../editor/livePreview";
 import { setEditorWidth, useEditorWidth } from "../editorWidth";
@@ -30,6 +31,7 @@ export function SettingsView({ section }: { section?: string }) {
   const { pref, theme, setPref } = useTheme();
   const weekStart = useWeekStart();
   const target = useDayTarget();
+  const carryWork = useCarryWork();
   const history = useHistory();
   const [preview, setPreview] = useState(livePreviewEnabled);
   const width = useEditorWidth();
@@ -159,6 +161,10 @@ export function SettingsView({ section }: { section?: string }) {
           </div>
           <span className="muted small">{target.hours ? "The Timesheet flags working days under this" : "Daily target check is off"}</span>
         </div>
+        <label className="setting-row check">
+          <input type="checkbox" checked={carryWork} onChange={(e) => setCarryWork(e.target.checked)} />
+          Start each new day's log with the previous day's projects and hours under Work (not what you did on them)
+        </label>
       </section>
 
       <section className="panel" id="settings-appearance">

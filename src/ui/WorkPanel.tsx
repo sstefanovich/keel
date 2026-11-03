@@ -1,74 +1,33 @@
-import { useEffect, useState } from "react";
+import { CalendarRange } from "lucide-react";
+import { ISODate, formatShort, parseISO, startOfWeek, today, weekdayOf } from "../core/dates";
 import { round2 } from "../core/hold";
-import { HoursEntry, ParsedFile, basename } from "../core/parse";
+import { ParsedFile, basename } from "../core/parse";
 import { slugify } from "../core/templates";
+import { buildWeek } from "../core/week";
+import { useDayTarget } from "./dayTarget";
 import { useHold } from "./HoldContext";
 import { flushEditors } from "./editor/Editor";
 import { MeetingHours } from "./MeetingHours";
+import { openOpts, useNav } from "./nav";
+import { useWeekStart } from "./weekStart";
 
-/** "portal-rebuild" → "Portal rebuild · Contoso" for display. */
-export function useWorkLabel() {
-  const { hold } = useHold();
-  return (key: string) => {
-    const r = hold.resolveHours(key);
-    const client = hold.clients().get(r.client);
-    if (r.project && hold.projectByKey(r.project)) return { name: hold.projectName(r.project), sub: client?.name ?? r.client, known: true };
-    if (client) return { name: client.name, sub: "general", known: true };
-    return { name: `@${key}`, sub: "not a known client or project", known: false };
-  };
-}
+const TOP_PROJECTS = 5;
 
-function HoursInput({ entry, onSave }: { entry: HoursEntry; onSave: (h: number) => void }) {
-  const [v, setV] = useState(entry.hours ? String(round2(entry.hours)) : "");
-  useEffect(() => setV(entry.hours ? String(round2(entry.hours)) : ""), [entry.hours]);
-  const commit = () => {
-    const h = v.trim() === "" ? 0 : Number(v);
-    if (!isNaN(h) && h >= 0 && h !== entry.hours) onSave(h);
-  };
-  return (
-    <span className="work-hours">
-      <input
-        type="number"
-        step="0.25"
-        min="0"
-        value={v}
-        placeholder="—"
-        aria-label="Hours"
-        onChange={(e) => setV(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-        className={entry.hours ? "" : "missing"}
-      />
-      h
-    </span>
-  );
-}
-
-function AddItem({ onAdd }: { onAdd: (text: string) => void }) {
-  const [text, setText] = useState("");
-  return (
-    <input
-      className="work-add"
-      value={text}
-      placeholder="+ what you did…"
-      aria-label="Add a done item"
-      onChange={(e) => setText(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" && text.trim()) {
-          onAdd(text.trim());
-          setText("");
-        }
-      }}
-    />
-  );
-}
-
-/** Per-project hours and done items for one day's log, editable without touching the markdown. */
+/**
+ * Beside a work log: the week this day falls in, the one thing the log itself can't show. Hours per day
+ * against the daily target, and where the week's hours went by project. The day's own work blocks are
+ * edited in the log, so they aren't repeated here. Also: meetings to turn into hours, and a project picker.
+ */
 export function WorkPanel({ file }: { file: ParsedFile }) {
   const { hold, bump, reportError, focus } = useHold();
-  const label = useWorkLabel();
-  const blocks = file.hours;
-  const total = blocks.reduce((s, b) => s + b.hours, 0);
+  const nav = useNav();
+  const weekStart = useWeekStart();
+  const target = useDayTarget();
+  const date = file.date!;
+  const now = today();
+  const start = startOfWeek(date, weekStart);
+  const week = buildWeek(hold, start, focus);
+  const isThisWeek = week.days.includes(now);
 
   const run = async (fn: () => Promise<unknown>) => {
     try {
@@ -79,15 +38,17 @@ export function WorkPanel({ file }: { file: ParsedFile }) {
       reportError(e);
     }
   };
-  // Lines may have moved after the editor saved; re-find the block (called after flushEditors)
-  const fresh = (b: HoursEntry) => {
-    const now = hold.get(file.path)?.hours ?? [];
-    const found = now.find((h) => h.line === b.line && h.client === b.client) ?? now.find((h) => h.client === b.client);
-    if (!found) throw new Error("That project's line changed in the editor; try again.");
-    return found;
-  };
 
-  const used = new Set(blocks.map((b) => b.client));
+  const workday = (d: ISODate) => target.workdays.includes(weekdayOf(d));
+  // non-working days only show up when something was logged on them
+  const days = week.days.map((d, i) => ({ d, hours: week.dayTotals[i] })).filter((x) => workday(x.d) || x.hours > 0);
+  const expected = target.hours ? week.days.filter(workday).length * target.hours : 0;
+  const scale = Math.max(target.hours, ...days.map((x) => x.hours), 1);
+  const projects = week.rows.filter((r) => r.total > 0).sort((a, b) => b.total - a.total);
+  const shown = projects.slice(0, TOP_PROJECTS);
+  const rest = projects.slice(TOP_PROJECTS).reduce((s, r) => s + r.total, 0);
+
+  const used = new Set(file.hours.map((b) => b.client));
   const clients = [...hold.clients().values()].sort((a, b) => a.name.localeCompare(b.name));
   const allOptions = clients
     .filter((c) => !focus || c.key === focus)
@@ -101,54 +62,85 @@ export function WorkPanel({ file }: { file: ParsedFile }) {
   const options = allOptions.filter((o) => !used.has(o.key));
 
   return (
-    <section className="work-panel">
+    <section className="work-panel wk-panel">
       <header>
-        <h3>Work</h3>
-        {total > 0 && <span className="chip">{round2(total)}h</span>}
+        <h3>{isThisWeek ? "This week" : `Week of ${formatShort(start)}`}</h3>
+        <button className="link wk-total" onClick={(e) => nav.go({ kind: "timesheet" }, openOpts(e))} title="Open the timesheet">
+          <b>{round2(week.total)}h</b>
+          {expected > 0 && <span className="muted"> of {round2(expected)}h</span>}
+        </button>
       </header>
-      {!blocks.length && (
-        <p className="muted small">
-          Add the projects you worked on, then list what you did under each and fill in the day's hours.
-          {!clients.length && " Set up clients and projects in Settings first."}
+
+      <ul className="wk-days" aria-label="Hours per day">
+        {days.map(({ d, hours }) => {
+          const future = d > now;
+          const short = target.hours > 0 && workday(d) && !future && d !== now && hours < target.hours;
+          const cls = ["wk-day", d === date ? "viewing" : "", d === now ? "today" : "", future ? "future" : "", short ? "short" : ""].filter(Boolean).join(" ");
+          return (
+            <li key={d}>
+              <button
+                className={cls}
+                onClick={(e) => d !== date && nav.openLog(d, openOpts(e))}
+                aria-current={d === date ? "date" : undefined}
+                title={`${formatShort(d)}: ${round2(hours)}h${short ? ` (under ${target.hours}h)` : ""}`}
+              >
+                <span className="wk-day-name">{parseISO(d).toLocaleDateString(undefined, { weekday: "short" })}</span>
+                <span className="wk-bar" aria-hidden="true">
+                  <span className="wk-fill" style={{ width: `${(hours / scale) * 100}%` }} />
+                  {target.hours > 0 && <span className="wk-target" style={{ left: `${(target.hours / scale) * 100}%` }} />}
+                </span>
+                <span className="wk-day-hours">{hours ? `${round2(hours)}h` : future ? "" : "–"}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      {shown.length > 0 ? (
+        <ul className="wk-projects" aria-label="Hours by project this week">
+          {shown.map((r) => (
+            <li key={`${r.client}/${r.project ?? ""}`}>
+              <span className="wk-project-name" title={r.project ? `${r.label} · ${r.clientName}` : `${r.clientName} (general)`}>
+                {r.label}
+                {r.project && r.label !== r.clientName && <span className="muted small"> · {r.clientName}</span>}
+              </span>
+              <span className="wk-project-hours">{round2(r.total)}h</span>
+            </li>
+          ))}
+          {rest > 0 && (
+            <li className="muted">
+              <span className="wk-project-name">
+                {projects.length - TOP_PROJECTS} more
+              </span>
+              <span className="wk-project-hours">{round2(rest)}h</span>
+            </li>
+          )}
+        </ul>
+      ) : (
+        <p className="muted small wk-empty">
+          <CalendarRange size={14} aria-hidden="true" />
+          {clients.length
+            ? "No hours yet this week. Under Work in the log, type @ to pick a project, then add the hours: - 6h @project"
+            : "Set up clients and projects in Settings, then log hours under Work: - 6h @project"}
         </p>
       )}
-      {blocks.map((b) => {
-        const l = label(b.client);
-        return (
-          <div key={`${b.line}-${b.client}`} className="work-block">
-            <div className="work-head">
-              <span className={`work-name${l.known ? "" : " unknown"}`} title={`@${b.client}`}>
-                {l.name}
-                <span className="muted small"> · {l.sub}</span>
-              </span>
-              <HoursInput entry={b} onSave={(h) => run(() => hold.setWorkHours(fresh(b), h))} />
-            </div>
-            {b.items.length > 0 && (
-              <ul className="work-items">
-                {b.items.map((it, i) => (
-                  <li key={i}>{it}</li>
-                ))}
-              </ul>
-            )}
-            <AddItem onAdd={(t) => run(() => hold.addWorkItem(fresh(b), t))} />
-          </div>
-        );
-      })}
+
+      <MeetingHours file={file} options={allOptions} run={run} />
+
       {/* own full-width row: long project names would otherwise push the panel off-screen */}
       <select
         className="work-add-project"
         value=""
-        aria-label="Add a project to this day"
-        onChange={(e) => e.target.value && run(() => hold.logWork(file.date!, e.target.value, {}))}
+        aria-label={`Add a project to ${date === now ? "today" : formatShort(date)}`}
+        onChange={(e) => e.target.value && run(() => hold.logWork(date, e.target.value, {}))}
       >
-        <option value="">+ Add project…</option>
+        <option value="">+ Add a project to {date === now ? "today" : formatShort(date)}…</option>
         {options.map((o) => (
           <option key={o.key} value={o.key}>
             {o.text}
           </option>
         ))}
       </select>
-      <MeetingHours file={file} options={allOptions} run={run} />
     </section>
   );
 }

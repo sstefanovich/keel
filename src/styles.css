@@ -1475,58 +1475,120 @@ mark {
 .work-panel header select {
   font-size: 13px;
 }
-.work-block {
-  padding: 8px 0;
-  border-top: 1px solid var(--border);
-}
-.work-block:first-of-type {
-  border-top: 0;
-}
-.work-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 .work-name {
   flex: 1;
   font-weight: 600;
 }
-.work-name.unknown {
+
+/* the week beside a work log: a bar per day against the daily target, then hours by project */
+.wk-panel header {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.wk-total {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.wk-days,
+.wk-projects {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wk-day {
+  display: grid;
+  grid-template-columns: 36px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 6px;
+  margin: 0 -6px;
+  box-sizing: content-box;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-2);
+  text-align: left;
+  cursor: pointer;
+}
+.wk-day:hover {
+  background: var(--accent-soft);
+}
+.wk-day.viewing {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+  cursor: default;
+}
+.wk-day.future {
+  color: var(--muted);
+}
+.wk-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+}
+.wk-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 0.2s ease-out;
+}
+.wk-day.short .wk-fill {
+  background: var(--warn);
+}
+.wk-target {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--muted);
+  opacity: 0.55;
+}
+.wk-day-hours {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.wk-day.short .wk-day-hours {
   color: var(--warn);
 }
-.work-hours {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--muted);
+.wk-projects {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
   font-size: 13px;
 }
-.work-hours input {
-  width: 70px;
-  text-align: right;
-  padding: 2px 6px;
+.wk-projects li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 0;
+}
+.wk-project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wk-project-hours {
+  flex: none;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
-.work-hours input.missing {
-  border-color: var(--warn);
+.wk-empty {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 10px 0 0;
 }
-.work-items {
-  margin: 4px 0 0;
-  padding-left: 20px;
-}
-.work-items li {
-  margin: 1px 0;
-}
-.work-add {
-  width: 100%;
-  margin-top: 4px;
-  border-style: dashed;
-  background: transparent;
-  font-size: 13px;
-}
-.work-add:focus {
-  border-style: solid;
+.wk-empty svg {
+  flex: none;
+  margin-top: 2px;
 }
 
 /* ---------- weekly timesheet ---------- */
