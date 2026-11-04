@@ -57,7 +57,7 @@ import { CalendarView } from "./ui/views/CalendarView";
 import { FileView } from "./ui/views/FileView";
 import { SearchView } from "./ui/views/SearchView";
 import { SettingsView } from "./ui/views/SettingsView";
-import { carryWorkEnabled } from "./ui/carryWork";
+import { carryWorkEnabled, workCarriedStore } from "./ui/carryWork";
 import { TimesheetView } from "./ui/views/TimesheetView";
 
 /** Editors listen for this and save immediately, so other writers never race unsaved typing. */
@@ -71,6 +71,7 @@ export default function App() {
       const { fs, dir } = await openFs();
       const hold = new Hold(fs);
       hold.carryWorkProjects = carryWorkEnabled;
+      hold.workCarriedOn = workCarriedStore;
       // the capture window only reads; the main window seeds and writes
       await hold.init(!isCaptureWindow);
       setState({ hold, dir });
