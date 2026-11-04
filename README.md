@@ -13,7 +13,7 @@ whenever you like; Keel picks up the changes.
 ## Highlights
 
 - **A log for every day.** Tasks, the work you did per project, and a running log. Unfinished tasks
-  roll over to the next day on their own.
+  roll over to the next day on their own, and (if you turn it on) so do yesterday's projects and hours.
 - **Plain text you can type fast.** `- [ ] Update the ADR @due(2026-11-03) @portal-rebuild` is a task with a
   due date, filed under a project. Tokens show as chips while you're not editing the line.
 - **Hours without the busywork.** One line per project per day (`- 4h @portal-rebuild`) with what you
@@ -21,6 +21,8 @@ whenever you like; Keel picks up the changes.
 - **Client status reports.** Dispatch builds a weekly update from your logs, meetings and tasks.
 - **Quick capture.** Ctrl+Alt+K anywhere in Windows: log hours, add a task, set a reminder, hoist a flag.
 - **Work and personal modes.** A separate personal space with its own logs, plus shopping lists and recipes.
+- **Claude built in.** A chat sidebar that works in your Hold, and a Timesheet button that has Claude
+  fill your timecard or draft a status report.
 - **Light and dark themes**, tabs, a command list (Ctrl+Shift+P), full-text search, and file history
   you can restore from.
 
@@ -29,12 +31,19 @@ whenever you like; Keel picks up the changes.
 ### Today
 
 Each day's log has three sections: **Tasks**, **Work** and **Log**. Under **Work**, every project
-you touched gets one line with the day's total and an indented list of what you did. Press Enter at
-the end of a project line and the next line starts indented under it. The **Work** panel on the right
-does the same with a form, if you'd rather not touch the markdown.
+you touched gets one line with the day's total and an indented list of what you did. Type `@` anywhere
+to pick a project. Press Enter at the end of a project line and the next line starts indented under it.
+
+Unfinished tasks move to the new day by themselves. Turn on **Settings › Timesheet › Start each new
+day's log with the previous day's projects and hours** and Work starts with the last working day's
+lines too (`- 6h @portal-rebuild`, without what you did), ready to adjust. A day's log that already
+exists before its day (from browsing ahead, or a task captured for tomorrow) gets them the first time
+you open it on the day, as long as its Work section is still empty.
 
 The strip above the log sums up the day: hours, open and overdue tasks, the next reminder and who you're
-waiting on. Dark mode follows Windows or can be set by hand:
+waiting on. On the right, the morning **briefing** lists what's due, what carried over and who you've
+been waiting on for a while. Below it, **This week** shows hours per day and per project against your
+target, with a menu to add a project to today. Dark mode follows Windows or can be set by hand:
 
 ![Today's log in dark mode](docs/screenshots/today-dark.png)
 
@@ -49,7 +58,12 @@ Hold, next to today's reminders and the Flags you've hoisted.
 
 Your week as projects × days. Click a number to copy it, or copy a row or the whole grid. Below it,
 each project gets a day-by-day list of what you did, ready to paste into a time-tracking system's
-notes field. Ticked tasks that belong to a project count as that day's work too.
+notes field. Ticked tasks that belong to a project count as that day's work too. A bar above the grid
+says whether the week is ready to submit, or lists the days with missing or short hours.
+
+The **Claude** menu hands the week to Claude: **Fill timecard** opens your timecard site in a browser and
+enters the hours, then stops for you to review and submit. **Draft status report** writes the week's
+report from your logs for you to edit.
 
 ![The weekly timesheet: hours per project per day, with daily task reports below](docs/screenshots/timesheet.png)
 
@@ -118,8 +132,11 @@ its ingredients to your shopping list in one click.
 - **Scratchpad:** one plain-text page for jottings, with a button to move a line somewhere permanent.
 - **File history:** automatic local snapshots (kept in a git repository inside the Hold, nothing is pushed),
   with a diff view and one-click restore.
-- **Claude panel:** optionally runs [Claude Code](https://claude.com/claude-code) in a terminal docked
-  under the main view, working in your Hold folder (Ctrl+\`).
+- **Claude:** a chat sidebar (Ctrl+\`) that runs [Claude Code](https://claude.com/claude-code) in your
+  Hold folder. It asks before changing files, and links to the files it touches. Ctrl+Shift+\` opens it
+  in a terminal instead, for `/login`, `/mcp` and other terminal-only commands.
+- **Tabs:** Ctrl+click or middle-click opens a new tab. Drag to reorder, and right-click a tab to close
+  others or those to its right, duplicate it, or reopen a closed one (Ctrl+Shift+T).
 - **Tray icon:** closing the window keeps Keel running for reminders and quick capture.
 
 ## How the files look

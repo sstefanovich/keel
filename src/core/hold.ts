@@ -224,18 +224,42 @@ export class Hold {
   /** Whether a new work log starts with the projects from the last day's Work section (a setting, read when a log is created). */
   carryWorkProjects: () => boolean = () => false;
 
+  /**
+   * The last day whose log was given the carried-over work, so it happens once per day: clearing
+   * Work on purpose isn't undone by reopening. The app persists it; the default only lasts a session.
+   */
+  workCarriedOn: { get: () => string | null; set: (d: ISODate) => void } = (() => {
+    let d: string | null = null;
+    return { get: () => d, set: (v: ISODate) => void (d = v) };
+  })();
+
+  /** The last working day's projects and hours as Work lines ("- 6h @project"), or "" if there are none. */
+  private carriedWorkLines(date: ISODate): string {
+    return this.lastWorkProjects(date)
+      .map(([k, h]) => (h ? `- ${round2(h)}h @${k}` : `- @${k}`))
+      .join("\n");
+  }
+
   private async createLog(date: ISODate, today: ISODate, space: Space): Promise<string> {
     const path = this.logPath(date, space);
+    const carryWork = space === "work" && this.carryWorkProjects();
     if (!(await this.fs.exists(path))) {
       let content = fillTemplate(await this.template(space === "personal" ? "personal-log" : "log"), { date });
-      if (space === "work" && this.carryWorkProjects()) {
-        const work = this.lastWorkProjects(date);
-        if (work.length) {
-          const lines = work.map(([k, h]) => (h ? `- ${round2(h)}h @${k}` : `- @${k}`));
-          content = appendToSection(content, workHeading(content), lines.join("\n"));
-        }
+      // a day ahead (browsing forward, a task captured for tomorrow) gets its work on the day itself, below,
+      // so it starts from the real last working day rather than a half-finished one
+      if (carryWork && date <= today) {
+        const lines = this.carriedWorkLines(date);
+        if (lines) content = appendToSection(content, workHeading(content), lines);
+        if (date === today) this.workCarriedOn.set(date);
       }
       await this.save(path, content);
+    } else if (carryWork && date === today && (this.workCarriedOn.get() ?? "") < date) {
+      // made early, before its day: the first open on the day fills Work, if nothing's been put there yet
+      this.workCarriedOn.set(date);
+      if (!this.get(path)?.hours.length) {
+        const lines = this.carriedWorkLines(date);
+        if (lines) await this.appendTo(path, workHeading(await this.fs.read(path)), lines);
+      }
     }
     // Runs on every open of today's log, not just creation, so a log made early
     // (by browsing ahead) still receives the carry-over. Repeating it is harmless:

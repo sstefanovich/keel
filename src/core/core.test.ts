@@ -509,6 +509,35 @@ describe("Hold", () => {
     expect(hold.get(p)!.hours).toEqual([]);
   });
 
+  it("a log made before its day gets the work on the day, once", async () => {
+    const hold = await makeHold({
+      "logs/2026/2026-10-19.md": "---\ndate: 2026-10-19\n---\n## Tasks\n\n## Work\n- 2h @portal-rebuild\n\n## Log\n",
+    });
+    hold.carryWorkProjects = () => true;
+    // on the 19th, browsing ahead (or capturing a task for tomorrow) makes the 20th: no work yet
+    const path = await hold.ensureLog("2026-10-20", "2026-10-19");
+    expect(hold.get(path)!.hours).toEqual([]);
+    // the 19th's hours grow during the day
+    await hold.save("logs/2026/2026-10-19.md", "---\ndate: 2026-10-19\n---\n## Tasks\n\n## Work\n- 7h @portal-rebuild\n- 1h @acme/sso\n\n## Log\n");
+    // the next morning: the full day's projects and hours arrive
+    await hold.ensureLog("2026-10-20", "2026-10-20");
+    expect(await hold.fs.read(path)).toContain("## Work\n- 7h @portal-rebuild\n- 1h @acme/sso\n");
+    // cleared on purpose: reopening the same day doesn't bring them back
+    await hold.save(path, (await hold.fs.read(path)).replace("- 7h @portal-rebuild\n- 1h @acme/sso\n", ""));
+    await hold.ensureLog("2026-10-20", "2026-10-20");
+    expect(hold.get(path)!.hours).toEqual([]);
+  });
+
+  it("doesn't add carried work to an early log that already has work in it", async () => {
+    const hold = await makeHold({
+      "logs/2026/2026-10-19.md": "---\ndate: 2026-10-19\n---\n## Work\n- 7h @portal-rebuild\n",
+      "logs/2026/2026-10-20.md": "---\ndate: 2026-10-20\n---\n## Work\n- 1h @acme/sso\n",
+    });
+    hold.carryWorkProjects = () => true;
+    await hold.ensureLog("2026-10-20", "2026-10-20");
+    expect(hold.get("logs/2026/2026-10-20.md")!.hours.map((h) => h.client)).toEqual(["acme/sso"]);
+  });
+
   it("carries tasks into today's log even if it was created early by browsing ahead", async () => {
     const hold = await makeHold({
       "logs/2026/2026-10-20.md": "---\ndate: 2026-10-20\n---\n## Tasks\n- [ ] finish deck\n",

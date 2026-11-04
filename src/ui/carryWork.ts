@@ -37,3 +37,22 @@ export function useCarryWork(): boolean {
     () => current,
   );
 }
+
+/** The last day whose log was given the carried-over work (see Hold.workCarriedOn). Per machine. */
+const CARRIED_KEY = "keel.workCarriedOn";
+export const workCarriedStore = {
+  get(): string | null {
+    try {
+      return localStorage.getItem(CARRIED_KEY);
+    } catch {
+      return null;
+    }
+  },
+  set(d: string) {
+    try {
+      localStorage.setItem(CARRIED_KEY, d);
+    } catch {
+      // then it may carry once more after a restart, into a Work section that's still empty
+    }
+  },
+};
