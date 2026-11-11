@@ -240,7 +240,7 @@ export function CalendarView({ date, mode: initialMode }: { date?: string; mode?
           ) : dayEvents.length ? (
             <ul className="events">
               {dayEvents.map((e) => (
-                <EventRow key={e.id} event={e} now={now} />
+                <EventRow key={e.id} event={e} now={now} addToWork={work} />
               ))}
             </ul>
           ) : (
