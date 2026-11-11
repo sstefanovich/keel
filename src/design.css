@@ -1556,6 +1556,27 @@ button.icon-text {
   display: flex;
   gap: 6px;
 }
+/* the day panel is narrow: the buttons get their own row under the title */
+.cal-day-panel .event-actions {
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.event-work {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.event-in-work {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.event-work-pick {
+  flex: 1 1 100%;
+  min-width: 0;
+  font-size: 13px;
+}
 
 .cal-settings {
   list-style: none;

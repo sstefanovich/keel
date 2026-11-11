@@ -2,12 +2,12 @@ import { CalendarClock, X } from "lucide-react";
 import { useState } from "react";
 import { addDays, parseISO, today } from "../core/dates";
 import { round2 } from "../core/hold";
-import { groupMeetings, meetingKey, workMeetings } from "../core/meetingHours";
+import { groupMeetings, workMeetings } from "../core/meetingHours";
 import { ParsedFile } from "../core/parse";
 import { CalItem, eventTime, useCalendarEvents } from "./calendars";
 import { useHold } from "./HoldContext";
+import { learnProject, learnedProjects, meetingOwner, ownerName } from "./workProjects";
 
-const LEARNED_KEY = "keel.meetingProjects";
 const DISMISSED_KEY = "keel.meetingsDismissed";
 
 function readJson<T>(key: string, fallback: T): T {
@@ -34,34 +34,22 @@ export function MeetingHours({ file, options, run }: { file: ParsedFile; options
   const { hold } = useHold();
   const date = file.date!;
   const events = useCalendarEvents(parseISO(date).getTime(), parseISO(addDays(date, 1)).getTime());
-  const [learned, setLearned] = useState<Record<string, string>>(() => readJson(LEARNED_KEY, {}));
+  const [learned, setLearned] = useState<Record<string, string>>(learnedProjects);
   const [dismissed, setDismissed] = useState<string[]>(() => readJson(DISMISSED_KEY, []));
 
   if (date > today()) return null;
   const meetings = workMeetings(events, Date.now());
-  const ownerOf = (title: string) => {
-    const known = learned[meetingKey(title)];
-    if (known) return known;
-    const g = hold.guessOwner(title);
-    return g.project ?? g.client;
-  };
+  const ownerOf = (title: string) => meetingOwner(hold, title, learned);
   const { groups, unassigned } = groupMeetings<CalItem>(meetings, ownerOf, file.hours, new Set(dismissed));
   if (!groups.length && !unassigned.length) return null;
 
-  const name = (key: string) => {
-    const r = hold.resolveHours(key);
-    return r.project && hold.projectByKey(r.project) ? hold.projectName(r.project) : (hold.clients().get(r.client)?.name ?? `@${key}`);
-  };
+  const name = (key: string) => ownerName(hold, key);
   const dismiss = (ids: string[]) => {
     const next = [...dismissed, ...ids].slice(-500);
     setDismissed(next);
     writeJson(DISMISSED_KEY, next);
   };
-  const learn = (title: string, key: string) => {
-    const next = { ...learned, [meetingKey(title)]: key };
-    setLearned(next);
-    writeJson(LEARNED_KEY, next);
-  };
+  const learn = (title: string, key: string) => setLearned(learnProject(title, key));
   const current = (key: string) => file.hours.find((b) => b.client === key);
 
   return (

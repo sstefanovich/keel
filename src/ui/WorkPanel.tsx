@@ -1,8 +1,7 @@
 import { CalendarRange } from "lucide-react";
 import { ISODate, formatShort, parseISO, startOfWeek, today, weekdayOf } from "../core/dates";
 import { round2 } from "../core/hold";
-import { ParsedFile, basename } from "../core/parse";
-import { slugify } from "../core/templates";
+import { ParsedFile } from "../core/parse";
 import { buildWeek } from "../core/week";
 import { useDayTarget } from "./dayTarget";
 import { useHold } from "./HoldContext";
@@ -10,6 +9,7 @@ import { flushEditors } from "./editor/Editor";
 import { MeetingHours } from "./MeetingHours";
 import { openOpts, useNav } from "./nav";
 import { useWeekStart } from "./weekStart";
+import { workOptions } from "./workProjects";
 
 const TOP_PROJECTS = 5;
 
@@ -49,16 +49,8 @@ export function WorkPanel({ file }: { file: ParsedFile }) {
   const rest = projects.slice(TOP_PROJECTS).reduce((s, r) => s + r.total, 0);
 
   const used = new Set(file.hours.map((b) => b.client));
-  const clients = [...hold.clients().values()].sort((a, b) => a.name.localeCompare(b.name));
-  const allOptions = clients
-    .filter((c) => !focus || c.key === focus)
-    .flatMap((c) => [
-      ...hold
-        .projectsOf(c.key)
-        .filter((p) => p.frontmatter.status !== "done")
-        .map((p) => ({ key: slugify(basename(p.path)), text: `${p.title} · ${c.name}` })),
-      { key: c.key, text: `${c.name} (general)` },
-    ]);
+  const hasClients = hold.clients().size > 0;
+  const allOptions = workOptions(hold, focus);
   const options = allOptions.filter((o) => !used.has(o.key));
 
   return (
@@ -119,7 +111,7 @@ export function WorkPanel({ file }: { file: ParsedFile }) {
       ) : (
         <p className="muted small wk-empty">
           <CalendarRange size={14} aria-hidden="true" />
-          {clients.length
+          {hasClients
             ? "No hours yet this week. Under Work in the log, type @ to pick a project, then add the hours: - 6h @project"
             : "Set up clients and projects in Settings, then log hours under Work: - 6h @project"}
         </p>
