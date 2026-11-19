@@ -20,7 +20,7 @@ whenever you like; Keel picks up the changes.
   did underneath. The Timesheet turns that into a week grid you can copy into your time system.
 - **Client status reports.** Dispatch builds a weekly update from your logs, meetings and tasks.
 - **Quick capture.** Ctrl+Alt+K anywhere in Windows: log hours, add a task, set a reminder, hoist a flag.
-- **Work and personal modes.** A separate personal space with its own logs, plus shopping lists and recipes.
+- **Work and personal modes.** A separate personal space with its own logs, reminders and scratchpad, plus shopping lists and recipes.
 - **Claude built in.** A chat sidebar that works in your Hold, and a Timesheet button that has Claude
   fill your timecard or draft a status report.
 - **Light and dark themes**, tabs, a command list (Ctrl+Shift+P), full-text search, and file history
@@ -139,7 +139,8 @@ for rating and cooking time; recipes and lists are also in the main Search.
   with a diff view and one-click restore.
 - **Claude:** a chat sidebar (Ctrl+\`) that runs [Claude Code](https://claude.com/claude-code) in your
   Hold folder. It asks before changing files, and links to the files it touches. Ctrl+Shift+\` opens it
-  in a terminal instead, for `/login`, `/mcp` and other terminal-only commands.
+  in a terminal instead, for `/login`, `/mcp` and other terminal-only commands. No Claude Code? Keel hides
+  its Claude features when it isn't installed, or turn them off in Settings → Claude.
 - **Tabs:** Ctrl+click or middle-click opens a new tab. Drag to reorder, and right-click a tab to close
   others or those to its right, duplicate it, or reopen a closed one (Ctrl+Shift+T).
 - **Tray icon:** closing the window keeps Keel running for reminders and quick capture.
@@ -192,8 +193,8 @@ projects/Portal Rebuild.md     a project: frontmatter client: contoso, status; b
 flags/….md                     Flags (sticky notes): frontmatter color, created, lowered
 reminders.md                   recurring reminders
 templates/{log,meeting,note,client}.md   how new files start; edit them freely
-personal/…                     the personal space: logs, flags, lists/, recipes/, reminders.md
-scratchpad.txt                 the Scratchpad
+personal/…                     the personal space: logs, flags, lists/, recipes/, reminders.md, scratchpad.txt
+scratchpad.txt                 the (work) Scratchpad
 ```
 
 A new Hold includes a **Welcome to Keel** note with the full guide, and a `CLAUDE.md` that explains the

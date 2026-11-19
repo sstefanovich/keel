@@ -28,6 +28,7 @@ import { today } from "../core/dates";
 import { ParsedFile, Space, basename, spaceOf } from "../core/parse";
 import { setSpace, useSpace } from "./space";
 import { ClaudeIcon } from "./ClaudePanel";
+import { useClaude } from "./claudeSetting";
 import { ArchiveSection, ChartsSection, LogsSection, MeetingsSection, NotesSection, PinnedSection, RecentSection } from "./SidebarSections";
 import { useHold } from "./HoldContext";
 import { OpenOpts, View, openOpts, useNav } from "./nav";
@@ -114,6 +115,7 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
   // a client focus only means something at work
   const focus = personal ? undefined : workFocus;
   const collapsed = nav.sidebarCollapsed;
+  const claude = useClaude().enabled;
   const v: View = nav.view;
   const current = v.kind === "file" ? v.path : undefined;
   const files = hold.all().filter((f) => spaceOf(f.path) === space);
@@ -309,15 +311,17 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
       <div className="side-foot">
         {item(Settings, "Settings", v.kind === "settings", (o) => nav.go({ kind: "settings" }, o))}
         <div className="side-foot-tools">
-          <button
-            className={`side-icon-btn claude-btn${nav.claudeOpen ? " on" : ""}`}
-            onClick={nav.toggleClaude}
-            title={`${nav.claudeOpen ? "Hide" : "Ask"} Claude (Ctrl+\`)`}
-            aria-label={nav.claudeOpen ? "Hide Claude" : "Open Claude"}
-            aria-pressed={nav.claudeOpen}
-          >
-            <ClaudeIcon size={17} />
-          </button>
+          {claude && (
+            <button
+              className={`side-icon-btn claude-btn${nav.claudeOpen ? " on" : ""}`}
+              onClick={nav.toggleClaude}
+              title={`${nav.claudeOpen ? "Hide" : "Ask"} Claude (Ctrl+\`)`}
+              aria-label={nav.claudeOpen ? "Hide Claude" : "Open Claude"}
+              aria-pressed={nav.claudeOpen}
+            >
+              <ClaudeIcon size={17} />
+            </button>
+          )}
           <ThemeToggle />
           {collapsed && (
             <button className="side-icon-btn" onClick={nav.toggleSidebar} title="Expand sidebar (Ctrl+B)" aria-label="Expand sidebar">

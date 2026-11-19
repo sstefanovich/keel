@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getAutostart, isTauri, loadSettings, notifyReminder, pickFolder, saveSettings, setAutostart } from "../../lib/platform";
+import { getAutostart, isTauri, loadSettings, notifyReminder, openUrl, pickFolder, saveSettings, setAutostart } from "../../lib/platform";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 import { useTheme } from "../theme";
@@ -12,6 +12,7 @@ import { setCarryWork, useCarryWork } from "../carryWork";
 import { setHistoryEnabled, snapshotNow, useHistory } from "../history";
 import { livePreviewEnabled, setLivePreview } from "../editor/livePreview";
 import { setEditorWidth, useEditorWidth } from "../editorWidth";
+import { ClaudePref, checkClaude, setClaudePref, useClaude } from "../claudeSetting";
 
 const SECTIONS = [
   ["hold", "Hold"],
@@ -21,8 +22,15 @@ const SECTIONS = [
   ["timesheet", "Timesheet"],
   ["appearance", "Appearance"],
   ["startup", "Startup & reminders"],
+  ["claude", "Claude"],
   ["shortcuts", "Shortcuts"],
 ] as const;
+
+const CLAUDE_PREFS: [ClaudePref, string][] = [
+  ["auto", "Automatic"],
+  ["on", "On"],
+  ["off", "Off"],
+];
 
 export function SettingsView({ section }: { section?: string }) {
   const { dir, reportError, toast } = useHold();
@@ -35,6 +43,7 @@ export function SettingsView({ section }: { section?: string }) {
   const history = useHistory();
   const [preview, setPreview] = useState(livePreviewEnabled);
   const width = useEditorWidth();
+  const claude = useClaude();
 
   useEffect(() => {
     getAutostart().then(setAuto).catch(() => {});
@@ -213,6 +222,43 @@ export function SettingsView({ section }: { section?: string }) {
         <button onClick={() => notifyReminder("keel-test", "Test reminder", "Keel notifications are working")}>Send a test notification</button>
       </section>
 
+      <section className="panel" id="settings-claude">
+        <h2>Claude</h2>
+        <p className="muted">
+          Keel can work with{" "}
+          <button className="link" onClick={() => void openUrl("https://claude.com/claude-code").catch(reportError)}>
+            Claude Code
+          </button>{" "}
+          in your Keel folder: the chat beside your notes, <code>? question</code> in
+          quick capture, the Timesheet's timecard and status-report helpers, and recipe substitutions. Without it, turn these off and they're hidden.
+        </p>
+        <div className="setting-row">
+          <div className="seg" role="radiogroup" aria-label="Claude features">
+            {CLAUDE_PREFS.map(([p, label]) => (
+              <button key={p} role="radio" aria-checked={claude.pref === p} className={claude.pref === p ? "on" : ""} onClick={() => setClaudePref(p)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="muted small">
+            {claude.pref === "auto"
+              ? claude.installed === null
+                ? "Looking for Claude Code…"
+                : claude.installed
+                  ? "Shown: Claude Code is installed on this computer"
+                  : "Hidden: Claude Code isn't installed on this computer"
+              : claude.pref === "on"
+                ? `Shown${claude.installed === false ? ", though Claude Code wasn't found on this computer" : ""}`
+                : "Hidden everywhere in Keel"}
+          </span>
+          {claude.installed === false && (
+            <button className="link small" onClick={() => void checkClaude().then((ok) => toast(ok ? "Found Claude Code" : "Still not found"))}>
+              Check again
+            </button>
+          )}
+        </div>
+      </section>
+
       <section className="panel" id="settings-shortcuts">
         <h2>Shortcuts</h2>
         <table className="table keys">
@@ -220,8 +266,12 @@ export function SettingsView({ section }: { section?: string }) {
             {[
               ["Ctrl+Alt+K", "Quick capture, from anywhere in Windows"],
               ["Ctrl+K", "Quick capture (inside Keel)"],
-              ["Ctrl+`", "Show / hide the Claude chat"],
-              ["Ctrl+Shift+`", "Claude in a terminal, for /login, /mcp and other terminal-only commands"],
+              ...(claude.enabled
+                ? [
+                    ["Ctrl+`", "Show / hide the Claude chat"],
+                    ["Ctrl+Shift+`", "Claude in a terminal, for /login, /mcp and other terminal-only commands"],
+                  ]
+                : []),
               ["Ctrl+P", "Go to any note, log, project, client or view"],
               ["Ctrl+Shift+P", "Commands: log hours, copy the week, theme, focus… (or type > in Ctrl+P)"],
               ["Ctrl+B", "Collapse / expand the sidebar"],

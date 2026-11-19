@@ -10,6 +10,7 @@ import { useDayTarget } from "../dayTarget";
 import { ChevronDown, CircleCheck, Clock, Copy, Sparkles, TriangleAlert } from "lucide-react";
 import { useContextMenu } from "../ContextMenu";
 import { handToClaude } from "../claudeTasks";
+import { useClaude } from "../claudeSetting";
 import { EmptyState } from "../EmptyState";
 
 type Preset = "this-week" | "last-week" | "this-month" | "last-month" | "this-year" | "custom";
@@ -299,6 +300,7 @@ function WeekCheckBar({ check, days, total, onOpen }: { check: WeekCheck; days: 
 /** Projects × days grid for entering into a timesheet system, plus per-project daily reports. */
 function WeekSheet({ toggle }: { toggle: ReactNode }) {
   const { hold, toast, focus, reportError } = useHold();
+  const claude = useClaude().enabled;
   const nav = useNav();
   const openMenu = useContextMenu();
   const weekStart = useWeekStart();
@@ -359,6 +361,7 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
           <button className="icon-text" onClick={() => copy(weekTsv(week), "the week grid")} disabled={!week.rows.length} title="Tab-separated, pastes into Excel or a form grid">
             <Copy size={14} aria-hidden="true" /> Copy grid
           </button>
+          {claude && (
           <button
             className="icon-text"
             disabled={!week.rows.length}
@@ -384,6 +387,7 @@ function WeekSheet({ toggle }: { toggle: ReactNode }) {
           >
             <Sparkles size={14} aria-hidden="true" /> Claude <ChevronDown size={13} aria-hidden="true" />
           </button>
+          )}
         </div>
       </header>
       {week.rows.length > 0 && (
