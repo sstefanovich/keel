@@ -19,7 +19,7 @@ import {
 import { DragEvent, MouseEvent, ReactNode, useEffect, useState } from "react";
 import { formatDate, parseISO, today } from "../core/dates";
 import { Hold } from "../core/hold";
-import { ParsedFile, basename } from "../core/parse";
+import { ParsedFile, Space, basename, spaceOf } from "../core/parse";
 import { confirmDialog } from "../lib/platform";
 import { MenuEntry, SEP, useContextMenu } from "./ContextMenu";
 import { useHold } from "./HoldContext";
@@ -278,9 +278,13 @@ export function fileMenu(
 
 // ---------- sections ----------
 
-export function PinnedSection({ current }: { current?: string }) {
+/** Pinned files of the space being shown (work pins stay out of personal mode and back). */
+export function PinnedSection({ current, space }: { current?: string; space: Space }) {
   const { hold } = useHold();
-  const pinned = hold.pins.map((p) => hold.get(p)).filter((f): f is ParsedFile => !!f);
+  const pinned = hold.pins
+    .filter((p) => spaceOf(p) === space)
+    .map((p) => hold.get(p))
+    .filter((f): f is ParsedFile => !!f);
   if (!pinned.length) return null;
   return (
     <Section id="pinned" title="Pinned" count={pinned.length}>
@@ -291,10 +295,11 @@ export function PinnedSection({ current }: { current?: string }) {
   );
 }
 
-export function RecentSection({ current }: { current?: string }) {
+/** Recently opened files of the space being shown only (a work log and a personal log of the same day look alike). */
+export function RecentSection({ current, space }: { current?: string; space: Space }) {
   const { hold } = useHold();
   const recent = useRecent()
-    .filter((p) => !hold.isPinned(p))
+    .filter((p) => spaceOf(p) === space && !hold.isPinned(p))
     .map((p) => hold.get(p))
     .filter((f): f is ParsedFile => !!f && f.kind !== "template")
     .slice(0, 6);

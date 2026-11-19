@@ -187,6 +187,23 @@ export class Hold {
 
   // ---------- paths & creation ----------
 
+  /** Where a space's new notes go. */
+  notesFolder(space: Space = "work"): string {
+    return space === "personal" ? `${PERSONAL}notes` : "notes";
+  }
+
+  /** Each space keeps its recurring reminders in its own file. */
+  remindersPath(space: Space = "work"): string {
+    return space === "personal" ? `${PERSONAL}reminders.md` : "reminders.md";
+  }
+
+  /** The space's reminders file, created from the default the first time it's opened. */
+  async ensureReminders(space: Space = "work"): Promise<string> {
+    const path = this.remindersPath(space);
+    if (!(await this.fs.exists(path))) await this.save(path, DEFAULT_REMINDERS.replace("- Plan tomorrow @remind(weekdays 17:00)\n", ""));
+    return path;
+  }
+
   logPath(date: ISODate, space: Space = "work"): string {
     return `${space === "personal" ? PERSONAL : ""}logs/${date.slice(0, 4)}/${date}.md`;
   }
@@ -713,9 +730,12 @@ export class Hold {
     await this.save(path, content);
   }
 
-  /** Add a line to the end of a note, found by name or title like a [[link]]; creates the note if needed. */
-  async appendToNote(name: string, line: string): Promise<string> {
-    const path = this.resolveLink(name) ?? (await this.createNote(name));
+  /**
+   * Add a line to the end of a note, found by name or title like a [[link]] (the space's own notes
+   * first); creates the note in that space if needed.
+   */
+  async appendToNote(name: string, line: string, space: Space = "work"): Promise<string> {
+    const path = this.resolveLink(name, space) ?? (await this.createNote(name, this.notesFolder(space)));
     const content = await this.fs.read(path);
     const eol = content.includes("\r\n") ? "\r\n" : "\n";
     await this.save(path, `${content.replace(/\s+$/, "")}${eol}${line}${eol}`);
@@ -971,9 +991,11 @@ export class Hold {
   // ---------- links ----------
 
   /** Resolve a [[link]] target to a file path (by basename or title, case-insensitive). */
-  resolveLink(target: string): string | undefined {
+  /** The file a [[link]] or note name means; with `prefer`, that space's files win a tie of names. */
+  resolveLink(target: string, prefer?: Space): string | undefined {
     const t = target.trim().toLowerCase().replace(/\.md$/, "");
-    const files = this.all().filter((f) => f.kind !== "template");
+    const all = this.all().filter((f) => f.kind !== "template");
+    const files = prefer ? [...all.filter((f) => spaceOf(f.path) === prefer), ...all.filter((f) => spaceOf(f.path) !== prefer)] : all;
     return (
       files.find((f) => f.path.toLowerCase().replace(/\.md$/, "") === t)?.path ??
       files.find((f) => basename(f.path).toLowerCase() === t)?.path ??

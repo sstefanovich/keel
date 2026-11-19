@@ -41,6 +41,7 @@ import { setThemePref } from "./theme";
 import { VIEW_ICONS, VIEW_TITLES } from "./viewMeta";
 import { SHOW_BRIEFING_EVENT } from "./Briefing";
 import { getSpace, setSpace } from "./space";
+import { claudeEnabled } from "./claudeSetting";
 
 /** Asks the open file view to show its History panel. */
 export const OPEN_HISTORY_EVENT = "keel-open-history";
@@ -150,5 +151,8 @@ export function buildCommands({ hold, nav, view, focus, setFocus, weekStart, day
     cmds.push({ id: `focus-${c.key}`, title: `Focus on ${c.name}`, sub: "Focus", Icon: Crosshair, run: () => setFocus(c.key) });
   }
   if (focus) cmds.push({ id: "focus-clear", title: "Clear the focus (all clients)", sub: "Focus", Icon: Crosshair, run: () => setFocus(undefined) });
-  return cmds;
+  // Claude turned off (or not installed): none of its commands
+  return claudeEnabled() ? cmds : cmds.filter((c) => !CLAUDE_COMMANDS.has(c.id));
 }
+
+const CLAUDE_COMMANDS = new Set(["ask", "timecard", "timecard-last", "status-report", "status-report-last", "claude", "claude-terminal"]);

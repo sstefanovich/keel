@@ -1,6 +1,13 @@
-/** The scratchpad: one plain-text page in the hold for transient jottings. */
+/** The scratchpad: a plain-text page in the hold for transient jottings, one per space. */
+import { PERSONAL, Space } from "./parse";
 
+/** The work scratchpad (the original, so existing jottings stay at work). */
 export const SCRATCH_PATH = "scratchpad.txt";
+
+/** Each space jots on its own page: personal/scratchpad.txt in personal mode. */
+export function scratchPath(space: Space = "work"): string {
+  return space === "personal" ? `${PERSONAL}${SCRATCH_PATH}` : SCRATCH_PATH;
+}
 
 /** The page with `text` added as a new line at the end. */
 export function appendLine(page: string, text: string): string {

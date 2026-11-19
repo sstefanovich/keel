@@ -5,6 +5,7 @@ import { MemoryFs } from "./fs";
 import { Hold } from "./hold";
 import { groupMeetings, quarterHours, workMeetings } from "./meetingHours";
 import { HoursEntry, parseFile } from "./parse";
+import { scratchPath } from "./scratch";
 import { DEFAULT_TEMPLATES, OLD_TEMPLATES } from "./templates";
 import { buildWeek, checkWeek } from "./week";
 
@@ -374,6 +375,36 @@ describe("work and personal spaces", () => {
     await hold.addRecipeNote(path, "   ");
     expect(hold.get(path)!.content).toMatch(/## Notes\n- 2026-11-26: made for Thanksgiving\n- 2026-11-27: less clove\n$/);
     expect(hold.recipeIngredients(hold.get(path)!)).toEqual(["flour"]);
+  });
+});
+
+describe("notes and scratchpads per space", () => {
+  it("each space has its own scratchpad file", () => {
+    expect(scratchPath("work")).toBe("scratchpad.txt");
+    expect(scratchPath("personal")).toBe("personal/scratchpad.txt");
+  });
+
+  it("> Note: appends to the space's own note, and makes new ones there", async () => {
+    const hold = await makeHold({ "notes/Ideas.md": "# Ideas\n", "personal/notes/Ideas.md": "# Ideas\n" });
+    expect(await hold.appendToNote("Ideas", "- garden", "personal")).toBe("personal/notes/Ideas.md");
+    expect(await hold.appendToNote("Ideas", "- roadmap", "work")).toBe("notes/Ideas.md");
+    expect(await hold.appendToNote("Gift ideas", "- book", "personal")).toBe("personal/notes/Gift ideas.md");
+    expect(hold.get("personal/notes/Gift ideas.md")!.kind).toBe("note");
+    expect(hold.get("notes/Ideas.md")!.content).not.toContain("garden");
+  });
+});
+
+describe("reminders per space", () => {
+  it("personal reminders get their own file, made on first use", async () => {
+    const hold = await makeHold();
+    expect(await hold.ensureReminders("work")).toBe("reminders.md");
+    const path = await hold.ensureReminders("personal");
+    expect(path).toBe("personal/reminders.md");
+    expect(hold.get(path)!.kind).toBe("reminders");
+    expect(hold.get(path)!.reminders).toEqual([]);
+    await hold.save(path, hold.get(path)!.content + "- Bins out @remind(tue 19:00)\n");
+    await hold.ensureReminders("personal"); // leaves it alone
+    expect(hold.get(path)!.reminders.length).toBe(1);
   });
 });
 

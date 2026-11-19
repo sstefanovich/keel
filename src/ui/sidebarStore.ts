@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { spaceOf } from "../core/parse";
 
 /**
  * Per-machine sidebar state kept in localStorage: which sections/folders are open,
@@ -59,13 +60,26 @@ export function setOpen(key: string, open: boolean) {
 
 // ---------- recently opened files ----------
 
+/** Both spaces share one list but each shows only its own, so it keeps up to this many per space. */
 const RECENT_MAX = 8;
 const recentStore = createStore<string[]>("keel.recent", [], isStrings);
 
 export function pushRecent(path: string) {
   const list = recentStore.get();
   if (list[0] === path) return;
-  recentStore.set([path, ...list.filter((p) => p !== path)].slice(0, RECENT_MAX));
+  const space = spaceOf(path);
+  const fresh = [path, ...list.filter((p) => p !== path)];
+  // up to RECENT_MAX per space
+  const kept: string[] = [];
+  const counts = { work: 0, personal: 0 };
+  for (const p of fresh) {
+    const s = p === path ? space : spaceOf(p);
+    if (counts[s] < RECENT_MAX) {
+      counts[s]++;
+      kept.push(p);
+    }
+  }
+  recentStore.set(kept);
 }
 
 export function renameRecent(from: string, to: string) {

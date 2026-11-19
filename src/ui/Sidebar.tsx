@@ -28,6 +28,7 @@ import { today } from "../core/dates";
 import { ParsedFile, Space, basename, spaceOf } from "../core/parse";
 import { setSpace, useSpace } from "./space";
 import { ClaudeIcon } from "./ClaudePanel";
+import { useClaude } from "./claudeSetting";
 import { ArchiveSection, ChartsSection, LogsSection, MeetingsSection, NotesSection, PinnedSection, RecentSection } from "./SidebarSections";
 import { useHold } from "./HoldContext";
 import { OpenOpts, View, openOpts, useNav } from "./nav";
@@ -107,18 +108,20 @@ export function KeelLogo({ size = 22 }: { size?: number }) {
 const byDateDesc = (a: ParsedFile, b: ParsedFile) => (b.date ?? "").localeCompare(a.date ?? "") || b.mtime - a.mtime;
 
 export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
-  const { hold, focus: workFocus, setFocus } = useHold();
+  const { hold, focus: workFocus, setFocus, reportError } = useHold();
   const nav = useNav();
   const space = useSpace();
   const personal = space === "personal";
   // a client focus only means something at work
   const focus = personal ? undefined : workFocus;
   const collapsed = nav.sidebarCollapsed;
+  const claude = useClaude().enabled;
   const v: View = nav.view;
   const current = v.kind === "file" ? v.path : undefined;
   const files = hold.all().filter((f) => spaceOf(f.path) === space);
   const t = today();
   const todayPath = hold.logPath(t, space);
+  const remindersPath = hold.remindersPath(space);
 
   const mine = (f: ParsedFile) => !focus || hold.fileClient(f) === focus;
   const logs = files.filter((f) => f.kind === "log").sort(byDateDesc);
@@ -237,23 +240,46 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
         </button>
       )}
 
-      <button className="capture-btn" onClick={nav.capture} title="Quick capture (Ctrl+K, or Ctrl+Alt+K anywhere)" aria-label="Quick capture">
-        <Zap size={16} className="nav-icon" aria-hidden="true" />
-        {!collapsed && (
-          <>
-            <span>Capture…</span>
-            <kbd>Ctrl K</kbd>
-          </>
-        )}
-      </button>
+      {/* the two ways in: find something, or jot something down */}
+      <div className="side-actions">
+        <button
+          className={`search-btn${v.kind === "search" ? " on" : ""}`}
+          onClick={(e) => nav.go({ kind: "search" }, openOpts(e))}
+          title={`Search ${personal ? "personal" : "work"} (Ctrl+Shift+F)`}
+          aria-label="Search"
+        >
+          <Search size={16} className="nav-icon" aria-hidden="true" />
+          {!collapsed && (
+            <>
+              <span>Search…</span>
+              <kbd>Ctrl ⇧ F</kbd>
+            </>
+          )}
+        </button>
+        <button className="capture-btn" onClick={nav.capture} title="Quick capture (Ctrl+K, or Ctrl+Alt+K anywhere)" aria-label="Quick capture">
+          <Zap size={16} className="nav-icon" aria-hidden="true" />
+          {!collapsed && (
+            <>
+              <span>Capture…</span>
+              <kbd>Ctrl K</kbd>
+            </>
+          )}
+        </button>
+      </div>
 
       <nav className="nav">
+        {/* your day: what's on, when */}
         {item(Sun, "Today", current === todayPath, (o) => nav.openToday(o), { hint: "Ctrl+T" })}
-        {item(NotepadText, "Scratchpad", v.kind === "scratch", (o) => nav.go({ kind: "scratch" }, o), { hint: "Ctrl+Shift+S" })}
         {item(ListChecks, "Agenda", v.kind === "agenda", (o) => nav.go({ kind: "agenda" }, o), { badge: agenda.overdue.length + agenda.today.length, alert: agenda.overdue.length > 0, hint: "Ctrl+J" })}
+        {item(CalendarDays, "Calendar", v.kind === "calendar", (o) => nav.go({ kind: "calendar" }, o))}
+        {item(Bell, "Reminders", current === remindersPath, (o) => void hold.ensureReminders(space).then((p) => nav.openFile(p, undefined, o), reportError))}
+        <div className="nav-sep" />
+        {/* things in flight */}
         {item(Flag, "Flags", v.kind === "flags", (o) => nav.go({ kind: "flags" }, o), { badge: flagCount })}
         {item(Hourglass, "Waiting on", v.kind === "waiting", (o) => nav.go({ kind: "waiting" }, o), { badge: waitingCount })}
+        {item(NotepadText, "Scratchpad", v.kind === "scratch", (o) => nav.go({ kind: "scratch" }, o), { hint: "Ctrl+Shift+S" })}
         <div className="nav-sep" />
+        {/* this space's own tools */}
         {personal ? (
           <>
             {item(ShoppingCart, "Lists", v.kind === "lists", (o) => nav.go({ kind: "lists" }, o), { badge: listCount })}
@@ -261,21 +287,17 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
           </>
         ) : (
           <>
+            {item(Compass, "Charts", v.kind === "charts", (o) => nav.go({ kind: "charts" }, o))}
             {item(Clock, "Timesheet", v.kind === "timesheet", (o) => nav.go({ kind: "timesheet" }, o))}
             {item(Send, "Dispatch", v.kind === "dispatch", (o) => nav.go({ kind: "dispatch" }, o))}
-            {item(Compass, "Charts", v.kind === "charts", (o) => nav.go({ kind: "charts" }, o))}
           </>
         )}
-        <div className="nav-sep" />
-        {item(CalendarDays, "Calendar", v.kind === "calendar", (o) => nav.go({ kind: "calendar" }, o))}
-        {item(Search, "Search", v.kind === "search", (o) => nav.go({ kind: "search" }, o), { hint: "Ctrl+Shift+F" })}
-        {item(Bell, "Reminders", current === "reminders.md", (o) => nav.openFile("reminders.md", undefined, o))}
       </nav>
 
       {!collapsed ? (
         <div className="side-scroll">
-          <PinnedSection current={current} />
-          <RecentSection current={current} />
+          <PinnedSection current={current} space={space} />
+          <RecentSection current={current} space={space} />
           {!personal && <MeetingsSection meetings={meetings} current={current} />}
           <NotesSection notes={notes} current={current} />
           <LogsSection logs={logs} current={current} />
@@ -289,15 +311,17 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
       <div className="side-foot">
         {item(Settings, "Settings", v.kind === "settings", (o) => nav.go({ kind: "settings" }, o))}
         <div className="side-foot-tools">
-          <button
-            className={`side-icon-btn claude-btn${nav.claudeOpen ? " on" : ""}`}
-            onClick={nav.toggleClaude}
-            title={`${nav.claudeOpen ? "Hide" : "Ask"} Claude (Ctrl+\`)`}
-            aria-label={nav.claudeOpen ? "Hide Claude" : "Open Claude"}
-            aria-pressed={nav.claudeOpen}
-          >
-            <ClaudeIcon size={17} />
-          </button>
+          {claude && (
+            <button
+              className={`side-icon-btn claude-btn${nav.claudeOpen ? " on" : ""}`}
+              onClick={nav.toggleClaude}
+              title={`${nav.claudeOpen ? "Hide" : "Ask"} Claude (Ctrl+\`)`}
+              aria-label={nav.claudeOpen ? "Hide Claude" : "Open Claude"}
+              aria-pressed={nav.claudeOpen}
+            >
+              <ClaudeIcon size={17} />
+            </button>
+          )}
           <ThemeToggle />
           {collapsed && (
             <button className="side-icon-btn" onClick={nav.toggleSidebar} title="Expand sidebar (Ctrl+B)" aria-label="Expand sidebar">

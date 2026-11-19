@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { formatAmount, scaleIngredient, servingsCount } from "../../core/scale";
 import { openUrl } from "../../lib/platform";
 import { ChatMarkdown } from "../ChatMarkdown";
+import { useClaude } from "../claudeSetting";
 import { flushEditors } from "../editor/Editor";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
@@ -27,6 +28,7 @@ const QUICK = [0.5, 1, 2, 3];
  */
 export function RecipeView({ path, onRate, factor, onFactor }: { path: string; onRate: (stars: number) => void; factor: number; onFactor: (f: number) => void }) {
   const { hold, bump, reportError, toast } = useHold();
+  const claude = useClaude().enabled;
   const nav = useNav();
   const file = hold.get(path);
   const [got, setGot] = useState<Set<string>>(new Set());
@@ -189,9 +191,11 @@ export function RecipeView({ path, onRate, factor, onFactor }: { path: string; o
                         </span>
                         <span>{text}</span>
                       </button>
-                      <button className="recipe-swap ghost icon-btn small" onClick={() => ask(text)} title={`Ask Claude what to use instead of ${text}`} aria-label={`Ask Claude for a substitute for ${text}`}>
-                        <ArrowLeftRight size={13} />
-                      </button>
+                      {claude && (
+                        <button className="recipe-swap ghost icon-btn small" onClick={() => ask(text)} title={`Ask Claude what to use instead of ${text}`} aria-label={`Ask Claude for a substitute for ${text}`}>
+                          <ArrowLeftRight size={13} />
+                        </button>
+                      )}
                     </li>
                   );
                 })}
@@ -199,18 +203,20 @@ export function RecipeView({ path, onRate, factor, onFactor }: { path: string; o
             </div>
           ))}
 
-          <form
-            className="recipe-ask"
-            onSubmit={(e) => {
-              e.preventDefault();
-              ask();
-            }}
-          >
-            <input value={need} onChange={(e) => setNeed(e.target.value)} placeholder="No dairy? Out of eggs?" aria-label="What do you need to swap or avoid?" />
-            <button type="submit" className="small icon-text" title="Ask Claude for substitutions (leave the box blank for general ideas)">
-              <Sparkles size={13} aria-hidden="true" /> Ask Claude
-            </button>
-          </form>
+          {claude && (
+            <form
+              className="recipe-ask"
+              onSubmit={(e) => {
+                e.preventDefault();
+                ask();
+              }}
+            >
+              <input value={need} onChange={(e) => setNeed(e.target.value)} placeholder="No dairy? Out of eggs?" aria-label="What do you need to swap or avoid?" />
+              <button type="submit" className="small icon-text" title="Ask Claude for substitutions (leave the box blank for general ideas)">
+                <Sparkles size={13} aria-hidden="true" /> Ask Claude
+              </button>
+            </form>
+          )}
         </section>
 
         <section className="recipe-method" aria-labelledby="rv-method">

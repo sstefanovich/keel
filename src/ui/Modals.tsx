@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CAPTURE_KINDS, Capture, CaptureKind, parseCapture } from "../core/capture";
 import { formatShort, today } from "../core/dates";
+import { useClaude } from "./claudeSetting";
 import { useHold } from "./HoldContext";
 import { useSpace } from "./space";
 import { mentionAt, workTargets } from "./workTargets";
@@ -55,7 +56,12 @@ export function QuickCapture({
   const input = useRef<HTMLInputElement>(null);
   useEscape(onClose);
   useEffect(() => input.current?.focus(), []);
-  const parsed = parseCapture(text, undefined, focus, force);
+  // with Claude off there's no "Ask": a leading "?" is just text for the log
+  const claude = useClaude().enabled;
+  const kinds: readonly CaptureKind[] = claude ? CAPTURE_KINDS : CAPTURE_KINDS.filter((k) => k !== "ask");
+  const chosen = force === "ask" && !claude ? undefined : force;
+  const looksLikeAsk = !claude && !chosen && parseCapture(text, undefined, focus)?.kind === "ask";
+  const parsed = parseCapture(text, undefined, focus, chosen ?? (looksLikeAsk ? "log" : undefined));
   const current = parsed?.kind ?? force ?? "log";
 
   // @project / @client suggestions for the word at the caret
@@ -91,8 +97,8 @@ export function QuickCapture({
   };
 
   const cycle = (dir: 1 | -1) => {
-    const i = CAPTURE_KINDS.indexOf(current);
-    const next = CAPTURE_KINDS[(i + dir + CAPTURE_KINDS.length) % CAPTURE_KINDS.length];
+    const i = kinds.indexOf(current);
+    const next = kinds[(i + dir + kinds.length) % kinds.length];
     setForce(next === parsed?.auto ? undefined : next);
   };
 
@@ -102,10 +108,10 @@ export function QuickCapture({
     const sp = space !== mode ? `${space} ` : "";
     if (c.kind === "ask") return "Claude";
     if (c.kind === "flag") return `the ${sp}Flags board`;
-    if (c.kind === "scratch") return "the scratchpad";
+    if (c.kind === "scratch") return `the ${sp}scratchpad`;
     if (c.kind === "list") return `${c.list?.name ?? "Shopping"} list`;
     if (c.kind === "note") {
-      const path = c.note ? hold.resolveLink(c.note) : undefined;
+      const path = c.note ? hold.resolveLink(c.note, space) : undefined;
       return path ? `note “${hold.get(path)?.title ?? c.note}”` : `new note “${c.note}”`;
     }
     return c.date ? `${formatShort(c.date)} ${sp}log` : `today's ${sp}log`;
@@ -117,7 +123,7 @@ export function QuickCapture({
           ref={input}
           readOnly={busy}
           value={text}
-          placeholder="Type anything · Tab changes the type · ? asks Claude · > Note: adds to a note · yesterday …"
+          placeholder={`Type anything · Tab changes the type${claude ? " · ? asks Claude" : ""} · > Note: adds to a note · yesterday …`}
           onChange={(e) => {
             setText(e.target.value);
             setCaret(e.target.selectionStart ?? e.target.value.length);
@@ -173,7 +179,7 @@ export function QuickCapture({
           </ul>
         )}
         <div className="capture-kinds" role="radiogroup" aria-label="Capture type">
-          {CAPTURE_KINDS.map((k) => (
+          {kinds.map((k) => (
             <button
               key={k}
               role="radio"

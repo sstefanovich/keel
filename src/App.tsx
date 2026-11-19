@@ -47,6 +47,7 @@ import { FlagsView } from "./ui/views/FlagsView";
 import { ClaudePanel } from "./ui/ClaudePanel";
 import { ClaudeChat } from "./ui/ClaudeChat";
 import { sendToClaude } from "./ui/claudeBridge";
+import { claudeEnabled, useClaude } from "./ui/claudeSetting";
 import { WaitingView } from "./ui/views/WaitingView";
 import { ScratchpadView } from "./ui/views/ScratchpadView";
 import { useReminders } from "./ui/useReminders";
@@ -203,6 +204,7 @@ function Shell() {
       const onDay = (c.date ? ` (${formatShort(c.date)})` : "") + (space !== getSpace() ? ` · ${space}` : "");
       let message: string;
       if (c.kind === "ask") {
+        if (!claudeEnabled()) throw new Error("Claude is turned off (Settings → Claude)");
         setClaudeMounted(true);
         setClaudeOpen(true);
         sendToClaude(c.ask!);
@@ -214,11 +216,11 @@ function Shell() {
         const n = await hold.addToList(c.list!.name, c.list!.items);
         message = n ? `Added ${n} to ${c.list!.name}` : `Already on ${c.list!.name}`;
       } else if (c.kind === "note") {
-        const path = await hold.appendToNote(c.note!, c.line);
+        const path = await hold.appendToNote(c.note!, c.line, space);
         message = `Added to ${hold.get(path)?.title ?? c.note}`;
       } else if (c.kind === "scratch") {
-        await appendToScratch(hold, c.line);
-        message = "Added to the scratchpad";
+        await appendToScratch(hold, c.line, space);
+        message = `Added to the ${space === getSpace() ? "" : `${space} `}scratchpad`;
       } else {
         if (c.work) await hold.logWork(day, c.work.key, c.work);
         else await hold.appendTo(await hold.ensureLog(day, today(), space), c.heading, c.line);
@@ -342,15 +344,20 @@ function Shell() {
   const [claudeMounted, setClaudeMounted] = useState(false);
   const [termOpen, setTermOpen] = useState(false);
   const [termMounted, setTermMounted] = useState(false);
+  // with Claude turned off (Settings → Claude, or not installed), none of these do anything
+  const claude = useClaude().enabled;
   const toggleClaude = useCallback(() => {
+    if (!claudeEnabled()) return;
     setClaudeMounted(true);
     setClaudeOpen((o) => !o);
   }, []);
   const toggleClaudeTerminal = useCallback(() => {
+    if (!claudeEnabled()) return;
     setTermMounted(true);
     setTermOpen((o) => !o);
   }, []);
   const askClaude = useCallback((prompt: string) => {
+    if (!claudeEnabled()) return;
     setClaudeMounted(true);
     setClaudeOpen(true);
     sendToClaude(prompt);
@@ -410,10 +417,10 @@ function Shell() {
       openSwitcher: () => setSwitcher(""),
       openTour: () => setTour(true),
       prompt: askFor,
-      claudeOpen,
+      claudeOpen: claude && claudeOpen,
       toggleClaude,
       askClaude,
-      claudeTerminalOpen: termOpen,
+      claudeTerminalOpen: claude && termOpen,
       toggleClaudeTerminal,
       tabs: tabs.tabs.map((t) => ({ id: t.id, view: t.history[t.index] })),
       activeTab: tabs.active,
@@ -432,7 +439,7 @@ function Shell() {
       sidebarCollapsed: sidebar.collapsed,
       toggleSidebar,
     }),
-    [view, show, openFile, openToday, openLog, openLink, startCapture, newItem, claudeOpen, toggleClaude, askClaude, termOpen, toggleClaudeTerminal, tabs, closeTabById, newTab, sidebar.collapsed, toggleSidebar, askFor],
+    [view, show, openFile, openToday, openLog, openLink, startCapture, newItem, claude, claudeOpen, toggleClaude, askClaude, termOpen, toggleClaudeTerminal, tabs, closeTabById, newTab, sidebar.collapsed, toggleSidebar, askFor],
   );
 
   // start on today's log, unless tabs were restored (then just make sure today's log exists and has its carry-over)
@@ -530,9 +537,9 @@ function Shell() {
             {view.kind === "lists" && <ListsView />}
             {view.kind === "recipes" && <RecipesView initial={view.q} />}
           </div>
-          {termMounted && <ClaudePanel open={termOpen} onClose={() => setTermOpen(false)} />}
+          {claude && termMounted && <ClaudePanel open={termOpen} onClose={() => setTermOpen(false)} />}
         </main>
-        {claudeMounted && <ClaudeChat open={claudeOpen} onClose={() => setClaudeOpen(false)} onTerminal={toggleClaudeTerminal} />}
+        {claude && claudeMounted && <ClaudeChat open={claudeOpen} onClose={() => setClaudeOpen(false)} onTerminal={toggleClaudeTerminal} />}
       </div>
       {capture && <QuickCapture onSubmit={submitCapture} onClose={() => setCapture(null)} focus={focus} initialKind={capture.kind} />}
       {prompt && <PromptModal spec={prompt} onClose={() => setPrompt(null)} />}

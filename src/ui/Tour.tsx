@@ -1,6 +1,7 @@
 import { Clock, Compass, LucideIcon, NotebookPen, Zap } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { ClaudeIcon } from "./ClaudePanel";
+import { useClaude } from "./claudeSetting";
 import { KeelLogo } from "./Sidebar";
 
 const DONE_KEY = "keel.tourDone";
@@ -27,7 +28,8 @@ interface Step {
   body: ReactNode;
 }
 
-const STEPS: Step[] = [
+/** The tour's steps; without Claude (turned off, or not installed) its step and tip are left out. */
+const buildSteps = (claude: boolean): Step[] => [
   {
     icon: "logo",
     title: "Welcome to Keel",
@@ -55,7 +57,13 @@ const STEPS: Step[] = [
             <code>todo …</code> · <code>wait Jordan: …</code> · <code>remind me 3pm …</code> · <code>flag …</code>
           </li>
           <li>
-            <code>yesterday …</code> or <code>fri: …</code> for another day · <code>? question</code> asks Claude
+            <code>yesterday …</code> or <code>fri: …</code> for another day
+            {claude && (
+              <>
+                {" "}
+                · <code>? question</code> asks Claude
+              </>
+            )}
           </li>
         </ul>
         <p>
@@ -96,7 +104,8 @@ const STEPS: Step[] = [
     icon: Compass,
     title: "Find your way around",
     body: (
-      <ul>
+      <>
+        <ul>
         <li>
           <kbd>Ctrl</kbd>+<kbd>P</kbd> jumps to any note, log, project or client
         </li>
@@ -109,10 +118,15 @@ const STEPS: Step[] = [
         <li>
           <b>Charts</b> keep each client's URLs, servers and resource groups one click from the clipboard
         </li>
-      </ul>
+        </ul>
+        {!claude && <p>You can replay this tour any time from Settings.</p>}
+      </>
     ),
   },
-  {
+  ...(claude ? [CLAUDE_STEP] : []),
+];
+
+const CLAUDE_STEP: Step = {
     icon: "claude",
     title: "Ask Claude",
     body: (
@@ -125,13 +139,13 @@ const STEPS: Step[] = [
         <p>You can replay this tour any time from Settings.</p>
       </>
     ),
-  },
-];
+};
 
 /** A short first-run walkthrough. Shown once; reopen from Settings. */
 export function Tour({ onClose }: { onClose: () => void }) {
   const [i, setI] = useState(0);
-  const step = STEPS[i];
+  const STEPS = buildSteps(useClaude().enabled);
+  const step = STEPS[Math.min(i, STEPS.length - 1)];
   const last = i === STEPS.length - 1;
   const close = () => {
     markSeen();

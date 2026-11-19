@@ -1,8 +1,9 @@
-import { getSpace } from "../space";
+import { useSpace } from "../space";
+import { Space } from "../../core/parse";
 import { Check, Eraser, FilePlus, Flag, ListPlus, NotepadText, ScrollText } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { today } from "../../core/dates";
-import { SCRATCH_PATH, appendLine, linesOf, noteFromText, takeText } from "../../core/scratch";
+import { appendLine, linesOf, noteFromText, scratchPath, takeText } from "../../core/scratch";
 import { setLiveScratch } from "../scratchStore";
 import { confirmDialog } from "../../lib/platform";
 import { useHold } from "../HoldContext";
@@ -10,10 +11,17 @@ import { useHold } from "../HoldContext";
 const SAVE_DELAY = 400;
 
 /**
- * One plain-text page for transient jottings (scratchpad.txt in the hold). No markdown.
+ * A plain-text page for transient jottings, one per space (scratchpad.txt, personal/scratchpad.txt). No markdown.
  * Select text, or put the cursor on a line, and move it somewhere permanent.
  */
 export function ScratchpadView() {
+  // keyed by space: switching saves this page and loads the other one
+  const space = useSpace();
+  return <ScratchPage key={space} space={space} />;
+}
+
+function ScratchPage({ space }: { space: Space }) {
+  const path = scratchPath(space);
   const { hold, bump, reportError, toast } = useHold();
   const [text, setText] = useState<string | null>(null);
   const [status, setStatus] = useState<"saved" | "pending">("saved");
@@ -29,19 +37,19 @@ export function ScratchpadView() {
     if (latest.current === saved.current) return setStatus("saved");
     const content = latest.current;
     try {
-      await hold.fs.write(SCRATCH_PATH, content);
+      await hold.fs.write(path, content);
       saved.current = content;
       if (latest.current === content) setStatus("saved");
     } catch (e) {
       reportError(e);
     }
-  }, [hold, reportError]);
+  }, [hold, path, reportError]);
 
   // load, and reload when coming back to the window (Claude or another app may have edited it)
   useEffect(() => {
     const load = async () => {
       if (timer.current !== undefined) return; // don't clobber unsaved typing
-      const content = (await hold.fs.exists(SCRATCH_PATH)) ? await hold.fs.read(SCRATCH_PATH) : "";
+      const content = (await hold.fs.exists(path)) ? await hold.fs.read(path) : "";
       if (content !== latest.current || text === null) {
         latest.current = saved.current = content;
         setText(content);
@@ -71,7 +79,7 @@ export function ScratchpadView() {
   // quick capture's "Scratch" appends here while the page is open
   useEffect(
     () =>
-      setLiveScratch(async (t) => {
+      setLiveScratch(space, async (t) => {
         change(appendLine(latest.current, t));
         await save();
       }),
@@ -102,28 +110,28 @@ export function ScratchpadView() {
   const toNote = () =>
     move("Moved to a note", async (t) => {
       const { title, body } = noteFromText(t);
-      const path = await hold.createNote(title);
-      if (body) await hold.save(path, `${(await hold.fs.read(path)).replace(/\s+$/, "")}\n${body}\n`);
-      return `“${hold.get(path)?.title ?? title}”`;
+      const note = await hold.createNote(title, hold.notesFolder(space));
+      if (body) await hold.save(note, `${(await hold.fs.read(note)).replace(/\s+$/, "")}\n${body}\n`);
+      return `“${hold.get(note)?.title ?? title}”`;
     });
 
   const toTasks = () =>
     move("Added as tasks", async (t) => {
-      const log = await hold.ensureLog(today(), today(), getSpace());
+      const log = await hold.ensureLog(today(), today(), space);
       await hold.appendTo(log, "Tasks", linesOf(t).map((l) => `- [ ] ${l}`).join("\n"));
       return "today's log";
     });
 
   const toLog = () =>
     move("Added to the log", async (t) => {
-      const log = await hold.ensureLog(today(), today(), getSpace());
+      const log = await hold.ensureLog(today(), today(), space);
       await hold.appendTo(log, "Log", linesOf(t).map((l) => `- ${l}`).join("\n"));
       return "today's log";
     });
 
   const toFlag = () =>
     move("Hoisted a flag", async (t) => {
-      await hold.hoistFlag(t, "yellow", undefined, getSpace());
+      await hold.hoistFlag(t, "yellow", undefined, space);
       return "the Flags board";
     });
 
@@ -146,7 +154,7 @@ export function ScratchpadView() {
       <header className="scratch-head">
         <div className="scratch-title">
           <NotepadText size={18} aria-hidden="true" />
-          <h1>Scratchpad</h1>
+          <h1>{space === "personal" ? "Personal scratchpad" : "Scratchpad"}</h1>
           <span className={`save-status ${status}`} role="status">
             {status === "saved" ? <Check size={13} aria-hidden="true" /> : <span className="save-dot" aria-hidden="true" />}
             {status === "saved" ? "Saved" : "Edited"}
@@ -187,7 +195,7 @@ export function ScratchpadView() {
         aria-label="Scratchpad"
       />
       <footer className="scratch-foot muted small">
-        {words} word{words === 1 ? "" : "s"} · saved to <code>{SCRATCH_PATH}</code> in your Keel folder · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> opens it
+        {words} word{words === 1 ? "" : "s"} · saved to <code>{path}</code> in your Keel folder · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> opens it
       </footer>
     </div>
   );

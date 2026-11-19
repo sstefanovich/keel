@@ -100,20 +100,30 @@ Never put work in \`personal/\` or personal things at the top level, and never l
 | \`personal/logs/YYYY/YYYY-MM-DD.md\` | Personal day log: \`## Tasks\` and \`## Log\` (no \`## Work\`) |
 | \`personal/notes/…\` | Personal notes |
 | \`personal/flags/…md\` | Personal flags (same format as \`flags/\`) |
+| \`personal/reminders.md\` | Personal recurring reminders (same format as \`reminders.md\`) |
+| \`personal/scratchpad.txt\` | The personal scratchpad (same as \`scratchpad.txt\`, which is work's) |
 | \`personal/lists/<Name>.md\` | Checklists: \`# Name\` then \`- [ ] item\` lines (\`Shopping.md\` is the shopping list). Ticked items are \`- [x] item\` with no \`@done\` |
 | \`personal/recipes/<Title>.md\` | Recipes: frontmatter \`title\`, \`source\` (link), \`servings\`, \`time\`, \`image\` (hold path or link, also shown as \`![](…)\` under the title), \`rating\` (1–5), \`collections\` (a list such as \`[Desserts, Thanksgiving 2026]\`); sections \`## Ingredients\` (bullets), \`## Method\` (numbered), \`## Notes\` (dated lines: \`- YYYY-MM-DD: …\`) |
 
 - **"Add X to the shopping list"** → \`personal/lists/Shopping.md\`: append \`- [ ] X\` unless it's already there unticked.
 - **Personal tasks or reminders** → today's \`personal/logs/…\` log, \`## Tasks\`.
+- **Recurring personal reminders** → \`personal/reminders.md\` (start it like \`reminders.md\` if it's missing), never the work \`reminders.md\`.
 `;
 
 /** The guide before the personal space existed (everything up to that section). */
 const BEFORE_PERSONAL = CLAUDE_GUIDE.replace(/\| `personal\/` \|.*\n/, "").replace(/\n## Personal space\n[\s\S]*$/, "");
 
+/** The guide before personal reminders and the personal scratchpad had their own files. */
+const BEFORE_PERSONAL_REMINDERS = CLAUDE_GUIDE.replace(/\| `personal\/reminders\.md` \|.*\n/, "")
+  .replace(/\| `personal\/scratchpad\.txt` \|.*\n/, "")
+  .replace(/- \*\*Recurring personal reminders\*\*.*\n/, "");
+
 /** Earlier versions of the guide: a CLAUDE.md still exactly like one of these is replaced with the current one. */
 export const PREVIOUS_GUIDES: string[] = [
+  // before personal reminders and the personal scratchpad had their own files
+  BEFORE_PERSONAL_REMINDERS,
   // before recipe photos, ratings and collections
-  CLAUDE_GUIDE.replace(
+  BEFORE_PERSONAL_REMINDERS.replace(
     /\| `personal\/recipes\/<Title>\.md` \|.*\n/,
     "| `personal/recipes/<Title>.md` | Recipes: frontmatter `title`, `source` (link), `servings`, `time`; sections `## Ingredients` (bullets), `## Method` (numbered), `## Notes` |\n",
   ),
