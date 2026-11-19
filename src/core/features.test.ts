@@ -338,6 +338,43 @@ describe("work and personal spaces", () => {
     expect(f.content).toContain("1. Fry\n2. Simmer");
     expect(hold.tasks().length).toBe(0);
   });
+
+  it("recipes keep a photo, a rating and collections", async () => {
+    const hold = await makeHold();
+    const path = await hold.createRecipe({ title: "Pumpkin pie", image: "attachments/recipes/pumpkin-pie.jpg", collections: ["Desserts", "Thanksgiving 2026", "desserts"] });
+    let f = hold.get(path)!;
+    expect(f.content).toContain("# Pumpkin pie\n\n![](attachments/recipes/pumpkin-pie.jpg)\n");
+    expect(hold.recipeCollections(f)).toEqual(["Desserts", "Thanksgiving 2026"]);
+    expect(hold.recipeRating(f)).toBe(0);
+
+    await hold.rateRecipe(path, 4);
+    expect(hold.recipeRating(hold.get(path)!)).toBe(4);
+    await hold.rateRecipe(path, 0);
+    expect(hold.get(path)!.frontmatter.rating).toBeUndefined();
+
+    const stuffing = await hold.createRecipe({ title: "Stuffing", collections: ["Thanksgiving 2025"] });
+    await hold.toggleRecipeCollection(stuffing, "Thanksgiving 2026");
+    await hold.toggleRecipeCollection(path, "desserts");
+    expect(hold.recipeCollections(hold.get(path)!)).toEqual(["Thanksgiving 2026"]);
+    expect(hold.recipeCollectionCounts()).toEqual([
+      { name: "Thanksgiving 2025", count: 1 },
+      { name: "Thanksgiving 2026", count: 2 },
+    ]);
+    expect(await hold.renameRecipeCollection("thanksgiving 2026", "Thanksgiving, 2026")).toBe(2);
+    f = hold.get(stuffing)!;
+    expect(hold.recipeCollections(f)).toEqual(["Thanksgiving 2025", "Thanksgiving, 2026"]);
+    expect(f.content).toContain(`collections: [Thanksgiving 2025, "Thanksgiving, 2026"]`);
+  });
+
+  it("recipe notes are dated lines under ## Notes", async () => {
+    const hold = await makeHold();
+    const path = await hold.createRecipe({ title: "Pie", ingredients: ["flour"], steps: ["Bake"] });
+    await hold.addRecipeNote(path, "  made for   Thanksgiving ", "2026-11-26");
+    await hold.addRecipeNote(path, "less clove", "2026-11-27");
+    await hold.addRecipeNote(path, "   ");
+    expect(hold.get(path)!.content).toMatch(/## Notes\n- 2026-11-26: made for Thanksgiving\n- 2026-11-27: less clove\n$/);
+    expect(hold.recipeIngredients(hold.get(path)!)).toEqual(["flour"]);
+  });
 });
 
 describe("capture: spaces and lists", () => {

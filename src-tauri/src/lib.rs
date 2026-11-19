@@ -233,6 +233,7 @@ pub fn run() {
             notify::reminder_notify,
             attach::hold_write_image,
             attach::hold_image_url,
+            attach::hold_fetch_image,
             attach::link_title,
             attach::recipe_from_url,
         ])

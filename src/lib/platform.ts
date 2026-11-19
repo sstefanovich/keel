@@ -221,6 +221,12 @@ export async function saveImage(root: string, path: string, base64: string): Pro
   await invoke("hold_write_image", { root, path, data: base64 });
 }
 
+/** Download a web image into the hold at `stem.<ext>`; returns its hold-relative path. */
+export async function fetchImage(root: string, stem: string, url: string): Promise<string> {
+  if (!isTauri) throw new Error("Images can only be downloaded in the desktop app");
+  return invoke<string>("hold_fetch_image", { root, stem, url });
+}
+
 const imageCache = new Map<string, Promise<string>>();
 
 /** A hold image as a data: URL (cached: attachment names are never reused). */

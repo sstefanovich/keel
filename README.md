@@ -118,7 +118,12 @@ Anything you're waiting on someone for, grouped by person, with how long it's be
 
 Switch to **Personal** at the top of the sidebar for a separate space with its own logs, tasks and Flags,
 plus **Lists** (shopping and anything else) and **Recipes**. Paste a recipe link to import it, and send
-its ingredients to your shopping list in one click.
+its ingredients to your shopping list in one click. Keel keeps the photo, lays the recipe out for cooking
+with ingredients to tick off beside the method, and lets you rate recipes and gather them into collections
+(say "Desserts" or "Thanksgiving 2026", where one recipe can be in several) to plan a meal and remember what you made.
+Halve or double a recipe (the amounts and the shopping list follow), add dated notes, and ask Claude what to
+use instead of an ingredient you're missing. Search recipes by what you have ("chicken, lemon"), with filters
+for rating and cooking time; recipes and lists are also in the main Search.
 
 | Lists | Recipes |
 |---|---|

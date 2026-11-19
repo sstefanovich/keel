@@ -101,7 +101,7 @@ Never put work in \`personal/\` or personal things at the top level, and never l
 | \`personal/notes/…\` | Personal notes |
 | \`personal/flags/…md\` | Personal flags (same format as \`flags/\`) |
 | \`personal/lists/<Name>.md\` | Checklists: \`# Name\` then \`- [ ] item\` lines (\`Shopping.md\` is the shopping list). Ticked items are \`- [x] item\` with no \`@done\` |
-| \`personal/recipes/<Title>.md\` | Recipes: frontmatter \`title\`, \`source\` (link), \`servings\`, \`time\`; sections \`## Ingredients\` (bullets), \`## Method\` (numbered), \`## Notes\` |
+| \`personal/recipes/<Title>.md\` | Recipes: frontmatter \`title\`, \`source\` (link), \`servings\`, \`time\`, \`image\` (hold path or link, also shown as \`![](…)\` under the title), \`rating\` (1–5), \`collections\` (a list such as \`[Desserts, Thanksgiving 2026]\`); sections \`## Ingredients\` (bullets), \`## Method\` (numbered), \`## Notes\` (dated lines: \`- YYYY-MM-DD: …\`) |
 
 - **"Add X to the shopping list"** → \`personal/lists/Shopping.md\`: append \`- [ ] X\` unless it's already there unticked.
 - **Personal tasks or reminders** → today's \`personal/logs/…\` log, \`## Tasks\`.
@@ -112,6 +112,11 @@ const BEFORE_PERSONAL = CLAUDE_GUIDE.replace(/\| `personal\/` \|.*\n/, "").repla
 
 /** Earlier versions of the guide: a CLAUDE.md still exactly like one of these is replaced with the current one. */
 export const PREVIOUS_GUIDES: string[] = [
+  // before recipe photos, ratings and collections
+  CLAUDE_GUIDE.replace(
+    /\| `personal\/recipes\/<Title>\.md` \|.*\n/,
+    "| `personal/recipes/<Title>.md` | Recipes: frontmatter `title`, `source` (link), `servings`, `time`; sections `## Ingredients` (bullets), `## Method` (numbered), `## Notes` |\n",
+  ),
   // before capitalised @Name meant "waiting on"
   BEFORE_PERSONAL.replace(/ tag\)\. A capitalised\n.*\n.*\n/, " tag).\n"),
   // before only a trailing @Name counted
