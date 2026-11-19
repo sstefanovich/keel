@@ -1279,3 +1279,15 @@ button.link:hover:not(:disabled) {
 .sidebar.collapsed .side-actions {
   align-items: center;
 }
+
+/* calendar "Add to Work": should the meeting's hours go in too? */
+.event-hours-ask {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}

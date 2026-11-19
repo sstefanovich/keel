@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Check, ChevronDown, FilePlus, FileText, MapPin, Repeat, Users, Video } from "lucide-react";
+import { BriefcaseBusiness, Check, ChevronDown, FilePlus, FileText, MapPin, Repeat, Users, Video, X } from "lucide-react";
 import { useState } from "react";
 import { toISO, today } from "../core/dates";
 import { isLogged, quarterHours } from "../core/meetingHours";
@@ -12,29 +12,59 @@ import { learnProject, meetingOwner, ownerName, workOptions } from "./workProjec
 const isUrl = (s: string) => /^https?:\/\//i.test(s);
 
 /**
- * "Add to Work": lists the meeting (and its time, for a timed one) under its project in today's
- * log, adding the project there if it isn't yet. Asks which project when the title doesn't say.
+ * "Add to Work": lists the meeting under its project in today's log, adding the project there if it
+ * isn't yet. Asks which project when the title doesn't say, and, for a timed meeting, whether to add
+ * its time too (the hours may already be in).
  */
 function AddToWork({ event: e }: { event: CalItem }) {
   const { hold, bump, reportError, focus } = useHold();
   const [picking, setPicking] = useState(false);
+  /** The project chosen, while asking whether to add the meeting's hours */
+  const [asking, setAsking] = useState<string | null>(null);
   const day = today();
   const blocks = hold.get(hold.logPath(day))?.hours ?? [];
   const owner = meetingOwner(hold, e.title);
   const hours = e.allDay || e.free || e.end <= e.start ? undefined : quarterHours(e.end - e.start);
-  const what = hours ? `${hours}h and “${e.title}”` : `“${e.title}”`;
 
-  const add = async (key: string) => {
-    setPicking(false);
+  const log = async (key: string, withHours: boolean) => {
+    setAsking(null);
     try {
-      learnProject(e.title, key);
       await flushEditors();
-      await hold.logMeetings(day, key, [e.title], hours);
+      await hold.logMeetings(day, key, [e.title], withHours ? hours : undefined);
       bump();
     } catch (err) {
       reportError(err);
     }
   };
+
+  /** Project chosen: an untimed meeting is just listed; a timed one asks about its hours first. */
+  const add = (key: string) => {
+    setPicking(false);
+    learnProject(e.title, key);
+    if (hours) setAsking(key);
+    else void log(key, false);
+  };
+
+  if (asking && !isLogged(e, blocks)) {
+    const logged = blocks.find((b) => b.client === asking)?.hours ?? 0;
+    return (
+      <span className="event-hours-ask" role="group" aria-label={`Add ${hours}h for “${e.title}”?`}>
+        <span className="small">
+          Add {hours}h to {ownerName(hold, asking)}?
+          {logged > 0 && <span className="muted"> ({Math.round(logged * 100) / 100}h logged today)</span>}
+        </span>
+        <button className="primary small" onClick={() => void log(asking, true)} title={`Add ${hours}h and list “${e.title}”`} autoFocus>
+          Add {hours}h
+        </button>
+        <button className="small" onClick={() => void log(asking, false)} title="The hours are already in: just list the meeting">
+          List only
+        </button>
+        <button className="icon-btn" onClick={() => setAsking(null)} title="Cancel" aria-label="Cancel">
+          <X size={13} aria-hidden="true" />
+        </button>
+      </span>
+    );
+  }
 
   if (isLogged(e, blocks)) {
     return (
@@ -50,7 +80,7 @@ function AddToWork({ event: e }: { event: CalItem }) {
       autoFocus
       value=""
       aria-label={`Which project was “${e.title}” for?`}
-      onChange={(ev) => ev.target.value && void add(ev.target.value)}
+      onChange={(ev) => ev.target.value && add(ev.target.value)}
       onBlur={() => setPicking(false)}
       onKeyDown={(ev) => ev.key === "Escape" && setPicking(false)}
     >
@@ -67,8 +97,8 @@ function AddToWork({ event: e }: { event: CalItem }) {
     <>
       <span className="event-work">
         <button
-          onClick={() => (owner ? void add(owner) : setPicking((p) => !p))}
-          title={owner ? `Add ${what} to ${ownerName(hold, owner)} in today's Work` : `Add ${what} to today's Work: pick the project`}
+          onClick={() => (owner ? add(owner) : setPicking((p) => !p))}
+          title={owner ? `Add “${e.title}” to ${ownerName(hold, owner)} in today's Work` : `Add “${e.title}” to today's Work: pick the project`}
         >
           <BriefcaseBusiness size={14} aria-hidden="true" /> Add to Work
         </button>
