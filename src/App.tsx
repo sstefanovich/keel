@@ -528,7 +528,7 @@ function Shell() {
             {view.kind === "search" && <SearchView initial={view.q} />}
             {view.kind === "settings" && <SettingsView section={view.section} />}
             {view.kind === "lists" && <ListsView />}
-            {view.kind === "recipes" && <RecipesView />}
+            {view.kind === "recipes" && <RecipesView initial={view.q} />}
           </div>
           {termMounted && <ClaudePanel open={termOpen} onClose={() => setTermOpen(false)} />}
         </main>

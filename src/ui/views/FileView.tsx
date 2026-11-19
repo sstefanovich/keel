@@ -4,7 +4,8 @@ import { isTauri, openUrl } from "../../lib/platform";
 import { useContextMenu } from "../ContextMenu";
 import { fileMenu } from "../SidebarSections";
 import { spaceOf } from "../../core/parse";
-import { shopForRecipe } from "../recipes";
+import { factorLabel, shopForRecipe } from "../recipes";
+import { Stars } from "../Stars";
 import { HistoryPanel } from "../HistoryPanel";
 import { OPEN_HISTORY_EVENT } from "../commands";
 import { FlagBoard } from "../FlagBoard";
@@ -18,6 +19,7 @@ import { Check, ExternalLink, FileX, History, MoreHorizontal, ShoppingCart } fro
 import { EmptyState } from "../EmptyState";
 import { useNav } from "../nav";
 import { ChartView } from "./ChartView";
+import { RecipeView } from "./RecipeView";
 
 export function FileView({ path, line }: { path: string; line?: number }) {
   const { hold, bump, reportError, toast } = useHold();
@@ -36,13 +38,28 @@ export function FileView({ path, line }: { path: string; line?: number }) {
   useEffect(() => setSaveStatus("saved"), [path]);
   const [history, setHistory] = useState(false);
   useEffect(() => setHistory(false), [path]);
+  // a recipe's portions (×½, ×2…): shown in the Recipe view and used by Shop; the note keeps the original
+  const [factor, setFactor] = useState(1);
+  useEffect(() => setFactor(1), [path]);
   useEffect(() => {
     const open = () => setHistory(true);
     window.addEventListener(OPEN_HISTORY_EVENT, open);
     return () => window.removeEventListener(OPEN_HISTORY_EVENT, open);
   }, []);
-  const [mode, setMode] = useState<"chart" | "edit">(hasChart && line == null ? "chart" : "edit");
-  useEffect(() => setMode(hasChart && line == null ? "chart" : "edit"), [path, hasChart, line]);
+  const isRecipe = file?.kind === "recipe";
+  // charts and recipes open on their laid-out view unless we're jumping to a specific line
+  const viewMode = hasChart ? "chart" : isRecipe ? "recipe" : null;
+  const [mode, setMode] = useState<"chart" | "recipe" | "edit">(viewMode && line == null ? viewMode : "edit");
+  useEffect(() => setMode(viewMode && line == null ? viewMode : "edit"), [path, viewMode, line]);
+  const rate = async (s: number) => {
+    try {
+      await flushEditors();
+      await hold.rateRecipe(path, s);
+      bump();
+    } catch (e) {
+      reportError(e);
+    }
+  };
 
   // Alt+←/→ steps between days in a log
   useEffect(() => {
@@ -114,10 +131,10 @@ export function FileView({ path, line }: { path: string; line?: number }) {
             ↳ {ownerProject.name}
           </button>
         )}
-        {hasChart && (
+        {viewMode && (
           <div className="seg" role="tablist">
-            <button role="tab" aria-selected={mode === "chart"} className={mode === "chart" ? "on" : ""} onClick={() => setMode("chart")}>
-              Chart
+            <button role="tab" aria-selected={mode === viewMode} className={mode === viewMode ? "on" : ""} onClick={() => setMode(viewMode)}>
+              {viewMode === "chart" ? "Chart" : "Recipe"}
             </button>
             <button role="tab" aria-selected={mode === "edit"} className={mode === "edit" ? "on" : ""} onClick={() => setMode("edit")}>
               Edit
@@ -127,7 +144,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
         <span className="file-path muted" title={path}>
           {path}
         </span>
-        {(mode === "edit" || !hasChart) && (
+        {(mode === "edit" || !viewMode) && (
           <span className={`save-status ${saveStatus}`} role="status" aria-live="polite">
             {saveStatus === "saved" ? <Check size={13} aria-hidden="true" /> : <span className="save-dot" aria-hidden="true" />}
             {saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Edited"}
@@ -135,21 +152,22 @@ export function FileView({ path, line }: { path: string; line?: number }) {
         )}
         {file.kind === "recipe" && (
           <>
+            {mode === "edit" && <Stars value={hold.recipeRating(file)} onChange={rate} />}
             <button
               className="ghost icon-text"
               onClick={async () => {
                 try {
                   await flushEditors();
-                  toast(await shopForRecipe(hold, hold.get(path) ?? file));
+                  toast(await shopForRecipe(hold, hold.get(path) ?? file, mode === "recipe" ? factor : 1));
                   bump();
                 } catch (e) {
                   reportError(e);
                 }
               }}
-              title="Put this recipe's ingredients on the Shopping list"
+              title={mode === "recipe" && factor !== 1 ? `Put the ingredients (${factorLabel(factor)}) on the Shopping list` : "Put this recipe's ingredients on the Shopping list"}
             >
               <ShoppingCart size={14} aria-hidden="true" />
-              Shop
+              {mode === "recipe" && factor !== 1 ? `Shop ${factorLabel(factor)}` : "Shop"}
             </button>
             {typeof file.frontmatter.source === "string" && (
               <button className="ghost icon-text" onClick={() => void openUrl(String(file.frontmatter.source)).catch(reportError)} title={String(file.frontmatter.source)}>
@@ -159,7 +177,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
             )}
           </>
         )}
-        {(mode === "edit" || !hasChart) && <Outline content={file.content} onJump={(l) => nav.openFile(path, l)} />}
+        {(mode === "edit" || !viewMode) && <Outline content={file.content} onJump={(l) => nav.openFile(path, l)} />}
         {isTauri && (
           <button className="ghost icon-text" onClick={() => setHistory(true)} title="Earlier versions of this file">
             <History size={14} aria-hidden="true" />
@@ -203,6 +221,8 @@ export function FileView({ path, line }: { path: string; line?: number }) {
           <>
             {mode === "chart" && hasChart ? (
               <ChartView path={path} />
+            ) : mode === "recipe" && isRecipe ? (
+              <RecipeView path={path} onRate={rate} factor={factor} onFactor={setFactor} />
             ) : (
               <Editor key={path} path={path} line={line} onOpenLink={(t, newTab) => nav.openLink(t, { newTab })} onStatus={setSaveStatus} />
             )}

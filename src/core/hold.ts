@@ -463,18 +463,35 @@ export class Hold {
       .sort((a, b) => a.title.localeCompare(b.title));
   }
 
-  /** A recipe note from what a recipe page says (or just its title and link). */
-  async createRecipe(r: { title: string; source?: string; ingredients?: string[]; steps?: string[]; servings?: string; time?: string; image?: string }): Promise<string> {
+  /**
+   * A recipe note from what a recipe page says (or just its title and link). `image` is a
+   * hold-relative path (downloaded) or a web URL; either way it's shown under the title.
+   */
+  async createRecipe(r: {
+    title: string;
+    source?: string;
+    ingredients?: string[];
+    steps?: string[];
+    servings?: string;
+    time?: string;
+    image?: string;
+    collections?: string[];
+  }): Promise<string> {
     const path = await this.freePath(`${PERSONAL}recipes`, r.title);
     const fm = ["---", `title: ${yamlScalar(r.title)}`];
     if (r.source) fm.push(`source: ${yamlScalar(r.source)}`);
     if (r.servings) fm.push(`servings: ${yamlScalar(r.servings)}`);
     if (r.time) fm.push(`time: ${yamlScalar(r.time)}`);
     if (r.image) fm.push(`image: ${yamlScalar(r.image)}`);
+    const cols = cleanCollections(r.collections ?? []);
+    if (cols.length) fm.push(`collections: ${yamlList(cols)}`);
     fm.push(`created: ${todayISO()}`, "---");
+    // the editor shows ![](…) as the picture; a path with spaces needs <…>
+    const img = r.image ? [`![](${/\s/.test(r.image) ? `<${r.image}>` : r.image})`, ""] : [];
     const body = [
       `# ${r.title}`,
       "",
+      ...img,
       "## Ingredients",
       ...(r.ingredients?.length ? r.ingredients.map((i) => `- ${i}`) : ["- "]),
       "",
@@ -486,6 +503,76 @@ export class Hold {
     ];
     await this.save(path, [...fm, ...body].join("\n"));
     return path;
+  }
+
+  /** Add a dated line under a recipe's "## Notes" (made if missing): "- 2026-11-18: used less clove". */
+  async addRecipeNote(path: string, text: string, date: ISODate = todayISO()): Promise<void> {
+    const note = text.replace(/\s+/g, " ").trim();
+    if (!note) return;
+    await this.appendTo(path, "Notes", `- ${date}: ${note}`);
+  }
+
+  /** A recipe's rating, 1–5 (0 when it has none). */
+  recipeRating(f: ParsedFile): number {
+    const n = Math.round(Number(f.frontmatter.rating));
+    return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
+  }
+
+  /** Rate a recipe 1–5; 0 clears the rating. */
+  async rateRecipe(path: string, stars: number): Promise<void> {
+    const n = Math.max(0, Math.min(5, Math.round(stars)));
+    await this.updateFrontmatter(path, { rating: n || undefined });
+  }
+
+  /** The collections ("Desserts", "Thanksgiving 2026", …) a recipe is in. */
+  recipeCollections(f: ParsedFile): string[] {
+    const v = f.frontmatter.collections;
+    return cleanCollections(Array.isArray(v) ? v.map(String) : typeof v === "string" ? v.split(",") : []);
+  }
+
+  /** Every collection in use, with how many recipes are in it, by name. */
+  recipeCollectionCounts(): { name: string; count: number }[] {
+    const counts = new Map<string, { name: string; count: number }>();
+    for (const f of this.recipes()) {
+      for (const c of this.recipeCollections(f)) {
+        const e = counts.get(c.toLowerCase()) ?? { name: c, count: 0 };
+        e.count++;
+        counts.set(c.toLowerCase(), e);
+      }
+    }
+    return [...counts.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  }
+
+  /** Replace a recipe's collections. */
+  async setRecipeCollections(path: string, names: string[]): Promise<void> {
+    const cols = cleanCollections(names);
+    let content = await this.fs.read(path);
+    content = setFrontmatterField(content, "collections", cols.length ? yamlList(cols) : undefined);
+    await this.save(path, content);
+  }
+
+  /** Put a recipe in a collection, or take it out. */
+  async toggleRecipeCollection(path: string, name: string): Promise<void> {
+    const f = this.get(path);
+    if (!f) return;
+    const cols = this.recipeCollections(f);
+    const has = cols.some((c) => c.toLowerCase() === name.trim().toLowerCase());
+    await this.setRecipeCollections(path, has ? cols.filter((c) => c.toLowerCase() !== name.trim().toLowerCase()) : [...cols, name]);
+  }
+
+  /** Rename a collection on every recipe in it (or remove it everywhere when `to` is empty). Returns how many changed. */
+  async renameRecipeCollection(from: string, to: string): Promise<number> {
+    let n = 0;
+    for (const f of this.recipes()) {
+      const cols = this.recipeCollections(f);
+      if (!cols.some((c) => c.toLowerCase() === from.toLowerCase())) continue;
+      await this.setRecipeCollections(
+        f.path,
+        cols.flatMap((c) => (c.toLowerCase() === from.toLowerCase() ? (to.trim() ? [to] : []) : [c])),
+      );
+      n++;
+    }
+    return n;
   }
 
   /** The bullet lines under a recipe's "## Ingredients" heading. */
@@ -1069,4 +1156,23 @@ export const PINS_PATH = ".keel/pins.json";
 
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Collection names trimmed, blanks and repeats (any case) dropped, first spelling kept. */
+export function cleanCollections(names: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of names) {
+    const n = raw.replace(/\s+/g, " ").trim();
+    if (n && !seen.has(n.toLowerCase())) {
+      seen.add(n.toLowerCase());
+      out.push(n);
+    }
+  }
+  return out;
+}
+
+/** A YAML flow list: [Desserts, "Thanksgiving 2026"] (items quoted when they'd be misread). */
+function yamlList(items: string[]): string {
+  return `[${items.map((s) => (/[,[\]{}]/.test(s) ? JSON.stringify(s) : yamlScalar(s))).join(", ")}]`;
 }

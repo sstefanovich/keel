@@ -251,6 +251,66 @@ pub fn recipe_from_html(html: &str) -> RecipeInfo {
     RecipeInfo { title: title_of(html).unwrap_or_default(), ..Default::default() }
 }
 
+/// The file extension for an image content type ("image/jpeg; charset=…" → "jpg").
+fn image_ext(content_type: &str) -> Option<&'static str> {
+    let t = content_type.split(';').next()?.trim().to_ascii_lowercase();
+    Some(match t.as_str() {
+        "image/png" => "png",
+        "image/jpeg" | "image/jpg" | "image/pjpeg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        "image/bmp" => "bmp",
+        _ => return None,
+    })
+}
+
+/// Download an image from the web into the hold at `{stem}.{ext}` (or `{stem}-2.{ext}`, … when
+/// taken), the extension coming from what the server sends. Returns the hold-relative path.
+#[tauri::command]
+pub async fn hold_fetch_image(root: String, stem: String, url: String) -> Result<String, String> {
+    let lower = url.to_ascii_lowercase();
+    if !(lower.starts_with("https://") || lower.starts_with("http://")) {
+        return Err("Not a web image".into());
+    }
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 Keel")
+        .build()
+        .map_err(|e| e.to_string())?;
+    let res = client
+        .get(&url)
+        .header(reqwest::header::ACCEPT, "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("The image didn't download ({})", res.status()));
+    }
+    let ext = res
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(image_ext)
+        .ok_or("That link isn't an image Keel can show")?;
+    let bytes = res.bytes().await.map_err(|e| e.to_string())?;
+    if bytes.len() > MAX_IMAGE {
+        return Err("That image is too large (25 MB at most)".into());
+    }
+    for n in 1..1000 {
+        let path = if n == 1 { format!("{stem}.{ext}") } else { format!("{stem}-{n}.{ext}") };
+        let target = resolve(&root, &path)?;
+        if target.exists() {
+            continue;
+        }
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        fs::write(&target, &bytes).map_err(|e| e.to_string())?;
+        return Ok(path);
+    }
+    Err("No free name for the image".into())
+}
+
 /// Fetch a recipe page and read its recipe. Errors only when the page can't be read at all.
 #[tauri::command]
 pub async fn recipe_from_url(url: String) -> Result<RecipeInfo, String> {
@@ -288,6 +348,13 @@ mod tests {
         assert_eq!(r.steps, vec!["Toast it.", "Butter it."]);
         let none = recipe_from_html("<title>Just a blog</title><script>var x = 1;</script>");
         assert_eq!(none, RecipeInfo { title: "Just a blog".into(), ..Default::default() });
+    }
+
+    #[test]
+    fn image_types() {
+        assert_eq!(image_ext("image/jpeg; charset=binary"), Some("jpg"));
+        assert_eq!(image_ext("IMAGE/WEBP"), Some("webp"));
+        assert_eq!(image_ext("text/html"), None);
     }
 
     #[test]

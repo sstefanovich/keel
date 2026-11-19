@@ -2,20 +2,23 @@ import { getSpace } from "../space";
 import { useEffect, useRef, useState } from "react";
 import { addDays, formatLong, formatShort, today } from "../../core/dates";
 import { SearchFilter } from "../../core/hold";
-import { FileKind, basename, readableLine } from "../../core/parse";
+import { FileKind, Space, basename, readableLine } from "../../core/parse";
 import { slugify } from "../../core/templates";
 import { useHold } from "../HoldContext";
 import { useNav } from "../nav";
 import { Search, SearchX } from "lucide-react";
 import { EmptyState } from "../EmptyState";
 
-const TYPES: Record<string, { label: string; kinds?: FileKind[] }> = {
+/** What to search; `space` marks a type that only exists in one space (hidden when searching the other). */
+const TYPES: Record<string, { label: string; kinds?: FileKind[]; space?: Space }> = {
   all: { label: "All" },
   logs: { label: "Logs", kinds: ["log"] },
-  meetings: { label: "Meetings", kinds: ["meeting"] },
+  meetings: { label: "Meetings", kinds: ["meeting"], space: "work" },
   notes: { label: "Notes", kinds: ["note"] },
-  charts: { label: "Clients & projects", kinds: ["client", "project"] },
+  charts: { label: "Clients & projects", kinds: ["client", "project"], space: "work" },
   flags: { label: "Flags", kinds: ["flag"] },
+  recipes: { label: "Recipes", kinds: ["recipe"], space: "personal" },
+  lists: { label: "Lists", kinds: ["list"], space: "personal" },
 };
 
 const WHEN: Record<string, { label: string; days?: number }> = {
@@ -51,6 +54,13 @@ export function SearchView({ initial = "" }: { initial?: string }) {
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
   useEffect(() => setOwner(focus ? `client:${focus}` : ""), [focus]);
+
+  const shownTypes = (Object.keys(TYPES) as (keyof typeof TYPES)[]).filter((k) => bothSpaces || !TYPES[k].space || TYPES[k].space === mode);
+  // a type that no longer applies (e.g. Recipes after unticking "Work and personal" in work mode) goes back to All
+  useEffect(() => {
+    if (!shownTypes.includes(type)) setType("all");
+  }, [shownTypes, type]);
+  const showOwners = bothSpaces || mode === "work";
 
   const [ownerKind, ownerKey] = owner.split(":");
   const days = WHEN[when].days;
@@ -88,12 +98,13 @@ export function SearchView({ initial = "" }: { initial?: string }) {
         />
         <div className="search-filters" role="group" aria-label="Filters">
           <div className="seg" role="radiogroup" aria-label="Type">
-            {(Object.keys(TYPES) as (keyof typeof TYPES)[]).map((k) => (
+            {shownTypes.map((k) => (
               <button key={k} role="radio" aria-checked={type === k} className={type === k ? "on" : ""} onClick={() => setType(k)}>
                 {TYPES[k].label}
               </button>
             ))}
           </div>
+          {showOwners && (
           <select value={owner} onChange={(e) => setOwner(e.target.value)} aria-label="Client or project">
             <option value="">Any client or project</option>
             {clients.map((c) => (
@@ -110,6 +121,7 @@ export function SearchView({ initial = "" }: { initial?: string }) {
               </optgroup>
             ))}
           </select>
+          )}
           <label className="check-inline small" title={`Searching ${bothSpaces ? "work and personal" : `only ${mode}`}`}>
             <input type="checkbox" checked={bothSpaces} onChange={(e) => setBothSpaces(e.target.checked)} />
             Work and personal
@@ -139,6 +151,14 @@ export function SearchView({ initial = "" }: { initial?: string }) {
             </span>
           )}
         </div>
+        {type === "recipes" && (
+          <p className="muted small search-hint">
+            Looking for something to cook?{" "}
+            <button className="link small" onClick={() => nav.go({ kind: "recipes", q: q.trim() || undefined })}>
+              Search recipes by ingredient, rating and time
+            </button>
+          </p>
+        )}
       </header>
       {q.trim() && !hits.length && (
         <EmptyState icon={SearchX} title={`Nothing matches “${q.trim()}”`}>

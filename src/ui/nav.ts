@@ -14,7 +14,7 @@ export type View =
   | { kind: "search"; q?: string }
   | { kind: "settings"; section?: string }
   | { kind: "lists" }
-  | { kind: "recipes" };
+  | { kind: "recipes"; q?: string };
 
 const VIEW_KINDS = new Set(["file", "agenda", "scratch", "flags", "waiting", "dispatch", "charts", "timesheet", "calendar", "search", "settings", "lists", "recipes"]);
 
