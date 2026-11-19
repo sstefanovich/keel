@@ -26,6 +26,9 @@ import { occursOn } from "./schedule";
 import { DEFAULT_REMINDERS, DEFAULT_TEMPLATES, OLD_TEMPLATES, WELCOME_NOTE, fillTemplate, safeFileName, slugify } from "./templates";
 
 export const FLAG_COLORS = ["yellow", "orange", "pink", "blue", "green", "purple"] as const;
+
+/** Where a book stands: on the to-read list, being read, or finished. */
+export type BookStatus = "to-read" | "reading" | "read";
 export type FlagColor = (typeof FLAG_COLORS)[number];
 
 export interface Client {
@@ -522,36 +525,115 @@ export class Hold {
     return path;
   }
 
-  /** Add a dated line under a recipe's "## Notes" (made if missing): "- 2026-11-18: used less clove". */
-  async addRecipeNote(path: string, text: string, date: ISODate = todayISO()): Promise<void> {
+  // ---------- personal: books ----------
+
+  /** Books, most recently finished (or added) first. */
+  books(): ParsedFile[] {
+    const when = (f: ParsedFile) => String(f.frontmatter.finished ?? f.frontmatter.started ?? f.frontmatter.added ?? "");
+    return this.all()
+      .filter((f) => f.kind === "book")
+      .sort((a, b) => when(b).localeCompare(when(a)) || a.title.localeCompare(b.title));
+  }
+
+  /** Where a book is: "to-read" (the default), "reading" or "read". */
+  bookStatus(f: ParsedFile): BookStatus {
+    const s = String(f.frontmatter.status ?? "").toLowerCase();
+    return s === "read" || s === "reading" ? s : "to-read";
+  }
+
+  /** A book already on the list with this title (and author, when both say one). */
+  findBook(title: string, author?: string): ParsedFile | undefined {
+    const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    return this.books().find(
+      (f) => norm(f.title) === norm(title) && (!author || !f.frontmatter.author || norm(f.frontmatter.author) === norm(author)),
+    );
+  }
+
+  /**
+   * A book note: frontmatter for what the catalogue knows (author, year, pages, ISBN, cover, link)
+   * and where it stands, then the cover under the title and a Notes section.
+   */
+  async createBook(b: {
+    title: string;
+    author?: string;
+    year?: number;
+    pages?: number;
+    isbn?: string;
+    cover?: string;
+    link?: string;
+    status?: BookStatus;
+    collections?: string[];
+    date?: ISODate;
+  }): Promise<string> {
+    const path = await this.freePath(`${PERSONAL}books`, b.title);
+    const status = b.status ?? "to-read";
+    const day = b.date ?? todayISO();
+    const fm = ["---", `title: ${yamlScalar(b.title)}`];
+    if (b.author) fm.push(`author: ${yamlScalar(b.author)}`);
+    if (b.year) fm.push(`year: ${b.year}`);
+    if (b.pages) fm.push(`pages: ${b.pages}`);
+    if (b.isbn) fm.push(`isbn: ${JSON.stringify(b.isbn)}`);
+    if (b.cover) fm.push(`cover: ${yamlScalar(b.cover)}`);
+    if (b.link) fm.push(`link: ${yamlScalar(b.link)}`);
+    fm.push(`status: ${status}`);
+    if (status !== "to-read") fm.push(`started: ${day}`);
+    if (status === "read") fm.push(`finished: ${day}`);
+    const cols = cleanCollections(b.collections ?? []);
+    if (cols.length) fm.push(`collections: ${yamlList(cols)}`);
+    fm.push(`added: ${day}`, "---");
+    const img = b.cover ? [`![](${/\s/.test(b.cover) ? `<${b.cover}>` : b.cover})`, ""] : [];
+    const body = [`# ${b.title}`, "", ...img, "## Notes", ""];
+    await this.save(path, [...fm, ...body].join("\n"));
+    return path;
+  }
+
+  /**
+   * Move a book along: starting it stamps `started`, finishing it stamps `finished` (both today
+   * unless given, and kept if already set); back to "to read" clears both.
+   */
+  async setBookStatus(path: string, status: BookStatus, date: ISODate = todayISO()): Promise<void> {
+    const f = this.get(path);
+    if (!f) return;
+    const has = (k: string) => typeof f.frontmatter[k] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(f.frontmatter[k]));
+    await this.updateFrontmatter(path, {
+      status,
+      started: status === "to-read" ? undefined : has("started") ? String(f.frontmatter.started) : date,
+      finished: status === "read" ? (has("finished") ? String(f.frontmatter.finished) : date) : undefined,
+    });
+  }
+
+  // ---------- shared by recipes and books: dated notes, ratings, collections ----------
+
+  /** Add a dated line under a file's "## Notes" (made if missing): "- 2026-11-18: used less clove". */
+  async addDatedNote(path: string, text: string, date: ISODate = todayISO()): Promise<void> {
     const note = text.replace(/\s+/g, " ").trim();
     if (!note) return;
     await this.appendTo(path, "Notes", `- ${date}: ${note}`);
   }
 
-  /** A recipe's rating, 1–5 (0 when it has none). */
-  recipeRating(f: ParsedFile): number {
+  /** A file's `rating:`, 1–5 (0 when it has none). */
+  rating(f: ParsedFile): number {
     const n = Math.round(Number(f.frontmatter.rating));
     return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
   }
 
-  /** Rate a recipe 1–5; 0 clears the rating. */
-  async rateRecipe(path: string, stars: number): Promise<void> {
+  /** Rate 1–5; 0 clears the rating. */
+  async setRating(path: string, stars: number): Promise<void> {
     const n = Math.max(0, Math.min(5, Math.round(stars)));
     await this.updateFrontmatter(path, { rating: n || undefined });
   }
 
-  /** The collections ("Desserts", "Thanksgiving 2026", …) a recipe is in. */
-  recipeCollections(f: ParsedFile): string[] {
+  /** The collections ("Desserts", "Thanksgiving 2026", "Book club"…) a file is in. */
+  collectionsOf(f: ParsedFile): string[] {
     const v = f.frontmatter.collections;
     return cleanCollections(Array.isArray(v) ? v.map(String) : typeof v === "string" ? v.split(",") : []);
   }
 
-  /** Every collection in use, with how many recipes are in it, by name. */
-  recipeCollectionCounts(): { name: string; count: number }[] {
+  /** Every collection in use among files of one kind, with how many are in it, by name. */
+  collectionCounts(kind: FileKind): { name: string; count: number }[] {
     const counts = new Map<string, { name: string; count: number }>();
-    for (const f of this.recipes()) {
-      for (const c of this.recipeCollections(f)) {
+    for (const f of this.all().filter((x) => x.kind === kind)) {
+      for (const c of this.collectionsOf(f)) {
         const e = counts.get(c.toLowerCase()) ?? { name: c, count: 0 };
         e.count++;
         counts.set(c.toLowerCase(), e);
@@ -560,36 +642,62 @@ export class Hold {
     return [...counts.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   }
 
-  /** Replace a recipe's collections. */
-  async setRecipeCollections(path: string, names: string[]): Promise<void> {
+  /** Replace a file's collections. */
+  async setCollections(path: string, names: string[]): Promise<void> {
     const cols = cleanCollections(names);
     let content = await this.fs.read(path);
     content = setFrontmatterField(content, "collections", cols.length ? yamlList(cols) : undefined);
     await this.save(path, content);
   }
 
-  /** Put a recipe in a collection, or take it out. */
-  async toggleRecipeCollection(path: string, name: string): Promise<void> {
+  /** Put a file in a collection, or take it out. */
+  async toggleCollection(path: string, name: string): Promise<void> {
     const f = this.get(path);
     if (!f) return;
-    const cols = this.recipeCollections(f);
+    const cols = this.collectionsOf(f);
     const has = cols.some((c) => c.toLowerCase() === name.trim().toLowerCase());
-    await this.setRecipeCollections(path, has ? cols.filter((c) => c.toLowerCase() !== name.trim().toLowerCase()) : [...cols, name]);
+    await this.setCollections(path, has ? cols.filter((c) => c.toLowerCase() !== name.trim().toLowerCase()) : [...cols, name]);
   }
 
-  /** Rename a collection on every recipe in it (or remove it everywhere when `to` is empty). Returns how many changed. */
-  async renameRecipeCollection(from: string, to: string): Promise<number> {
+  /** Rename a collection on every file of a kind in it (or remove it everywhere when `to` is empty). Returns how many changed. */
+  async renameCollection(kind: FileKind, from: string, to: string): Promise<number> {
     let n = 0;
-    for (const f of this.recipes()) {
-      const cols = this.recipeCollections(f);
+    for (const f of this.all().filter((x) => x.kind === kind)) {
+      const cols = this.collectionsOf(f);
       if (!cols.some((c) => c.toLowerCase() === from.toLowerCase())) continue;
-      await this.setRecipeCollections(
+      await this.setCollections(
         f.path,
         cols.flatMap((c) => (c.toLowerCase() === from.toLowerCase() ? (to.trim() ? [to] : []) : [c])),
       );
       n++;
     }
     return n;
+  }
+
+  // the recipe names the Recipes page uses
+  addRecipeNote(path: string, text: string, date?: ISODate) {
+    return this.addDatedNote(path, text, date);
+  }
+  recipeRating(f: ParsedFile) {
+    return this.rating(f);
+  }
+  rateRecipe(path: string, stars: number) {
+    return this.setRating(path, stars);
+  }
+  recipeCollections(f: ParsedFile) {
+    return this.collectionsOf(f);
+  }
+  recipeCollectionCounts() {
+    return this.collectionCounts("recipe");
+  }
+  setRecipeCollections(path: string, names: string[]) {
+    return this.setCollections(path, names);
+  }
+  toggleRecipeCollection(path: string, name: string) {
+    return this.toggleCollection(path, name);
+  }
+  renameRecipeCollection(from: string, to: string) {
+    return this.renameCollection("recipe", from, to);
   }
 
   /** The bullet lines under a recipe's "## Ingredients" heading. */
@@ -1011,10 +1119,10 @@ export class Hold {
 
   // ---------- queries ----------
 
-  /** Tasks (in one space, or both). List items and recipe lines are checklists, not tasks. */
+  /** Tasks (in one space, or both). List items and recipe and book lines are checklists, not tasks. */
   tasks(space?: Space): Task[] {
     return this.all()
-      .filter((f) => f.kind !== "template" && f.kind !== "list" && f.kind !== "recipe" && (!space || spaceOf(f.path) === space))
+      .filter((f) => f.kind !== "template" && f.kind !== "list" && f.kind !== "recipe" && f.kind !== "book" && (!space || spaceOf(f.path) === space))
       .flatMap((f) => f.tasks);
   }
 

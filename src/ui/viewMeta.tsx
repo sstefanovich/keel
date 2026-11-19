@@ -1,6 +1,7 @@
 import {
   Bell,
   Building2,
+  BookOpen,
   ChefHat,
   ShoppingCart,
   CalendarDays,
@@ -38,6 +39,7 @@ export const VIEW_ICONS: Record<Exclude<View["kind"], "file">, LucideIcon> = {
   settings: Settings,
   lists: ShoppingCart,
   recipes: ChefHat,
+  books: BookOpen,
 };
 
 export const VIEW_TITLES: Record<Exclude<View["kind"], "file">, string> = {
@@ -53,6 +55,7 @@ export const VIEW_TITLES: Record<Exclude<View["kind"], "file">, string> = {
   settings: "Settings",
   lists: "Lists",
   recipes: "Recipes",
+  books: "Books",
 };
 
 export const FILE_ICONS: Record<FileKind, LucideIcon> = {
@@ -66,6 +69,7 @@ export const FILE_ICONS: Record<FileKind, LucideIcon> = {
   template: FileText,
   list: ShoppingCart,
   recipe: ChefHat,
+  book: BookOpen,
 };
 
 /** Title and icon for a view (a tab, a switcher row, …). */

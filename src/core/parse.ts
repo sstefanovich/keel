@@ -2,7 +2,7 @@ import { parse as parseYaml } from "yaml";
 import { ISODate, isISODate } from "./dates";
 import { RemindRule, parseRemind } from "./schedule";
 
-export type FileKind = "log" | "meeting" | "note" | "client" | "project" | "flag" | "reminders" | "template" | "list" | "recipe";
+export type FileKind = "log" | "meeting" | "note" | "client" | "project" | "flag" | "reminders" | "template" | "list" | "recipe" | "book";
 
 /** Work (everything at the top of the hold) or personal (everything under personal/). */
 export type Space = "work" | "personal";
@@ -151,13 +151,14 @@ export const MENTION_RE = /(?<=^|\s)@(?!(?:due|remind|waiting|since|done)\b)([\w
 const LINK_RE = /\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/g;
 
 export function kindOf(path: string): FileKind {
-  // the personal space has its own logs, flags, lists, recipes and notes (no clients, projects or meetings)
+  // the personal space has its own logs, flags, lists, recipes, books and notes (no clients, projects or meetings)
   if (path.startsWith(PERSONAL)) {
     const p = path.slice(PERSONAL.length);
     if (p.startsWith("logs/")) return "log";
     if (p.startsWith("flags/")) return "flag";
     if (p.startsWith("lists/")) return "list";
     if (p.startsWith("recipes/")) return "recipe";
+    if (p.startsWith("books/")) return "book";
     if (p === "reminders.md") return "reminders";
     return "note";
   }
