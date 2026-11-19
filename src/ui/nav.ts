@@ -14,9 +14,10 @@ export type View =
   | { kind: "search"; q?: string }
   | { kind: "settings"; section?: string }
   | { kind: "lists" }
-  | { kind: "recipes"; q?: string };
+  | { kind: "recipes"; q?: string }
+  | { kind: "books"; q?: string };
 
-const VIEW_KINDS = new Set(["file", "agenda", "scratch", "flags", "waiting", "dispatch", "charts", "timesheet", "calendar", "search", "settings", "lists", "recipes"]);
+const VIEW_KINDS = new Set(["file", "agenda", "scratch", "flags", "waiting", "dispatch", "charts", "timesheet", "calendar", "search", "settings", "lists", "recipes", "books"]);
 
 export function isView(v: unknown): v is View {
   if (typeof v !== "object" || v === null) return false;

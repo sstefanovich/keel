@@ -20,7 +20,7 @@ whenever you like; Keel picks up the changes.
   did underneath. The Timesheet turns that into a week grid you can copy into your time system.
 - **Client status reports.** Dispatch builds a weekly update from your logs, meetings and tasks.
 - **Quick capture.** Ctrl+Alt+K anywhere in Windows: log hours, add a task, set a reminder, hoist a flag.
-- **Work and personal modes.** A separate personal space with its own logs, reminders and scratchpad, plus shopping lists and recipes.
+- **Work and personal modes.** A separate personal space with its own logs, reminders and scratchpad, plus shopping lists, recipes and books.
 - **Claude built in.** A chat sidebar that works in your Hold, and a Timesheet button that has Claude
   fill your timecard or draft a status report.
 - **Light and dark themes**, tabs, a command list (Ctrl+Shift+P), full-text search, and file history
@@ -117,13 +117,18 @@ Anything you're waiting on someone for, grouped by person, with how long it's be
 ### Personal mode
 
 Switch to **Personal** at the top of the sidebar for a separate space with its own logs, tasks and Flags,
-plus **Lists** (shopping and anything else) and **Recipes**. Paste a recipe link to import it, and send
+plus **Lists** (shopping and anything else), **Recipes** and **Books**. Paste a recipe link to import it, and send
 its ingredients to your shopping list in one click. Keel keeps the photo, lays the recipe out for cooking
 with ingredients to tick off beside the method, and lets you rate recipes and gather them into collections
 (say "Desserts" or "Thanksgiving 2026", where one recipe can be in several) to plan a meal and remember what you made.
 Halve or double a recipe (the amounts and the shopping list follow), add dated notes, and ask Claude what to
 use instead of an ingredient you're missing. Search recipes by what you have ("chicken, lemon"), with filters
 for rating and cooking time; recipes and lists are also in the main Search.
+
+**Books** keeps what you're reading, what's next and what you've read. Type a title, author or ISBN and
+pick the match: Keel fills in the author, year, pages and cover from [Open Library](https://openlibrary.org).
+Rate books, note when you finished them and whether you bought or borrowed them from the library, add dated
+notes, and put them on shelves ("Book club", "Sci-fi"); a book can sit on several.
 
 | Lists | Recipes |
 |---|---|
@@ -193,7 +198,7 @@ projects/Portal Rebuild.md     a project: frontmatter client: contoso, status; b
 flags/….md                     Flags (sticky notes): frontmatter color, created, lowered
 reminders.md                   recurring reminders
 templates/{log,meeting,note,client}.md   how new files start; edit them freely
-personal/…                     the personal space: logs, flags, lists/, recipes/, reminders.md, scratchpad.txt
+personal/…                     the personal space: logs, flags, lists/, recipes/, books/, reminders.md, scratchpad.txt
 scratchpad.txt                 the (work) Scratchpad
 ```
 

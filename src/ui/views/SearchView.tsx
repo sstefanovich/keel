@@ -18,6 +18,7 @@ const TYPES: Record<string, { label: string; kinds?: FileKind[]; space?: Space }
   charts: { label: "Clients & projects", kinds: ["client", "project"], space: "work" },
   flags: { label: "Flags", kinds: ["flag"] },
   recipes: { label: "Recipes", kinds: ["recipe"], space: "personal" },
+  books: { label: "Books", kinds: ["book"], space: "personal" },
   lists: { label: "Lists", kinds: ["list"], space: "personal" },
 };
 

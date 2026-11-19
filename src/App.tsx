@@ -6,6 +6,7 @@ import { useDayTarget } from "./ui/dayTarget";
 import { getSpace, useSpace } from "./ui/space";
 import { ListsView } from "./ui/views/ListsView";
 import { RecipesView } from "./ui/views/RecipesView";
+import { BooksView } from "./ui/views/BooksView";
 import { formatShort, today } from "./core/dates";
 import { Hold } from "./core/hold";
 import { basename } from "./core/parse";
@@ -536,6 +537,7 @@ function Shell() {
             {view.kind === "settings" && <SettingsView section={view.section} />}
             {view.kind === "lists" && <ListsView />}
             {view.kind === "recipes" && <RecipesView initial={view.q} />}
+            {view.kind === "books" && <BooksView initial={view.q} />}
           </div>
           {claude && termMounted && <ClaudePanel open={termOpen} onClose={() => setTermOpen(false)} />}
         </main>

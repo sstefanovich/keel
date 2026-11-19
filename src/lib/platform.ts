@@ -260,6 +260,24 @@ export interface RecipeInfo {
   image?: string;
 }
 
+export interface BookHit {
+  title: string;
+  authors: string[];
+  year?: number;
+  pages?: number;
+  isbn?: string;
+  /** Large cover image URL */
+  cover?: string;
+  /** Open Library work id, "/works/OL45804W" */
+  key?: string;
+}
+
+/** Look a book up on Open Library by title, author or ISBN (best match first). */
+export async function bookSearch(query: string): Promise<BookHit[]> {
+  if (!isTauri) throw new Error("Book lookup works in the desktop app");
+  return invoke<BookHit[]>("book_search", { query });
+}
+
 /** A recipe read from its page (the structured data recipe sites publish); title only when there's none. */
 export async function recipeFromUrl(url: string): Promise<RecipeInfo> {
   if (!isTauri) throw new Error("Recipes can only be imported in the desktop app");

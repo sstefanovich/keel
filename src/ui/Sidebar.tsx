@@ -1,5 +1,6 @@
 import {
   Bell,
+  BookOpen,
   Briefcase,
   ChefHat,
   Home,
@@ -135,6 +136,7 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
   const waitingCount = hold.waitingOn(focus, space).length;
   const agenda = hold.agenda(t, 14, focus, space);
   const listCount = personal ? hold.lists().reduce((n, l) => n + l.tasks.filter((x) => x.status === "open").length, 0) : 0;
+  const readingCount = personal ? hold.books().filter((b) => hold.bookStatus(b) === "reading").length : 0;
 
   const switchTo = (s: Space) => {
     if (s === space) return;
@@ -284,6 +286,7 @@ export function Sidebar({ onResize }: { onResize: (width: number) => void }) {
           <>
             {item(ShoppingCart, "Lists", v.kind === "lists", (o) => nav.go({ kind: "lists" }, o), { badge: listCount })}
             {item(ChefHat, "Recipes", v.kind === "recipes", (o) => nav.go({ kind: "recipes" }, o))}
+            {item(BookOpen, "Books", v.kind === "books", (o) => nav.go({ kind: "books" }, o), { badge: readingCount, hint: readingCount ? `Reading ${readingCount}` : undefined })}
           </>
         ) : (
           <>

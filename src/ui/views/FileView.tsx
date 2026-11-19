@@ -20,6 +20,7 @@ import { EmptyState } from "../EmptyState";
 import { useNav } from "../nav";
 import { ChartView } from "./ChartView";
 import { RecipeView } from "./RecipeView";
+import { BookView } from "./BookView";
 
 export function FileView({ path, line }: { path: string; line?: number }) {
   const { hold, bump, reportError, toast } = useHold();
@@ -47,9 +48,10 @@ export function FileView({ path, line }: { path: string; line?: number }) {
     return () => window.removeEventListener(OPEN_HISTORY_EVENT, open);
   }, []);
   const isRecipe = file?.kind === "recipe";
-  // charts and recipes open on their laid-out view unless we're jumping to a specific line
-  const viewMode = hasChart ? "chart" : isRecipe ? "recipe" : null;
-  const [mode, setMode] = useState<"chart" | "recipe" | "edit">(viewMode && line == null ? viewMode : "edit");
+  const isBook = file?.kind === "book";
+  // charts, recipes and books open on their laid-out view unless we're jumping to a specific line
+  const viewMode = hasChart ? "chart" : isRecipe ? "recipe" : isBook ? "book" : null;
+  const [mode, setMode] = useState<"chart" | "recipe" | "book" | "edit">(viewMode && line == null ? viewMode : "edit");
   useEffect(() => setMode(viewMode && line == null ? viewMode : "edit"), [path, viewMode, line]);
   const rate = async (s: number) => {
     try {
@@ -134,7 +136,7 @@ export function FileView({ path, line }: { path: string; line?: number }) {
         {viewMode && (
           <div className="seg" role="tablist">
             <button role="tab" aria-selected={mode === viewMode} className={mode === viewMode ? "on" : ""} onClick={() => setMode(viewMode)}>
-              {viewMode === "chart" ? "Chart" : "Recipe"}
+              {viewMode === "chart" ? "Chart" : viewMode === "book" ? "Book" : "Recipe"}
             </button>
             <button role="tab" aria-selected={mode === "edit"} className={mode === "edit" ? "on" : ""} onClick={() => setMode("edit")}>
               Edit
@@ -223,6 +225,8 @@ export function FileView({ path, line }: { path: string; line?: number }) {
               <ChartView path={path} />
             ) : mode === "recipe" && isRecipe ? (
               <RecipeView path={path} onRate={rate} factor={factor} onFactor={setFactor} />
+            ) : mode === "book" && isBook ? (
+              <BookView path={path} />
             ) : (
               <Editor key={path} path={path} line={line} onOpenLink={(t, newTab) => nav.openLink(t, { newTab })} onStatus={setSaveStatus} />
             )}

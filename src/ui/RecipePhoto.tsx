@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { imageUrl } from "../lib/platform";
 import { useHold } from "./HoldContext";
 
-/** A recipe's picture: a web link as is, a hold path loaded from disk. Nothing when it can't load. */
-export function RecipePhoto({ src, className = "recipe-photo" }: { src?: string; className?: string }) {
+/** A recipe's picture or a book's cover: a web link as is, a hold path loaded from disk. `fallback` (or nothing) when it can't load. */
+export function RecipePhoto({ src, className = "recipe-photo", fallback = null }: { src?: string; className?: string; fallback?: ReactNode }) {
   const { dir } = useHold();
   const [url, setUrl] = useState<string>();
   useEffect(() => {
@@ -19,6 +19,6 @@ export function RecipePhoto({ src, className = "recipe-photo" }: { src?: string;
       live = false;
     };
   }, [src, dir]);
-  if (!url) return null;
+  if (!url) return <>{fallback}</>;
   return <img className={className} src={url} alt="" loading="lazy" onError={() => setUrl(undefined)} />;
 }

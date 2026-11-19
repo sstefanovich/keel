@@ -378,6 +378,61 @@ describe("work and personal spaces", () => {
   });
 });
 
+describe("books", () => {
+  it("a book note keeps what the catalogue knows and where it stands", async () => {
+    const hold = await makeHold();
+    const path = await hold.createBook({
+      title: "Project Hail Mary",
+      author: "Andy Weir",
+      year: 2021,
+      pages: 496,
+      isbn: "9780593135204",
+      cover: "attachments/books/project-hail-mary.jpg",
+      link: "https://openlibrary.org/works/OL1W",
+      collections: ["Sci-fi", "Book club"],
+      date: "2026-11-01",
+    });
+    const f = hold.get(path)!;
+    expect(path).toBe("personal/books/Project Hail Mary.md");
+    expect(f.kind).toBe("book");
+    expect(hold.bookStatus(f)).toBe("to-read");
+    expect(f.frontmatter.isbn).toBe("9780593135204");
+    expect(f.frontmatter.started).toBeUndefined();
+    expect(f.content).toContain("# Project Hail Mary\n\n![](attachments/books/project-hail-mary.jpg)\n\n## Notes\n");
+    expect(hold.collectionsOf(f)).toEqual(["Sci-fi", "Book club"]);
+    expect(hold.findBook("project hail mary!", "Andy Weir")?.path).toBe(path);
+    expect(hold.findBook("Project Hail Mary", "Someone Else")).toBeUndefined();
+  });
+
+  it("moving a book along stamps the dates, and back to To read clears them", async () => {
+    const hold = await makeHold();
+    const path = await hold.createBook({ title: "Piranesi", date: "2026-10-01" });
+    await hold.setBookStatus(path, "reading", "2026-10-05");
+    expect(hold.get(path)!.frontmatter).toMatchObject({ status: "reading", started: "2026-10-05" });
+    await hold.setBookStatus(path, "read", "2026-10-20");
+    expect(hold.get(path)!.frontmatter).toMatchObject({ status: "read", started: "2026-10-05", finished: "2026-10-20" });
+    await hold.setBookStatus(path, "read", "2026-11-01"); // already finished: date kept
+    expect(hold.get(path)!.frontmatter.finished).toBe("2026-10-20");
+    await hold.setRating(path, 5);
+    await hold.addDatedNote(path, "- [ ] lend to Sam", "2026-10-21");
+    expect(hold.rating(hold.get(path)!)).toBe(5);
+    expect(hold.tasks().length).toBe(0); // book notes aren't tasks
+    await hold.setBookStatus(path, "to-read");
+    expect(hold.get(path)!.frontmatter.started).toBeUndefined();
+    expect(hold.get(path)!.frontmatter.finished).toBeUndefined();
+  });
+
+  it("a book added as read is finished that day; shelves are counted per kind", async () => {
+    const hold = await makeHold();
+    const p = await hold.createBook({ title: "Dune", status: "read", collections: ["Sci-fi"], date: "2026-06-30" });
+    await hold.createRecipe({ title: "Pie", collections: ["Sci-fi"] });
+    expect(hold.get(p)!.frontmatter).toMatchObject({ status: "read", started: "2026-06-30", finished: "2026-06-30" });
+    expect(hold.collectionCounts("book")).toEqual([{ name: "Sci-fi", count: 1 }]);
+    expect(await hold.renameCollection("book", "Sci-fi", "SF")).toBe(1);
+    expect(hold.recipeCollectionCounts()).toEqual([{ name: "Sci-fi", count: 1 }]);
+  });
+});
+
 describe("notes and scratchpads per space", () => {
   it("each space has its own scratchpad file", () => {
     expect(scratchPath("work")).toBe("scratchpad.txt");

@@ -1,4 +1,5 @@
 mod attach;
+mod books;
 mod calendar;
 mod chat;
 mod history;
@@ -234,6 +235,7 @@ pub fn run() {
             attach::hold_write_image,
             attach::hold_image_url,
             attach::hold_fetch_image,
+            books::book_search,
             attach::link_title,
             attach::recipe_from_url,
         ])
