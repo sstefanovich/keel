@@ -187,6 +187,18 @@ export class Hold {
 
   // ---------- paths & creation ----------
 
+  /** Each space keeps its recurring reminders in its own file. */
+  remindersPath(space: Space = "work"): string {
+    return space === "personal" ? `${PERSONAL}reminders.md` : "reminders.md";
+  }
+
+  /** The space's reminders file, created from the default the first time it's opened. */
+  async ensureReminders(space: Space = "work"): Promise<string> {
+    const path = this.remindersPath(space);
+    if (!(await this.fs.exists(path))) await this.save(path, DEFAULT_REMINDERS.replace("- Plan tomorrow @remind(weekdays 17:00)\n", ""));
+    return path;
+  }
+
   logPath(date: ISODate, space: Space = "work"): string {
     return `${space === "personal" ? PERSONAL : ""}logs/${date.slice(0, 4)}/${date}.md`;
   }

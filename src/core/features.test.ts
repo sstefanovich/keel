@@ -377,6 +377,20 @@ describe("work and personal spaces", () => {
   });
 });
 
+describe("reminders per space", () => {
+  it("personal reminders get their own file, made on first use", async () => {
+    const hold = await makeHold();
+    expect(await hold.ensureReminders("work")).toBe("reminders.md");
+    const path = await hold.ensureReminders("personal");
+    expect(path).toBe("personal/reminders.md");
+    expect(hold.get(path)!.kind).toBe("reminders");
+    expect(hold.get(path)!.reminders).toEqual([]);
+    await hold.save(path, hold.get(path)!.content + "- Bins out @remind(tue 19:00)\n");
+    await hold.ensureReminders("personal"); // leaves it alone
+    expect(hold.get(path)!.reminders.length).toBe(1);
+  });
+});
+
 describe("capture: spaces and lists", () => {
   const now = new Date(2026, 9, 23, 10, 0);
   it("p: / w: pick the space; + adds to a list", async () => {

@@ -192,7 +192,7 @@ projects/Portal Rebuild.md     a project: frontmatter client: contoso, status; b
 flags/….md                     Flags (sticky notes): frontmatter color, created, lowered
 reminders.md                   recurring reminders
 templates/{log,meeting,note,client}.md   how new files start; edit them freely
-personal/…                     the personal space: logs, flags, lists/, recipes/
+personal/…                     the personal space: logs, flags, lists/, recipes/, reminders.md
 scratchpad.txt                 the Scratchpad
 ```
 

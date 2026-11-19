@@ -1,8 +1,9 @@
 import { CornerDownLeft, LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatLong, formatShort, today } from "../core/dates";
-import { ParsedFile } from "../core/parse";
+import { ParsedFile, spaceOf } from "../core/parse";
 import { useHold } from "./HoldContext";
+import { useSpace } from "./space";
 import { View, useNav } from "./nav";
 import { FILE_ICONS, VIEW_ICONS, VIEW_TITLES } from "./viewMeta";
 
@@ -28,7 +29,12 @@ interface Item {
   Icon: LucideIcon;
   /** Higher sorts first when nothing is typed */
   recency: number;
+  /** A file from the other space (work while in personal mode, or the reverse): labelled and ranked lower */
+  other?: boolean;
 }
+
+/** How much a match in the space you're in outranks the same match in the other one. */
+const SPACE_BONUS = 12;
 
 /** Fuzzy-ish score: all query words must appear; earlier and word-start matches rank higher. */
 function score(item: Item, words: string[]): number {
@@ -49,6 +55,7 @@ function score(item: Item, words: string[]): number {
 export function QuickSwitcher({ onClose, commands, initial = "" }: { onClose: () => void; commands: Command[]; initial?: string }) {
   const { hold } = useHold();
   const nav = useNav();
+  const space = useSpace();
   const [q, setQ] = useState(initial);
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -73,9 +80,22 @@ export function QuickSwitcher({ onClose, commands, initial = "" }: { onClose: ()
     const files = hold
       .all()
       .filter((f) => f.kind !== "template" && !(f.kind === "flag" && f.frontmatter.lowered))
-      .map((f) => ({ key: f.path, ...label(f), view: { kind: "file", path: f.path } as View, Icon: FILE_ICONS[f.kind], recency: f.mtime }));
+      .map((f) => {
+        const other = spaceOf(f.path) !== space;
+        const l = label(f);
+        // a work log and a personal log of the same day share a title: say which is which
+        return {
+          key: f.path,
+          title: l.title,
+          sub: other ? [spaceOf(f.path) === "personal" ? "Personal" : "Work", l.sub].filter(Boolean).join(" · ") : l.sub,
+          view: { kind: "file", path: f.path } as View,
+          Icon: FILE_ICONS[f.kind],
+          recency: f.mtime,
+          other,
+        };
+      });
     return [...views, ...files];
-  }, [hold]);
+  }, [hold, space]);
 
   const commandMode = q.startsWith(">");
   const commandItems = useMemo<Item[]>(
@@ -88,12 +108,14 @@ export function QuickSwitcher({ onClose, commands, initial = "" }: { onClose: ()
     ? pool
         .map((i) => ({ i, s: score(i, words) }))
         .filter((r) => r.s >= 0)
+        .map((r) => ({ ...r, s: r.s + (r.i.other ? 0 : SPACE_BONUS) }))
         .sort((a, b) => b.s - a.s || b.i.recency - a.i.recency)
         .slice(0, 50)
         .map((r) => r.i)
     : commandMode
       ? commandItems
-      : [...items].sort((a, b) => b.recency - a.recency).slice(0, 12);
+      : // nothing typed: recent files of this space only
+        items.filter((i) => !i.other).sort((a, b) => b.recency - a.recency).slice(0, 12);
   const current = Math.min(sel, Math.max(0, results.length - 1));
 
   useEffect(() => {
