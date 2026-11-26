@@ -104,6 +104,52 @@ export function plainText(s: string): string {
     .trim();
 }
 
+/**
+ * A recipe written out as a plain-text email: title, intro, time and servings, ingredients, method
+ * and a link to where it came from. Your own Notes stay out of it.
+ */
+export function recipeEmail(f: ParsedFile): { subject: string; body: string } {
+  const layout = recipeLayout(f.body);
+  const out: string[] = [f.title, ""];
+  const intro = layout.intro
+    .split(/\r?\n/)
+    .map((l) => plainText(l.replace(/^\s*#{1,6}\s+/, "")))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (intro) out.push(intro, "");
+  const facts = [
+    f.frontmatter.time ? `Time: ${String(f.frontmatter.time)}` : "",
+    f.frontmatter.servings ? `Serves: ${String(f.frontmatter.servings)}` : "",
+  ].filter(Boolean);
+  if (facts.length) out.push(facts.join("   "), "");
+  const section = (heading: string, groups: RecipeGroup[], numbered: boolean) => {
+    if (!groups.some((g) => g.items.length)) return;
+    out.push(heading.toUpperCase());
+    let n = 0;
+    for (const g of groups) {
+      if (g.label) out.push("", g.label);
+      for (const item of g.items) out.push(numbered ? `${++n}. ${item}` : `- ${item}`);
+    }
+    out.push("");
+  };
+  section("Ingredients", layout.ingredients, false);
+  section("Method", layout.steps, true);
+  const source = typeof f.frontmatter.source === "string" ? f.frontmatter.source : undefined;
+  if (source) out.push(`Original recipe: ${source}`);
+  return { subject: `Recipe: ${f.title}`, body: out.join("\n").trim() + "\n" };
+}
+
+/** Past this length some mail apps cut a mailto: link short, so the recipe goes on the clipboard instead. */
+export const MAILTO_MAX = 2000;
+
+/** A mailto: link that drafts the email; `undefined` body leaves it empty. */
+export function mailtoUrl(subject: string, body?: string): string {
+  const q = [`subject=${encodeURIComponent(subject)}`];
+  if (body != null) q.push(`body=${encodeURIComponent(body.replace(/\r?\n/g, "\r\n"))}`);
+  return `mailto:?${q.join("&")}`;
+}
+
 /** The items of a list section: bullets or numbers (wrapped lines joined), else one per paragraph. */
 function listGroups(lines: string[]): RecipeGroup[] {
   const groups: RecipeGroup[] = [{ items: [] }];

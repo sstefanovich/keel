@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { addDays, formatLong, today } from "../../core/dates";
-import { isTauri, openUrl } from "../../lib/platform";
+import { copyText, isTauri, openUrl } from "../../lib/platform";
 import { useContextMenu } from "../ContextMenu";
 import { fileMenu } from "../SidebarSections";
 import { spaceOf } from "../../core/parse";
-import { factorLabel, shopForRecipe } from "../recipes";
+import { MAILTO_MAX, factorLabel, mailtoUrl, recipeEmail, shopForRecipe } from "../recipes";
 import { Stars } from "../Stars";
 import { HistoryPanel } from "../HistoryPanel";
 import { OPEN_HISTORY_EVENT } from "../commands";
@@ -15,7 +15,7 @@ import { Outline } from "../Outline";
 import { Glance } from "../Glance";
 import { useHold } from "../HoldContext";
 import { Editor, SaveStatus, flushEditors } from "../editor/Editor";
-import { Check, ExternalLink, FileX, History, MoreHorizontal, ShoppingCart } from "lucide-react";
+import { Check, ExternalLink, FileX, History, MoreHorizontal, Share2, ShoppingCart } from "lucide-react";
 import { EmptyState } from "../EmptyState";
 import { useNav } from "../nav";
 import { ChartView } from "./ChartView";
@@ -58,6 +58,27 @@ export function FileView({ path, line }: { path: string; line?: number }) {
       await flushEditors();
       await hold.rateRecipe(path, s);
       bump();
+    } catch (e) {
+      reportError(e);
+    }
+  };
+  // Share: draft an email in the default mail app. A long recipe would overflow a mailto: link, so
+  // then it goes on the clipboard to paste in (and it's always there in case the mail app drops it).
+  const shareRecipe = async () => {
+    try {
+      await flushEditors();
+      const f = hold.get(path);
+      if (!f) return;
+      const { subject, body } = recipeEmail(f);
+      await copyText(body);
+      const full = mailtoUrl(subject, body);
+      if (full.length <= MAILTO_MAX) {
+        await openUrl(full);
+        toast("Email drafted (the recipe's on your clipboard too)");
+      } else {
+        await openUrl(mailtoUrl(subject));
+        toast("Email drafted: the recipe's on your clipboard, paste it in");
+      }
     } catch (e) {
       reportError(e);
     }
@@ -177,6 +198,10 @@ export function FileView({ path, line }: { path: string; line?: number }) {
                 Source
               </button>
             )}
+            <button className="ghost icon-text" onClick={() => void shareRecipe()} title="Draft an email with this recipe written out">
+              <Share2 size={14} aria-hidden="true" />
+              Share
+            </button>
           </>
         )}
         {(mode === "edit" || !viewMode) && <Outline content={file.content} onJump={(l) => nav.openFile(path, l)} />}

@@ -1,9 +1,22 @@
-import { ReactNode, useEffect, useState } from "react";
+import { MouseEvent, ReactNode, useEffect, useState } from "react";
 import { imageUrl } from "../lib/platform";
 import { useHold } from "./HoldContext";
 
 /** A recipe's picture or a book's cover: a web link as is, a hold path loaded from disk. `fallback` (or nothing) when it can't load. */
-export function RecipePhoto({ src, className = "recipe-photo", fallback = null }: { src?: string; className?: string; fallback?: ReactNode }) {
+export function RecipePhoto({
+  src,
+  className = "recipe-photo",
+  fallback = null,
+  onOpen,
+  title,
+}: {
+  src?: string;
+  className?: string;
+  fallback?: ReactNode;
+  /** Clicking the picture opens what it's of (a middle-click, or Ctrl+click, asks for a new tab). Mouse only: the title beside it is the keyboard way in. */
+  onOpen?: (e: MouseEvent) => void;
+  title?: string;
+}) {
   const { dir } = useHold();
   const [url, setUrl] = useState<string>();
   useEffect(() => {
@@ -20,5 +33,16 @@ export function RecipePhoto({ src, className = "recipe-photo", fallback = null }
     };
   }, [src, dir]);
   if (!url) return <>{fallback}</>;
-  return <img className={className} src={url} alt="" loading="lazy" onError={() => setUrl(undefined)} />;
+  return (
+    <img
+      className={onOpen ? `${className} opens` : className}
+      src={url}
+      alt=""
+      title={title}
+      loading="lazy"
+      onError={() => setUrl(undefined)}
+      onClick={onOpen}
+      onAuxClick={onOpen && ((e) => e.button === 1 && onOpen(e))}
+    />
+  );
 }
