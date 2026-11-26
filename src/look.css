@@ -875,6 +875,13 @@ button.link:hover:not(:disabled) {
   object-fit: cover;
   background: var(--border);
 }
+.recipe-photo.opens {
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.recipe-photo.opens:hover {
+  opacity: 0.9;
+}
 .recipe-collections {
   display: flex;
   flex-wrap: wrap;

@@ -354,7 +354,7 @@ export function RecipesView({ initial }: { initial?: string }) {
                   </h3>
                 )}
                 <article className={`recipe-card${partial ? " partial" : ""}`}>
-                  <RecipePhoto src={recipeImage(f)} />
+                  <RecipePhoto src={recipeImage(f)} title={`Open ${f.title}`} onOpen={(e) => nav.openFile(f.path, undefined, openOpts(e))} />
                   <button className="recipe-title" onClick={(e) => nav.openFile(f.path, undefined, openOpts(e))}>
                     {f.title}
                   </button>
